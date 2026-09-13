@@ -1,0 +1,1804 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tambiz Calculator</title>
+<script src="https://unpkg.com/xlsx@latest/dist/xlsx.full.min.js"></script>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: Arial, sans-serif;
+  font-size: 13px;
+  background: #f2faf4;
+  color: #1a1a18;
+  min-height: 100vh;
+}
+
+/* ── HEADER ─────────────────────────────────────────── */
+header {
+  background: linear-gradient(135deg, #0d4f2b 0%, #1a6b3c 60%, #1e8449 100%);
+  padding: 26px 32px;
+  text-align: center;
+  border-bottom: 5px solid #f0b429;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.18);
+}
+header h1 {
+  font-size: 30px;
+  font-weight: 800;
+  color: #f0b429;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.3);
+}
+header p {
+  color: #a9dfb5;
+  font-size: 12px;
+  margin-top: 5px;
+  letter-spacing: 0.05em;
+}
+
+/* ── LAYOUT ─────────────────────────────────────────── */
+.main {
+  padding: 24px;
+  max-width: 1460px;
+  margin: 0 auto;
+}
+
+.section-title {
+  font-size: 12px;
+  font-weight: 800;
+  color: #0d4f2b;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin: 30px 0 12px;
+  padding-bottom: 7px;
+  border-bottom: 2px solid #f0b429;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.section-title::before {
+  content: '';
+  display: inline-block;
+  width: 4px;
+  height: 14px;
+  background: #f0b429;
+  border-radius: 2px;
+}
+
+/* ── TABLE WRAPPER ──────────────────────────────────── */
+.table-wrapper {
+  overflow-x: auto;
+  border-radius: 10px;
+  border: 1px solid #b7dfc0;
+  background: #fff;
+  box-shadow: 0 1px 6px rgba(0,0,0,0.07);
+  margin-bottom: 14px;
+}
+
+.encode-scroll {
+  max-height: 58vh;
+  overflow: auto;
+}
+
+.results-scroll {
+  max-height: 42vh;
+  overflow: auto;
+}
+
+/* ── INPUT TABLE ────────────────────────────────────── */
+table { border-collapse: collapse; min-width: 100%; }
+
+.input-table thead tr.cat-row th {
+  padding: 9px 6px;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+  white-space: nowrap;
+  border: 1px solid rgba(255,255,255,0.25);
+}
+.input-table thead tr.comp-row th {
+  padding: 6px 3px;
+  font-size: 10px;
+  font-weight: 600;
+  text-align: center;
+  background: #f0faf3;
+  color: #777;
+  border: 1px solid #ddf0e3;
+  min-width: 44px;
+}
+
+th.th-group {
+  background: #0d4f2b;
+  color: #f0b429;
+  min-width: 140px;
+  font-size: 12px;
+  padding: 9px 14px;
+  text-align: left;
+}
+th.th-c1 { background: #1a6b3c; color: #fff; }
+th.th-c2 { background: #9a7d0a; color: #fff; }
+th.th-c3 { background: #0d4f2b; color: #f0b429; }
+th.th-c4 { background: #b7470a; color: #fff; }
+
+.input-table tbody tr { border-bottom: 1px solid #e5f5ea; }
+.input-table tbody tr:hover { background: #f0faf3; }
+.input-table tbody td {
+  padding: 4px 3px;
+  border: 1px solid #e8f5eb;
+  vertical-align: middle;
+}
+.input-table tbody td.td-name {
+  padding: 4px 10px;
+  background: #f5fdf7;
+  border-right: 2px solid #b7dfc0;
+  position: sticky;
+  left: 0;
+  z-index: 1;
+}
+/* category column separators */
+#inputTable tbody td:nth-child(6)  { border-right: 2px solid #b7dfc0; }
+#inputTable tbody td:nth-child(10) { border-right: 2px solid #b7dfc0; }
+#inputTable tbody td:nth-child(19) { border-right: 2px solid #b7dfc0; }
+
+#boothTable tbody td:nth-child(9)  { border-right: 2px solid #b7dfc0; }
+#boothTable tbody td:nth-child(13) { border-right: 2px solid #b7dfc0; }
+
+input.name-input {
+  width: 130px;
+  border: none;
+  background: transparent;
+  color: #0d4f2b;
+  font-size: 13px;
+  font-weight: 600;
+  outline: none;
+  cursor: pointer;
+}
+input.name-input:focus { border-bottom: 2px solid #f0b429; cursor: text; }
+
+input.score-input {
+  width: 42px;
+  text-align: center;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  padding: 4px 2px;
+  font-size: 12px;
+  font-weight: 600;
+  background: transparent;
+  color: #1a1a18;
+  outline: none;
+  display: block;
+  margin: 0 auto;
+}
+input.score-input:hover  { background: #e5f5ea; }
+input.score-input:focus  { background: #fff9c4; border-color: #f0b429; }
+input.score-input.invalid { background: #ffebee; color: #c62828; border-color: #e57373; }
+
+.btn-remove-row {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1px solid #ddd;
+  background: none;
+  color: #ccc;
+  cursor: pointer;
+  font-size: 15px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto;
+  padding: 0;
+}
+.btn-remove-row:hover { color: #e74c3c; border-color: #e74c3c; background: #ffebee; }
+td.td-action { min-width: 32px; text-align: center; }
+
+/* ── ACTIONS ────────────────────────────────────────── */
+.actions {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.btn {
+  padding: 8px 20px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  border: none;
+  transition: background 0.15s, transform 0.1s;
+  letter-spacing: 0.03em;
+}
+.btn:active { transform: scale(0.97); }
+.btn-add   { background: #1a6b3c; color: #fff; }
+.btn-add:hover   { background: #0d4f2b; }
+.btn-clear { background: #fff; color: #888; border: 1px solid #ccc; }
+.btn-clear:hover { color: #e74c3c; border-color: #e74c3c; }
+
+/* ── RESULTS TABLE ──────────────────────────────────── */
+.results-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #fff;
+  font-size: 13px;
+}
+.results-table th {
+  padding: 12px 14px;
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.results-table th.rth-group   { background: #0d4f2b; color: #f0b429; text-align: left; padding-left: 20px; min-width: 140px; }
+.results-table th.rth-c1      { background: #1a6b3c; color: #fff; }
+.results-table th.rth-c2      { background: #9a7d0a; color: #fff; }
+.results-table th.rth-c3      { background: #0d4f2b; color: #f0b429; }
+.results-table th.rth-c4      { background: #b7470a; color: #fff; }
+.results-table th.rth-overall { background: #1a1a18; color: #f0b429; }
+
+.results-table td {
+  padding: 11px 14px;
+  border-bottom: 1px solid #e8f5eb;
+  text-align: center;
+  vertical-align: middle;
+}
+.results-table td.td-group-name {
+  text-align: left;
+  font-weight: 700;
+  color: #0d4f2b;
+  padding-left: 20px;
+  font-size: 14px;
+}
+.results-table tbody tr:hover td { background: #f0faf3; }
+
+.rank-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.pct-val {
+  font-size: 18px;
+  font-weight: 800;
+  color: #1a1a18;
+}
+.pct-val.overall-pct { color: #0d4f2b; }
+
+.rank-badge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 9px;
+  border-radius: 9px;
+  letter-spacing: 0.02em;
+}
+.rb-1 { background: #f0b429; color: #3d2800; }
+.rb-2 { background: #b0b8bf; color: #1a1a18; }
+.rb-3 { background: #cd7f32; color: #fff; }
+.rb-4 { background: #e5f5ea; color: #1a6b3c; border: 1px solid #b7dfc0; }
+.rb-x { background: #f4faf0; color: #888; border: 1px solid #ddd; }
+
+.empty-cell { color: #ccc; font-style: italic; font-size: 12px; }
+
+/* ── PANELIST ROWS ─────────────────────────────────── */
+tr.panelist-header-row {
+  background: #f9fbfa;
+  border-top: 1px solid #e8e5de;
+}
+tr.panelist-header-row td.td-name {
+  padding: 8px 10px;
+  font-weight: 700;
+  color: #0d4f2b;
+  font-size: 12px;
+}
+tr.panelist-row td.td-name {
+  background: #fafcfb;
+  padding: 4px 14px;
+  color: #888;
+  font-size: 11px;
+  font-weight: 500;
+  font-style: italic;
+}
+td.td-panelist-actions {
+  min-width: 70px;
+  text-align: center;
+  padding: 4px;
+}
+.btn-panel { font-size: 11px; padding: 4px 10px; border-radius: 4px; border: 1px solid #ddd; background: #fff; cursor: pointer; font-weight: 600; margin: 0 2px; }
+.btn-panel:hover { background: #f0faf3; color: #0d4f2b; border-color: #b7dfc0; }
+.btn-panel.remove { color: #e74c3c; }
+.btn-panel.remove:hover { background: #ffebee; border-color: #f4bcb5; }
+
+/* ── LEADERBOARD ────────────────────────────────────── */
+.lb-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 36px;
+}
+.lb-card {
+  background: #fff;
+  border-radius: 12px;
+  border: 1px solid #b7dfc0;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+}
+.lb-card-header {
+  padding: 13px 18px;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.lbh-c1      { background: #1a6b3c; color: #fff; }
+.lbh-c2      { background: #9a7d0a; color: #fff; }
+.lbh-c3      { background: #0d4f2b; color: #f0b429; }
+.lbh-c4      { background: #b7470a; color: #fff; }
+.lbh-overall { background: #1a1a18; color: #f0b429; }
+
+.lb-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 18px;
+  border-bottom: 1px solid #eef7f0;
+}
+.lb-item:last-child { border-bottom: none; }
+
+.lb-pos {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+.lp1 { background: #f0b429; color: #3d2800; }
+.lp2 { background: #b0b8bf; color: #1a1a18; }
+.lp3 { background: #cd7f32; color: #fff; }
+.lp4 { background: #e5f5ea; color: #1a6b3c; border: 1px solid #b7dfc0; }
+.lp5 { background: #f4f4f4; color: #666; border: 1px solid #ddd; }
+
+.lb-pct {
+  font-size: 16px;
+  font-weight: 800;
+  color: #0d4f2b;
+  min-width: 56px;
+  text-align: right;
+  flex-shrink: 0;
+}
+.lb-name {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 600;
+  color: #1a1a18;
+}
+.lb-empty {
+  padding: 16px 18px;
+  color: #bbb;
+  font-style: italic;
+  font-size: 12px;
+}
+
+/* ── INDIVIDUAL GRADES ─────────────────────────────── */
+.ind-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #fff;
+  font-size: 12px;
+}
+.ind-table th {
+  padding: 9px 8px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border: 1px solid #ddf0e3;
+}
+.ind-table th.h-group { background: #0d4f2b; color: #f0b429; text-align: left; }
+.ind-table th.h-name  { background: #1a6b3c; color: #fff; text-align: left; }
+.ind-table th.h-skill { background: #9a7d0a; color: #fff; }
+.ind-table th.h-total { background: #1a1a18; color: #f0b429; }
+.ind-table th.h-final { background: #b7470a; color: #fff; }
+.ind-table th.h-act   { background: #f5fdf7; color: #0d4f2b; }
+
+.ind-table td {
+  padding: 6px 7px;
+  border: 1px solid #e8f5eb;
+  vertical-align: middle;
+}
+.ind-table td.ind-group-name {
+  background: #f5fdf7;
+  color: #0d4f2b;
+  font-weight: 700;
+}
+.ind-table td.ind-member-name input {
+  width: 170px;
+}
+.ind-member-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.ind-member-controls input.name-input {
+  width: 140px;
+}
+.ind-table td.ind-score { text-align: center; }
+.ind-table td.ind-total,
+.ind-table td.ind-final {
+  text-align: center;
+  font-weight: 700;
+  color: #0d4f2b;
+}
+.ind-table tr.ind-group-row td {
+  background: #f9fbfa;
+  border-top: 2px solid #d9eddc;
+}
+.ind-table tr:hover td { background: #f0faf3; }
+
+/* ── FOOTER ACTIONS ─────────────────────────────────── */
+.footer-actions {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  padding-bottom: 32px;
+}
+
+/* ── PRINT ──────────────────────────────────────────── */
+@media print {
+  body { background: #fff; }
+  .actions, .footer-actions, .btn-remove-row { display: none !important; }
+}
+
+/* ── RESPONSIVE ─────────────────────────────────────── */
+@media (max-width: 680px) {
+  header h1 { font-size: 22px; }
+  .main { padding: 14px; }
+  .lb-grid { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 420px) {
+  .lb-grid { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Tambiz Calculator</h1>
+  <p>Group Scoring &amp; Ranking System</p>
+</header>
+
+<div class="main">
+
+  <!-- ══ DEFENSE SECTION ═════════════════════════════════ -->
+  <div class="section-title">Defense Scores</div>
+
+  <div class="table-wrapper encode-scroll">
+    <table class="input-table" id="inputTable">
+      <thead>
+        <tr class="cat-row">
+          <th class="th-group" rowspan="2">Group Name</th>
+          <th class="th-c1" colspan="5">Elevator Pitch &nbsp;·&nbsp; <span style="font-weight:400;font-size:10px">5 components · max 20 each</span></th>
+          <th class="th-c2" colspan="4">Informercial &nbsp;·&nbsp; <span style="font-weight:400;font-size:10px">4 components · max 10 each</span></th>
+          <th class="th-c3" colspan="9">Paper &nbsp;·&nbsp; <span style="font-weight:400;font-size:10px">5 · 20 · 10 · 10 · 10 · 10 · 10 · 10 · 15</span></th>
+          <th class="th-c4" colspan="3">Product Demo &nbsp;·&nbsp; <span style="font-weight:400;font-size:10px">25 · 25 · 50</span></th>
+          <th class="th-group" rowspan="2" style="min-width:34px;text-align:center;"></th>
+        </tr>
+        <tr class="comp-row">
+          <!-- Cat 1 -->
+          <th title="Max 20">/20</th><th title="Max 20">/20</th><th title="Max 20">/20</th><th title="Max 20">/20</th><th title="Max 20">/20</th>
+          <!-- Cat 2 -->
+          <th title="Max 10">/10</th><th title="Max 10">/10</th><th title="Max 10">/10</th><th title="Max 10">/10</th>
+          <!-- Cat 3 -->
+          <th title="Max 5">/5</th><th title="Max 20">/20</th><th title="Max 10">/10</th><th title="Max 10">/10</th><th title="Max 10">/10</th><th title="Max 10">/10</th><th title="Max 10">/10</th><th title="Max 10">/10</th><th title="Max 15">/15</th>
+          <!-- Cat 4 -->
+          <th title="Max 25">/25</th><th title="Max 25">/25</th><th title="Max 50">/50</th>
+        </tr>
+      </thead>
+      <tbody id="inputBody"></tbody>
+    </table>
+  </div>
+
+  <div class="actions">
+    <button class="btn btn-add" onclick="addGroup()">+ Add Group</button>
+    <button class="btn btn-clear" onclick="removeLastGroup()">Remove Last Group</button>
+    <button class="btn btn-clear" onclick="clearScores()">Clear All Scores</button>
+  </div>
+
+  <!-- ══ BOOTH SECTION ═══════════════════════════════════ -->
+  <div class="section-title">Booth Scores</div>
+
+  <div class="table-wrapper encode-scroll">
+    <table class="input-table" id="boothTable">
+      <thead>
+        <tr class="cat-row">
+          <th class="th-group" rowspan="2">Group Name</th>
+          <th class="th-c1" colspan="8">Best Business Plan Booth &nbsp;·&nbsp; <span style="font-weight:400;font-size:10px">20 · 20 · 10 · 10 · 10 · 10 · 10 · 10</span></th>
+          <th class="th-c2" colspan="4">Student Innovation &nbsp;·&nbsp; <span style="font-weight:400;font-size:10px">20 · 30 · 30 · 20</span></th>
+          <th class="th-c4" colspan="6">Best Product Demonstration &nbsp;·&nbsp; <span style="font-weight:400;font-size:10px">30 · 30 · 20 · 5 · 10 · 5</span></th>
+          <th class="th-group" rowspan="2" style="min-width:34px;text-align:center;"></th>
+        </tr>
+        <tr class="comp-row">
+          <th title="Max 20">/20</th><th title="Max 20">/20</th><th title="Max 10">/10</th><th title="Max 10">/10</th><th title="Max 10">/10</th><th title="Max 10">/10</th><th title="Max 10">/10</th><th title="Max 10">/10</th>
+          <th title="Max 20">/20</th><th title="Max 30">/30</th><th title="Max 30">/30</th><th title="Max 20">/20</th>
+          <th title="Max 30">/30</th><th title="Max 30">/30</th><th title="Max 20">/20</th><th title="Max 5">/5</th><th title="Max 10">/10</th><th title="Max 5">/5</th>
+        </tr>
+      </thead>
+      <tbody id="boothBody"></tbody>
+    </table>
+  </div>
+
+  <!-- ══ RESULTS SECTION ═════════════════════════════════ -->
+  <div class="section-title">Results by Category</div>
+
+  <div class="table-wrapper results-scroll">
+    <table class="results-table">
+      <thead>
+        <tr>
+          <th class="rth-group">Group</th>
+          <th class="rth-c1">Elevator Pitch</th>
+          <th class="rth-c2">Informercial</th>
+          <th class="rth-c3">Paper</th>
+          <th class="rth-c4">Product Demo</th>
+          <th class="rth-c1">Best Business Plan Booth</th>
+          <th class="rth-c2">Student Innovation</th>
+          <th class="rth-c4">Best Product Demonstration</th>
+          <th class="rth-overall">Overall</th>
+        </tr>
+      </thead>
+      <tbody id="resultsBody"></tbody>
+    </table>
+  </div>
+
+  <!-- ══ LEADERBOARD SECTION ═════════════════════════════ -->
+  <div class="section-title">Top 10 Leaderboard</div>
+  <div class="lb-grid" id="leaderboard"></div>
+
+  <!-- ══ INDIVIDUAL GRADES SECTION ═══════════════════════ -->
+  <div class="section-title">Individual Grades</div>
+  <div class="table-wrapper results-scroll">
+    <table class="ind-table" id="individualGradesTable">
+      <thead>
+        <tr>
+          <th class="h-name">Member Name</th>
+          <th class="h-group">Student ID</th>
+          <th class="h-group">Group Name</th>
+          <th class="h-group">Panelist</th>
+          <th class="h-skill">Presentation Skills</th>
+          <th class="h-skill">Communication Skills</th>
+          <th class="h-skill">Q&amp;A</th>
+          <th class="h-total">Total Score</th>
+          <th class="h-final">Final Grade</th>
+        </tr>
+      </thead>
+      <tbody id="individualGradesBody"></tbody>
+    </table>
+  </div>
+
+  <div class="footer-actions">
+    <button class="btn btn-add" onclick="window.print()">Print / Save as PDF</button>
+    <button class="btn btn-add" onclick="exportToExcel()">Save as Excel</button>
+    <button class="btn btn-add" onclick="document.getElementById('importFileInput').click()">Import Excel</button>
+    <input type="file" id="importFileInput" accept=".xlsx,.xls" style="display:none;" onchange="handleImportFile(event)">
+  </div>
+
+</div>
+
+<script>
+// ── Config ──────────────────────────────────────────────
+const DEFENSE_CATS = [
+  { name: 'Elevator Pitch', maxes: [20, 20, 20, 20, 20] },
+  { name: 'Informercial',   maxes: [10, 10, 10, 10] },
+  { name: 'Paper',          maxes: [5, 20, 10, 10, 10, 10, 10, 10, 15] },
+  { name: 'Product Demo',   maxes: [25, 25, 50] }
+];
+
+const BOOTH_CATS = [
+  { name: 'Best Business Plan Booth', maxes: [20, 20, 10, 10, 10, 10, 10, 10] },
+  { name: 'Student Innovation',       maxes: [20, 30, 30, 20] },
+  { name: 'Best Product Demonstration', maxes: [30, 30, 20, 5, 10, 5] }
+];
+
+const DEFENSE_CAT_TOTAL_MAX = DEFENSE_CATS.map(c => c.maxes.reduce((a, b) => a + b, 0));
+const BOOTH_CAT_TOTAL_MAX = BOOTH_CATS.map(c => c.maxes.reduce((a, b) => a + b, 0));
+const TOTAL_COLS = DEFENSE_CATS.reduce((a, c) => a + c.maxes.length, 0);
+const BOOTH_TOTAL_COLS = BOOTH_CATS.reduce((a, c) => a + c.maxes.length, 0);
+const MEMBER_BASE_COUNT = 8;
+
+function defaultDefensePanelists(panelistCount = 3) {
+  return Array.from({ length: panelistCount }, (_, pi) => ({
+    name: 'Panelist ' + (pi + 1),
+    scores: Array(TOTAL_COLS).fill('')
+  }));
+}
+
+function defaultBoothPanelists(panelistCount = 3) {
+  return Array.from({ length: panelistCount }, (_, pi) => ({
+    name: 'Panelist ' + (pi + 1),
+    scores: Array(BOOTH_TOTAL_COLS).fill('')
+  }));
+}
+
+function defaultMembers(panelistCount = 3) {
+  return Array.from({ length: MEMBER_BASE_COUNT }, (_, mi) => ({
+    name: 'Member ' + (mi + 1),
+    studentId: '',
+    scores: Array.from({ length: panelistCount }, () => ({
+      presentation: '',
+      communication: '',
+      qa: ''
+    }))
+  }));
+}
+
+// ── State ────────────────────────────────────────────────
+let groups = Array.from({ length: 1 }, (_, i) => {
+  const panelistCount = 3;
+  return {
+    name: 'Group ' + (i + 1),
+    panelists: defaultDefensePanelists(panelistCount),
+    boothPanelists: defaultBoothPanelists(panelistCount),
+    members: defaultMembers(panelistCount)
+  };
+});
+
+// ── Helpers ──────────────────────────────────────────────
+function colOffset(catIdx) {
+  let o = 0;
+  for (let i = 0; i < catIdx; i++) o += DEFENSE_CATS[i].maxes.length;
+  return o;
+}
+
+function boothColOffset(catIdx) {
+  let o = 0;
+  for (let i = 0; i < catIdx; i++) o += BOOTH_CATS[i].maxes.length;
+  return o;
+}
+
+function getAveragedScores(g) {
+  const avg = Array(TOTAL_COLS).fill(0);
+  const counts = Array(TOTAL_COLS).fill(0);
+  g.panelists.forEach(p => {
+    p.scores.forEach((s, i) => {
+      if (s !== '') { avg[i] += +s; counts[i]++; }
+    });
+  });
+  return avg.map((v, i) => counts[i] > 0 ? v / counts[i] : '');
+}
+
+function catScore(g, ci) {
+  const off = colOffset(ci);
+  const avgScores = getAveragedScores(g);
+  let sum = 0, hasAny = false;
+  DEFENSE_CATS[ci].maxes.forEach((m, mi) => {
+    const v = avgScores[off + mi];
+    if (v !== '') { sum += +v; hasAny = true; }
+  });
+  return hasAny ? (sum / DEFENSE_CAT_TOTAL_MAX[ci]) * 100 : null;
+}
+
+function getAveragedBoothScores(g) {
+  const avg = Array(BOOTH_TOTAL_COLS).fill(0);
+  const counts = Array(BOOTH_TOTAL_COLS).fill(0);
+  (g.boothPanelists || []).forEach(p => {
+    p.scores.forEach((s, i) => {
+      if (s !== '') { avg[i] += +s; counts[i]++; }
+    });
+  });
+  return avg.map((v, i) => counts[i] > 0 ? v / counts[i] : '');
+}
+
+function boothCatScore(g, ci) {
+  const off = boothColOffset(ci);
+  const avgScores = getAveragedBoothScores(g);
+  let sum = 0, hasAny = false;
+  BOOTH_CATS[ci].maxes.forEach((m, mi) => {
+    const v = avgScores[off + mi];
+    if (v !== '') { sum += +v; hasAny = true; }
+  });
+  return hasAny ? (sum / BOOTH_CAT_TOTAL_MAX[ci]) * 100 : null;
+}
+
+function overallDefenseScore(g) {
+  const anyEntered = g.panelists.some(p => p.scores.some(s => s !== ''));
+  if (!anyEntered) return null;
+  const pcts = DEFENSE_CATS.map((_, ci) => catScore(g, ci) ?? 0);
+  return pcts.reduce((a, b) => a + b, 0) / DEFENSE_CATS.length;
+}
+
+function overallBoothScore(g) {
+  const anyEntered = (g.boothPanelists || []).some(p => p.scores.some(s => s !== ''));
+  if (!anyEntered) return null;
+  const pcts = BOOTH_CATS.map((_, ci) => boothCatScore(g, ci) ?? 0);
+  return pcts.reduce((a, b) => a + b, 0) / BOOTH_CATS.length;
+}
+
+function overallScore(g) {
+  const defense = overallDefenseScore(g);
+  const booth = overallBoothScore(g);
+  if (defense === null && booth === null) return null;
+  return (defense ?? 0) * 0.7 + (booth ?? 0) * 0.3;
+}
+
+function rankFn(scoreFn, tiebreakerFn) {
+  const scored = groups.map((g, i) => ({ i, s: scoreFn(g), tb: tiebreakerFn ? tiebreakerFn(g) : null }))
+    .filter(x => x.s !== null)
+    .sort((a, b) => {
+      if (b.s !== a.s) return b.s - a.s;
+      if (tiebreakerFn && b.tb !== null && a.tb !== null && b.tb !== a.tb) return b.tb - a.tb;
+      return 0;
+    });
+  const map = {};
+  scored.forEach((item, pos) => {
+    let rank = pos + 1;
+    for (let j = 0; j < pos; j++) {
+      const sameScore = scored[j].s === item.s;
+      const sameTb = !tiebreakerFn || scored[j].tb === item.tb;
+      if (sameScore && sameTb) { rank = j + 1; break; }
+    }
+    map[item.i] = rank;
+  });
+  return gi => map[gi] ?? null;
+}
+
+function rankBadgeClass(r) {
+  if (r === 1) return 'rb-1';
+  if (r === 2) return 'rb-2';
+  if (r === 3) return 'rb-3';
+  if (r === 4) return 'rb-4';
+  return 'rb-x';
+}
+
+function posClass(p) { return p <= 4 ? 'lp' + p : 'lp5'; }
+
+function displayName(gi) {
+  return groups[gi].name.trim() || ('Group ' + (gi + 1));
+}
+
+function parseScoreValue(value) {
+  if (value === '' || value === undefined || value === null) return '';
+  const n = parseFloat(value);
+  return isNaN(n) ? '' : n;
+}
+
+function normalizeMemberScores(scores, panelistCount) {
+  let list;
+
+  if (Array.isArray(scores)) {
+    list = scores.map(set => ({
+      presentation: parseScoreValue(set?.presentation),
+      communication: parseScoreValue(set?.communication),
+      qa: parseScoreValue(set?.qa)
+    }));
+  } else {
+    list = [{
+      presentation: parseScoreValue(scores?.presentation),
+      communication: parseScoreValue(scores?.communication),
+      qa: parseScoreValue(scores?.qa)
+    }];
+  }
+
+  if (typeof panelistCount === 'number') {
+    while (list.length < panelistCount) {
+      list.push({ presentation: '', communication: '', qa: '' });
+    }
+    if (list.length > panelistCount) {
+      list = list.slice(0, panelistCount);
+    }
+  }
+
+  return list;
+}
+
+function normalizeGroupMembers(g) {
+  if (!Array.isArray(g.panelists)) g.panelists = defaultDefensePanelists(3);
+  if (!Array.isArray(g.boothPanelists)) g.boothPanelists = defaultBoothPanelists(3);
+  if (!Array.isArray(g.members)) g.members = defaultMembers();
+  g.members = g.members.map((m, mi) => ({
+    name: (m?.name ?? ('Member ' + (mi + 1))).toString(),
+    studentId: (m?.studentId ?? '').toString(),
+    scores: normalizeMemberScores(m?.scores, g.panelists.length)
+  }));
+}
+
+function memberTotal(member) {
+  const scoresList = normalizeMemberScores(member?.scores);
+  if (!scoresList.length) return null;
+
+  const totals = scoresList.map(set => {
+    const vals = [set.presentation, set.communication, set.qa];
+    const hasAny = vals.some(v => v !== '');
+    return hasAny ? vals.reduce((sum, v) => sum + (v === '' ? 0 : +v), 0) : null;
+  }).filter(v => v !== null);
+
+  if (!totals.length) return null;
+  return totals.reduce((a, b) => a + b, 0) / totals.length;
+}
+
+// ── Build Input Table ────────────────────────────────────
+function buildTable() {
+  const tbody = document.getElementById('inputBody');
+  tbody.innerHTML = '';
+
+  groups.forEach((g, gi) => {
+    // ── Group Header Row ──
+    const hdr = document.createElement('tr');
+    hdr.className = 'panelist-header-row';
+    const hdrName = document.createElement('td');
+    hdrName.className = 'td-name';
+    const nameInp = document.createElement('input');
+    nameInp.className = 'name-input';
+    nameInp.value = g.name;
+    nameInp.placeholder = 'Group ' + (gi + 1);
+    nameInp.oninput = function () {
+      groups[gi].name = this.value;
+      buildBoothTable();
+      recalc();
+    };
+    hdrName.appendChild(nameInp);
+    hdr.appendChild(hdrName);
+
+    // Colspan for actions
+    const hdrAct = document.createElement('td');
+    hdrAct.colSpan = TOTAL_COLS + 1;
+    hdrAct.style.textAlign = 'right';
+    const addPanelBtn = document.createElement('button');
+    addPanelBtn.className = 'btn-panel';
+    addPanelBtn.textContent = '+ Panelist';
+    addPanelBtn.onclick = function () { 
+      g.panelists.push({ name: 'Panelist ' + (g.panelists.length + 1), scores: Array(TOTAL_COLS).fill('') }); 
+      normalizeGroupMembers(g);
+      buildTable(); 
+      recalc();
+    };
+    hdrAct.appendChild(addPanelBtn);
+    if (groups.length > 1) {
+      const delGrp = document.createElement('button');
+      delGrp.className = 'btn-remove-row';
+      delGrp.title = 'Remove group';
+      delGrp.textContent = '×';
+      delGrp.onclick = function () {
+        groups.splice(gi, 1);
+        buildTable();
+        buildBoothTable();
+        recalc();
+      };
+      hdrAct.appendChild(delGrp);
+    }
+    hdr.appendChild(hdrAct);
+    tbody.appendChild(hdr);
+
+    // ── Panelist Rows ──
+    g.panelists.forEach((p, pi) => {
+      const tr = document.createElement('tr');
+      tr.className = 'panelist-row';
+
+      // Panelist name
+      const nameTd = document.createElement('td');
+      nameTd.className = 'td-name';
+      const pNameInp = document.createElement('input');
+      pNameInp.className = 'name-input';
+      pNameInp.style.width = '100px';
+      pNameInp.value = p.name;
+      pNameInp.oninput = function () { p.name = this.value; };
+      nameTd.appendChild(pNameInp);
+      tr.appendChild(nameTd);
+
+      // Score cells
+      let colIdx = 0;
+      DEFENSE_CATS.forEach(cat => {
+        cat.maxes.forEach(maxVal => {
+          const td = document.createElement('td');
+          td.style.textAlign = 'center';
+
+          const inp = document.createElement('input');
+          inp.className = 'score-input';
+          inp.type = 'number';
+          inp.inputMode = 'decimal';
+          inp.min = 0;
+          inp.max = maxVal;
+          inp.step = 0.5;
+          inp.placeholder = '–';
+          const v = p.scores[colIdx];
+          if (v !== '') inp.value = v;
+
+          const ci_ = colIdx, max_ = maxVal;
+          inp.oninput = function () {
+            let n = this.value;
+            if (n !== '') {
+              n = parseFloat(n);
+              if (n > max_) { n = max_; this.value = max_; }
+              if (n < 0)    { n = 0;    this.value = 0; }
+              inp.classList.remove('invalid');
+              p.scores[ci_] = n;
+            } else {
+              p.scores[ci_] = '';
+            }
+            recalc();
+          };
+
+          td.appendChild(inp);
+          tr.appendChild(td);
+          colIdx++;
+        });
+      });
+
+      // Panelist actions
+      const actTd = document.createElement('td');
+      actTd.className = 'td-panelist-actions';
+      if (g.panelists.length > 1) {
+        const rmBtn = document.createElement('button');
+        rmBtn.className = 'btn-panel remove';
+        rmBtn.textContent = 'Remove';
+        rmBtn.onclick = function () {
+          g.panelists.splice(pi, 1);
+          normalizeGroupMembers(g);
+          buildTable();
+          recalc();
+        };
+        actTd.appendChild(rmBtn);
+      }
+      tr.appendChild(actTd);
+
+      tbody.appendChild(tr);
+    });
+  });
+}
+
+// ── Results Table ────────────────────────────────────────
+function buildResults() {
+  const defenseRankFns = DEFENSE_CATS.map((_, ci) => rankFn(g => catScore(g, ci), g => overallScore(g)));
+  const boothRankFns = BOOTH_CATS.map((_, ci) => rankFn(g => boothCatScore(g, ci), g => overallScore(g)));
+  const ovRankFn   = rankFn(g => overallScore(g));
+
+  // Sort by group name
+  const order = groups.map((_, i) => i).sort((a, b) =>
+    displayName(a).localeCompare(displayName(b), undefined, { sensitivity: 'base', numeric: true })
+  );
+
+  const tbody = document.getElementById('resultsBody');
+  tbody.innerHTML = '';
+
+  order.forEach(gi => {
+    const g = groups[gi];
+    const tr = document.createElement('tr');
+
+    // Group name
+    const nameTd = document.createElement('td');
+    nameTd.className = 'td-group-name';
+    nameTd.textContent = displayName(gi);
+    tr.appendChild(nameTd);
+
+    // Category columns
+    DEFENSE_CATS.forEach((_, ci) => {
+      const pct  = catScore(g, ci);
+      const rank = defenseRankFns[ci](gi);
+      const td   = document.createElement('td');
+      if (pct === null) {
+        td.innerHTML = '<span class="empty-cell">—</span>';
+      } else {
+        td.innerHTML = `
+          <div class="rank-cell">
+            <span class="pct-val">${pct.toFixed(1)}%</span>
+            <span class="rank-badge ${rankBadgeClass(rank)}">Rank ${rank}</span>
+          </div>`;
+      }
+      tr.appendChild(td);
+    });
+
+    BOOTH_CATS.forEach((_, ci) => {
+      const pct  = boothCatScore(g, ci);
+      const rank = boothRankFns[ci](gi);
+      const td   = document.createElement('td');
+      if (pct === null) {
+        td.innerHTML = '<span class="empty-cell">—</span>';
+      } else {
+        td.innerHTML = `
+          <div class="rank-cell">
+            <span class="pct-val">${pct.toFixed(1)}%</span>
+            <span class="rank-badge ${rankBadgeClass(rank)}">Rank ${rank}</span>
+          </div>`;
+      }
+      tr.appendChild(td);
+    });
+
+    // Overall
+    const ov   = overallScore(g);
+    const ovR  = ovRankFn(gi);
+    const ovTd = document.createElement('td');
+    if (ov === null) {
+      ovTd.innerHTML = '<span class="empty-cell">—</span>';
+    } else {
+      ovTd.innerHTML = `
+        <div class="rank-cell">
+          <span class="pct-val overall-pct">${ov.toFixed(1)}%</span>
+          <span class="rank-badge ${rankBadgeClass(ovR)}">Rank ${ovR}</span>
+        </div>`;
+    }
+    tr.appendChild(ovTd);
+
+    tbody.appendChild(tr);
+  });
+}
+
+function buildBoothTable() {
+  const tbody = document.getElementById('boothBody');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+
+  groups.forEach((g, gi) => {
+    normalizeGroupMembers(g);
+
+    const hdr = document.createElement('tr');
+    hdr.className = 'panelist-header-row';
+
+    const hdrName = document.createElement('td');
+    hdrName.className = 'td-name';
+    hdrName.textContent = displayName(gi);
+    hdr.appendChild(hdrName);
+
+    const hdrAct = document.createElement('td');
+    hdrAct.colSpan = BOOTH_TOTAL_COLS + 1;
+    hdrAct.style.textAlign = 'right';
+
+    const addPanelBtn = document.createElement('button');
+    addPanelBtn.className = 'btn-panel';
+    addPanelBtn.textContent = '+ Panelist';
+    addPanelBtn.onclick = function () {
+      g.boothPanelists.push({
+        name: 'Panelist ' + (g.boothPanelists.length + 1),
+        scores: Array(BOOTH_TOTAL_COLS).fill('')
+      });
+      buildBoothTable();
+      recalc();
+    };
+    hdrAct.appendChild(addPanelBtn);
+
+    hdr.appendChild(hdrAct);
+    tbody.appendChild(hdr);
+
+    g.boothPanelists.forEach((p, pi) => {
+      const tr = document.createElement('tr');
+      tr.className = 'panelist-row';
+
+      const nameTd = document.createElement('td');
+      nameTd.className = 'td-name';
+      const pNameInp = document.createElement('input');
+      pNameInp.className = 'name-input';
+      pNameInp.style.width = '100px';
+      pNameInp.value = p.name;
+      pNameInp.oninput = function () { p.name = this.value; };
+      nameTd.appendChild(pNameInp);
+      tr.appendChild(nameTd);
+
+      let colIdx = 0;
+      BOOTH_CATS.forEach(cat => {
+        cat.maxes.forEach(maxVal => {
+          const td = document.createElement('td');
+          td.style.textAlign = 'center';
+
+          const inp = document.createElement('input');
+          inp.className = 'score-input';
+          inp.type = 'number';
+          inp.inputMode = 'decimal';
+          inp.min = 0;
+          inp.max = maxVal;
+          inp.step = 0.5;
+          inp.placeholder = '–';
+          const v = p.scores[colIdx];
+          if (v !== '') inp.value = v;
+
+          const ci_ = colIdx;
+          const max_ = maxVal;
+          inp.oninput = function () {
+            let n = this.value;
+            if (n !== '') {
+              n = parseFloat(n);
+              if (n > max_) { n = max_; this.value = max_; }
+              if (n < 0)    { n = 0;    this.value = 0; }
+              inp.classList.remove('invalid');
+              p.scores[ci_] = n;
+            } else {
+              p.scores[ci_] = '';
+            }
+            recalc();
+          };
+
+          td.appendChild(inp);
+          tr.appendChild(td);
+          colIdx++;
+        });
+      });
+
+      const actTd = document.createElement('td');
+      actTd.className = 'td-panelist-actions';
+      if (g.boothPanelists.length > 1) {
+        const rmBtn = document.createElement('button');
+        rmBtn.className = 'btn-panel remove';
+        rmBtn.textContent = 'Remove';
+        rmBtn.onclick = function () {
+          g.boothPanelists.splice(pi, 1);
+          buildBoothTable();
+          recalc();
+        };
+        actTd.appendChild(rmBtn);
+      }
+      tr.appendChild(actTd);
+
+      tbody.appendChild(tr);
+    });
+  });
+}
+
+// ── Leaderboard ──────────────────────────────────────────
+function buildLeaderboard() {
+  const configs = [
+    { label: 'Elevator Pitch', cls: 'lbh-c1',      fn: g => catScore(g, 0) },
+    { label: 'Informercial',   cls: 'lbh-c2',      fn: g => catScore(g, 1) },
+    { label: 'Paper',          cls: 'lbh-c3',      fn: g => catScore(g, 2) },
+    { label: 'Product Demo',   cls: 'lbh-c4',      fn: g => catScore(g, 3) },
+    { label: 'Best Business Plan Booth', cls: 'lbh-c1', fn: g => boothCatScore(g, 0) },
+    { label: 'Student Innovation', cls: 'lbh-c2', fn: g => boothCatScore(g, 1) },
+    { label: 'Best Product Demonstration', cls: 'lbh-c4', fn: g => boothCatScore(g, 2) },
+    { label: 'Overall',        cls: 'lbh-overall', fn: g => overallScore(g) }
+  ];
+
+  const lb = document.getElementById('leaderboard');
+  lb.innerHTML = '';
+
+  configs.forEach(cfg => {
+    const sorted = groups
+      .map((g, i) => ({ name: displayName(i), score: cfg.fn(g) }))
+      .filter(x => x.score !== null)
+      .sort((a, b) => {
+        if (b.score !== a.score) return b.score - a.score;
+        return a.name.localeCompare(b.name, undefined, { sensitivity: 'base', numeric: true });
+      });
+
+    const ranked = [];
+    let prevScore = null;
+    let prevRank = 0;
+    sorted.forEach((item, idx) => {
+      const rank = (idx === 0)
+        ? 1
+        : (item.score === prevScore ? prevRank : idx + 1);
+      ranked.push({ ...item, rank });
+      prevScore = item.score;
+      prevRank = rank;
+    });
+
+    const top10 = ranked
+      .slice(0, 10);
+
+    const card = document.createElement('div');
+    card.className = 'lb-card';
+
+    let html = `<div class="lb-card-header ${cfg.cls}">${cfg.label}</div>`;
+
+    if (top10.length === 0) {
+      html += `<div class="lb-empty">No data yet</div>`;
+    } else {
+      top10.forEach(item => {
+        html += `
+          <div class="lb-item">
+            <div class="lb-pos ${posClass(item.rank)}">${item.rank}</div>
+            <div class="lb-pct">${item.score.toFixed(1)}%</div>
+            <div class="lb-name">${item.name}</div>
+          </div>`;
+      });
+    }
+
+    card.innerHTML = html;
+    lb.appendChild(card);
+  });
+}
+
+// ── Individual Grades ───────────────────────────────────
+function buildIndividualGrades() {
+  const tbody = document.getElementById('individualGradesBody');
+  tbody.innerHTML = '';
+
+  groups.forEach((g, gi) => {
+    normalizeGroupMembers(g);
+    const members = Array.isArray(g.members) ? g.members : [];
+
+    const grpRow = document.createElement('tr');
+    grpRow.className = 'ind-group-row';
+
+    const grpCell = document.createElement('td');
+    grpCell.colSpan = 9;
+    grpCell.className = 'ind-group-name';
+    grpCell.textContent = displayName(gi) + ' · Members: ' + members.length;
+
+    const addBtn = document.createElement('button');
+    addBtn.className = 'btn-panel';
+    addBtn.style.marginLeft = '10px';
+    addBtn.textContent = '+ Member';
+    addBtn.onclick = function () {
+      members.push({
+        name: 'Member ' + (members.length + 1),
+        studentId: '',
+        scores: Array.from({ length: g.panelists.length }, () => ({
+          presentation: '',
+          communication: '',
+          qa: ''
+        }))
+      });
+      buildIndividualGrades();
+    };
+
+    grpCell.appendChild(addBtn);
+    grpRow.appendChild(grpCell);
+    tbody.appendChild(grpRow);
+
+    members.forEach((m, mi) => {
+      const scoresList = normalizeMemberScores(m.scores, g.panelists.length);
+      m.scores = scoresList;
+
+      let totalTd;
+      let finalTd;
+
+      const scoreFields = [
+        { key: 'presentation', max: 20 },
+        { key: 'communication', max: 40 },
+        { key: 'qa', max: 40 }
+      ];
+
+      const updateMemberComputedValues = () => {
+        const total = memberTotal(m);
+        const ov = overallScore(g);
+        const final = (total === null || ov === null) ? null : (total + ov) / 2;
+        if (totalTd) totalTd.textContent = total === null ? '—' : total.toFixed(1);
+        if (finalTd) finalTd.textContent = final === null ? '—' : final.toFixed(1);
+      };
+
+      scoresList.forEach((scoreSet, si) => {
+        const tr = document.createElement('tr');
+
+        if (si === 0) {
+          const nameTd = document.createElement('td');
+          nameTd.className = 'ind-member-name';
+          nameTd.rowSpan = scoresList.length;
+
+          const controlsWrap = document.createElement('div');
+          controlsWrap.className = 'ind-member-controls';
+
+          const nameInp = document.createElement('input');
+          nameInp.className = 'name-input';
+          nameInp.value = m.name;
+          nameInp.placeholder = 'Member ' + (mi + 1);
+          nameInp.oninput = function () { m.name = this.value; };
+
+          controlsWrap.appendChild(nameInp);
+
+          if (members.length > 1) {
+            const rmMemberBtn = document.createElement('button');
+            rmMemberBtn.className = 'btn-panel remove';
+            rmMemberBtn.textContent = 'Remove';
+            rmMemberBtn.title = 'Remove member';
+            rmMemberBtn.onclick = function () {
+              members.splice(mi, 1);
+              buildIndividualGrades();
+            };
+            controlsWrap.appendChild(rmMemberBtn);
+          }
+
+          nameTd.appendChild(controlsWrap);
+          tr.appendChild(nameTd);
+
+          const idTd = document.createElement('td');
+          idTd.rowSpan = scoresList.length;
+          const idInp = document.createElement('input');
+          idInp.className = 'name-input';
+          idInp.style.width = '120px';
+          idInp.placeholder = 'Student ID';
+          idInp.value = m.studentId || '';
+          idInp.oninput = function () { m.studentId = this.value; };
+          idTd.appendChild(idInp);
+          tr.appendChild(idTd);
+
+          const groupTd = document.createElement('td');
+          groupTd.rowSpan = scoresList.length;
+          groupTd.textContent = displayName(gi);
+          tr.appendChild(groupTd);
+        }
+
+        const panelistTd = document.createElement('td');
+        panelistTd.textContent = g.panelists[si]?.name || ('Panelist ' + (si + 1));
+        panelistTd.style.fontSize = '11px';
+        panelistTd.style.color = '#777';
+        tr.appendChild(panelistTd);
+
+        scoreFields.forEach(field => {
+          const td = document.createElement('td');
+          td.className = 'ind-score';
+
+          const inp = document.createElement('input');
+          inp.className = 'score-input';
+          inp.type = 'number';
+          inp.inputMode = 'decimal';
+          inp.min = 0;
+          inp.max = field.max;
+          inp.step = 0.1;
+          inp.placeholder = '–';
+          if (scoreSet[field.key] !== '') inp.value = scoreSet[field.key];
+
+          inp.oninput = function () {
+            if (this.value === '') {
+              scoreSet[field.key] = '';
+              inp.classList.remove('invalid');
+            } else {
+              let n = parseFloat(this.value);
+              if (isNaN(n)) {
+                scoreSet[field.key] = '';
+              } else {
+                if (n < 0) n = 0;
+                if (n > field.max) n = field.max;
+                scoreSet[field.key] = n;
+                this.value = n;
+              }
+              inp.classList.remove('invalid');
+            }
+            updateMemberComputedValues();
+          };
+
+          td.appendChild(inp);
+          tr.appendChild(td);
+        });
+
+        if (si === 0) {
+          totalTd = document.createElement('td');
+          totalTd.className = 'ind-total';
+          totalTd.rowSpan = scoresList.length;
+          tr.appendChild(totalTd);
+
+          finalTd = document.createElement('td');
+          finalTd.className = 'ind-final';
+          finalTd.rowSpan = scoresList.length;
+          tr.appendChild(finalTd);
+        }
+
+        tbody.appendChild(tr);
+      });
+
+      updateMemberComputedValues();
+    });
+  });
+}
+
+// ── Recalc ───────────────────────────────────────────────
+function recalc() {
+  buildResults();
+  buildLeaderboard();
+  buildIndividualGrades();
+}
+
+// ── Public Actions ───────────────────────────────────────
+function addGroup() {
+  const panelistCount = 3;
+  groups.push({
+    name: 'Group ' + (groups.length + 1),
+    panelists: defaultDefensePanelists(panelistCount),
+    boothPanelists: defaultBoothPanelists(panelistCount),
+    members: defaultMembers(panelistCount)
+  });
+  buildTable();
+  buildBoothTable();
+  recalc();
+}
+
+function removeLastGroup() {
+  if (groups.length <= 1) {
+    alert('At least one group is required.');
+    return;
+  }
+  const removedName = displayName(groups.length - 1);
+  if (!confirm('Remove ' + removedName + '?')) return;
+  groups.pop();
+  buildTable();
+  buildBoothTable();
+  recalc();
+}
+
+function clearScores() {
+  if (!confirm('Clear all scores? Group names will be kept.')) return;
+  groups.forEach(g => {
+    normalizeGroupMembers(g);
+    g.panelists.forEach(p => { p.scores = Array(TOTAL_COLS).fill(''); });
+    g.boothPanelists.forEach(p => { p.scores = Array(BOOTH_TOTAL_COLS).fill(''); });
+    g.members.forEach(m => {
+      m.scores.forEach(set => {
+        set.presentation = '';
+        set.communication = '';
+        set.qa = '';
+      });
+    });
+  });
+  buildTable();
+  buildBoothTable();
+  recalc();
+}
+// ── Excel Import ────────────────────────────────────
+function handleImportFile(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  if (typeof XLSX === 'undefined') {
+    alert('Excel library is still loading. Please try again in a moment.');
+    event.target.value = '';
+    return;
+  }
+
+  const reader = new FileReader();
+  reader.onload = function (e) {
+    try {
+      const data = new Uint8Array(e.target.result);
+      const workbook = XLSX.read(data, { type: 'array' });
+      const sheetName = workbook.SheetNames[0]; // First sheet (Scores)
+      const sheet = workbook.Sheets[sheetName];
+      const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+      const boothSheet = workbook.Sheets['Booth Scores'];
+      const boothRows = boothSheet ? XLSX.utils.sheet_to_json(boothSheet, { header: 1 }) : [];
+      const individualSheet = workbook.Sheets['Individual Grades'];
+      const individualRows = individualSheet ? XLSX.utils.sheet_to_json(individualSheet, { header: 1 }) : [];
+
+      if (rows.length < 2) {
+        alert('Invalid file format.');
+        event.target.value = '';
+        return;
+      }
+
+      // Parse rows: skip header (row 0)
+      const headerRow = rows[0];
+      const dataRows = rows.slice(1);
+
+      // Group rows by group name
+      const groupMap = {};
+      dataRows.forEach(row => {
+        const groupName = (row[0] || '').trim();
+        const panelistName = (row[1] || '').trim();
+        const scores = row.slice(2);
+
+        if (!groupName && !panelistName) return; // Skip empty rows
+
+        // If group name is present, start a new group
+        if (groupName) {
+          if (!groupMap[groupName]) {
+            groupMap[groupName] = [];
+          }
+          groupMap[groupName].push({
+            name: panelistName || 'Panelist',
+            scores: scores.map(s => {
+              if (s === '' || s === undefined || s === null) return '';
+              const num = parseFloat(s);
+              return isNaN(num) ? '' : num;
+            })
+          });
+        } else if (panelistName) {
+          // Continuation of previous group
+          const lastGroup = Object.keys(groupMap)[Object.keys(groupMap).length - 1];
+          if (lastGroup) {
+            groupMap[lastGroup].push({
+              name: panelistName || 'Panelist',
+              scores: scores.map(s => {
+                if (s === '' || s === undefined || s === null) return '';
+                const num = parseFloat(s);
+                return isNaN(num) ? '' : num;
+              })
+            });
+          }
+        }
+      });
+
+      const boothMap = {};
+      if (boothRows.length > 1) {
+        boothRows.slice(1).forEach(row => {
+          const groupName = String(row[0] || '').trim();
+          const panelistName = String(row[1] || '').trim();
+          const scores = row.slice(2);
+          if (!groupName && !panelistName) return;
+
+          if (groupName) {
+            if (!boothMap[groupName]) boothMap[groupName] = [];
+            boothMap[groupName].push({
+              name: panelistName || 'Panelist',
+              scores: scores.map(s => {
+                if (s === '' || s === undefined || s === null) return '';
+                const num = parseFloat(s);
+                return isNaN(num) ? '' : num;
+              })
+            });
+          } else if (panelistName) {
+            const lastGroup = Object.keys(boothMap)[Object.keys(boothMap).length - 1];
+            if (lastGroup) {
+              boothMap[lastGroup].push({
+                name: panelistName || 'Panelist',
+                scores: scores.map(s => {
+                  if (s === '' || s === undefined || s === null) return '';
+                  const num = parseFloat(s);
+                  return isNaN(num) ? '' : num;
+                })
+              });
+            }
+          }
+        });
+      }
+
+      // Parse Individual Grades sheet (if present)
+      const memberMap = {};
+      if (individualRows.length > 1) {
+        const indHeader = (individualRows[0] || []).map(v => String(v || '').trim().toLowerCase());
+        const hasStudentIdCol = indHeader[2] === 'student id';
+        const panelistIdx = hasStudentIdCol ? 3 : 2;
+        const hasPanelistCol = indHeader[panelistIdx] === 'panelist';
+        individualRows.slice(1).forEach(row => {
+          const groupName = String(row[0] ?? '').trim();
+          const memberName = String(row[1] ?? '').trim();
+          const studentId = hasStudentIdCol ? String(row[2] ?? '').trim() : '';
+          if (!groupName || !memberName) return;
+
+          const parseMaybeNum = val => {
+            if (val === '' || val === undefined || val === null) return '';
+            const num = parseFloat(val);
+            return isNaN(num) ? '' : num;
+          };
+
+          const baseIdx = hasPanelistCol ? (hasStudentIdCol ? 4 : 3) : (hasStudentIdCol ? 3 : 2);
+          const presentation = parseMaybeNum(row[baseIdx]);
+          const communication = parseMaybeNum(row[baseIdx + 1]);
+          const qa = parseMaybeNum(row[baseIdx + 2]);
+          const panelistName = hasPanelistCol ? String(row[panelistIdx] ?? '').trim() : '';
+
+          if (!memberMap[groupName]) memberMap[groupName] = {};
+          if (!memberMap[groupName][memberName]) memberMap[groupName][memberName] = [];
+          memberMap[groupName][memberName].push({ panelist: panelistName, studentId, presentation, communication, qa });
+        });
+      }
+
+      // Parse imported groups
+      const importedGroups = Object.entries(groupMap).map(([groupName, panelists]) => {
+        const membersByName = memberMap[groupName] || {};
+        const importedMembers = Object.entries(membersByName).map(([memberName, entries]) => {
+          const studentId = String(entries[0]?.studentId ?? '').trim();
+          const scores = normalizeMemberScores(
+            panelists.map((p, idx) => {
+              const byName = entries.find(e => e.panelist && e.panelist.toLowerCase() === String(p.name || '').toLowerCase());
+              const fallback = entries[idx] || entries[0] || {};
+              const src = byName || fallback;
+              return {
+                presentation: parseScoreValue(src.presentation),
+                communication: parseScoreValue(src.communication),
+                qa: parseScoreValue(src.qa)
+              };
+            }),
+            panelists.length
+          );
+
+          return {
+            name: memberName,
+            studentId,
+            scores
+          };
+        });
+
+        const finalMembers = importedMembers.length > 0 ? importedMembers : defaultMembers(panelists.length);
+        const importedBoothPanelists = (boothMap[groupName] && boothMap[groupName].length > 0)
+          ? boothMap[groupName]
+          : defaultBoothPanelists(3);
+        return {
+          name: groupName,
+          panelists: panelists,
+          boothPanelists: importedBoothPanelists,
+          members: finalMembers
+        };
+      });
+
+      if (importedGroups.length === 0) {
+        alert('No valid groups found in file.');
+        event.target.value = '';
+        return;
+      }
+
+      // Add imported groups to existing groups
+      const importedCount = importedGroups.length;
+      groups = groups.concat(importedGroups);
+
+      alert('Imported ' + importedCount + ' group(s). Total groups: ' + groups.length);
+      buildTable();
+      buildBoothTable();
+      recalc();
+    } catch (err) {
+      alert('Error reading file: ' + err.message);
+      console.error(err);
+    }
+    event.target.value = ''; // Reset file input
+  };
+
+  reader.onerror = function () {
+    alert('Error reading file.');
+    event.target.value = '';
+  };
+
+  reader.readAsArrayBuffer(file);
+}
+
+// ── Excel Export ────────────────────────────────────
+function exportToExcel() {
+  if (typeof XLSX === 'undefined') {
+    alert('Excel library is still loading. Please try again in a moment.');
+    return;
+  }
+  const wb = XLSX.utils.book_new();
+
+  // Sheet 1: Defense Scores (with panelists)
+  const inputData = [];
+  inputData.push(['Group Name', 'Panelist', ...DEFENSE_CATS.flatMap(c => c.maxes.map((m, i) => `${c.name} #${i + 1}`))]);
+  groups.forEach((g, gi) => {
+    g.panelists.forEach((p, pi) => {
+      inputData.push([pi === 0 ? displayName(gi) : '', p.name, ...p.scores.map(s => (s === '' ? '' : s))]);
+    });
+  });
+  const ws1 = XLSX.utils.aoa_to_sheet(inputData);
+  ws1['!cols'] = [{wch: 14}, {wch: 12}, ...Array(TOTAL_COLS).fill({wch: 11})];
+  XLSX.utils.book_append_sheet(wb, ws1, 'Scores');
+
+  // Sheet 2: Booth Scores
+  const boothData = [];
+  boothData.push(['Group Name', 'Panelist', ...BOOTH_CATS.flatMap(c => c.maxes.map((m, i) => `${c.name} #${i + 1}`))]);
+  groups.forEach((g, gi) => {
+    normalizeGroupMembers(g);
+    g.boothPanelists.forEach((p, pi) => {
+      boothData.push([pi === 0 ? displayName(gi) : '', p.name, ...p.scores.map(s => (s === '' ? '' : s))]);
+    });
+  });
+  const wsBooth = XLSX.utils.aoa_to_sheet(boothData);
+  wsBooth['!cols'] = [{wch: 18}, {wch: 12}, ...Array(BOOTH_TOTAL_COLS).fill({wch: 12})];
+  XLSX.utils.book_append_sheet(wb, wsBooth, 'Booth Scores');
+
+  // Sheet 3: Results
+  const resultData = [];
+  resultData.push(['Group Name', 'Elevator Pitch %', 'Elevator Pitch Rank', 'Informercial %', 'Informercial Rank', 'Paper %', 'Paper Rank', 'Product Demo %', 'Product Demo Rank', 'Best Business Plan Booth %', 'Best Business Plan Booth Rank', 'Student Innovation %', 'Student Innovation Rank', 'Best Product Demonstration %', 'Best Product Demonstration Rank', 'Overall %', 'Overall Rank']);
+  const defenseRankFns = DEFENSE_CATS.map((_, ci) => rankFn(g => catScore(g, ci), g => overallScore(g)));
+  const boothRankFns = BOOTH_CATS.map((_, ci) => rankFn(g => boothCatScore(g, ci), g => overallScore(g)));
+  const ovRankFn   = rankFn(g => overallScore(g));
+  const order = groups.map((_, i) => i).sort((a, b) => {
+    const ra = ovRankFn(a), rb = ovRankFn(b);
+    if (ra === null && rb === null) return 0;
+    if (ra === null) return 1;
+    if (rb === null) return -1;
+    return ra - rb;
+  });
+  order.forEach(gi => {
+    const g = groups[gi];
+    const row = [displayName(gi)];
+    DEFENSE_CATS.forEach((_, ci) => {
+      const pct  = catScore(g, ci);
+      const rank = defenseRankFns[ci](gi);
+      row.push(pct !== null ? parseFloat(pct.toFixed(1)) : '');
+      row.push(rank !== null ? 'Rank ' + rank : '');
+    });
+    BOOTH_CATS.forEach((_, ci) => {
+      const pct  = boothCatScore(g, ci);
+      const rank = boothRankFns[ci](gi);
+      row.push(pct !== null ? parseFloat(pct.toFixed(1)) : '');
+      row.push(rank !== null ? 'Rank ' + rank : '');
+    });
+    const ov   = overallScore(g);
+    const ovR  = ovRankFn(gi);
+    row.push(ov !== null ? parseFloat(ov.toFixed(1)) : '');
+    row.push(ovR !== null ? 'Rank ' + ovR : '');
+    resultData.push(row);
+  });
+  const ws2 = XLSX.utils.aoa_to_sheet(resultData);
+  ws2['!cols'] = [{wch: 18}, ...Array(16).fill({wch: 16})];
+  XLSX.utils.book_append_sheet(wb, ws2, 'Results');
+
+  // Sheet 4: Leaderboard
+  const lbData = [['', 'Elevator Pitch', 'Informercial', 'Paper', 'Product Demo', 'Best Business Plan Booth', 'Student Innovation', 'Best Product Demonstration', 'Overall']];
+  const configs = [
+    { fn: g => catScore(g, 0) },
+    { fn: g => catScore(g, 1) },
+    { fn: g => catScore(g, 2) },
+    { fn: g => catScore(g, 3) },
+    { fn: g => boothCatScore(g, 0) },
+    { fn: g => boothCatScore(g, 1) },
+    { fn: g => boothCatScore(g, 2) },
+    { fn: g => overallScore(g) }
+  ];
+  for (let pos = 1; pos <= 10; pos++) {
+    const row = ['Position ' + pos];
+    configs.forEach(cfg => {
+      const top10 = groups
+        .map((g, i) => ({ name: displayName(i), score: cfg.fn(g) }))
+        .filter(x => x.score !== null)
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 10);
+      if (pos <= top10.length) {
+        row.push(top10[pos - 1].name + ': ' + parseFloat(top10[pos - 1].score.toFixed(1)) + '%');
+      } else {
+        row.push('');
+      }
+    });
+    lbData.push(row);
+  }
+  const ws3 = XLSX.utils.aoa_to_sheet(lbData);
+  ws3['!cols'] = [{wch: 16}, ...Array(8).fill({wch: 24})];
+  XLSX.utils.book_append_sheet(wb, ws3, 'Leaderboard');
+
+  // Sheet 5: Individual Grades
+  const indData = [[
+    'Group Name',
+    'Member Name',
+    'Student ID',
+    'Panelist',
+    'Presentation Skills',
+    'Communication Skills',
+    'Q&A',
+    'Total Score',
+    'Group Overall %',
+    'Final Grade'
+  ]];
+
+  groups.forEach((g, gi) => {
+    normalizeGroupMembers(g);
+    const members = Array.isArray(g.members) ? g.members : [];
+    const ov = overallScore(g);
+
+    members.forEach(m => {
+      const scoresList = normalizeMemberScores(m.scores, g.panelists.length);
+      const total = memberTotal(m);
+      const final = (total === null || ov === null) ? null : (total + ov) / 2;
+
+      scoresList.forEach((scoreSet, si) => {
+        indData.push([
+          displayName(gi),
+          m.name,
+          m.studentId || '',
+          g.panelists[si]?.name || ('Panelist ' + (si + 1)),
+          scoreSet.presentation === '' ? '' : scoreSet.presentation,
+          scoreSet.communication === '' ? '' : scoreSet.communication,
+          scoreSet.qa === '' ? '' : scoreSet.qa,
+          si === 0 ? (total === null ? '' : parseFloat(total.toFixed(1))) : '',
+          si === 0 ? (ov === null ? '' : parseFloat(ov.toFixed(1))) : '',
+          si === 0 ? (final === null ? '' : parseFloat(final.toFixed(1))) : ''
+        ]);
+      });
+    });
+  });
+
+  const ws4 = XLSX.utils.aoa_to_sheet(indData);
+  ws4['!cols'] = [
+    {wch: 16},
+    {wch: 16},
+    {wch: 14},
+    {wch: 14},
+    {wch: 18},
+    {wch: 20},
+    {wch: 10},
+    {wch: 12},
+    {wch: 16},
+    {wch: 12}
+  ];
+  XLSX.utils.book_append_sheet(wb, ws4, 'Individual Grades');
+
+  // Download
+  try {
+    const now = new Date();
+    const fname = 'Tambiz_' + now.toISOString().slice(0, 10) + '_' + now.toTimeString().slice(0, 5).replace(':', '') + '.xlsx';
+    XLSX.writeFile(wb, fname);
+  } catch (e) {
+    alert('Error exporting file: ' + e.message);
+    console.error(e);
+  }
+}
+// ── Init ─────────────────────────────────────────────────
+buildTable();
+buildBoothTable();
+recalc();
+</script>
+</body>
+</html>

@@ -1,0 +1,9 @@
+# Real student data never belongs in this repository.
+*.xlsx
+*.xls
+*.csv
+local-data/
+data/
+
+# Local noise
+.DS_Store
