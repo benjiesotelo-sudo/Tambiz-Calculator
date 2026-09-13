@@ -89,6 +89,40 @@ export function criterionLabel(c: Category, i: number) {
   return c.criteria?.[i] || `Criterion ${i + 1}`;
 }
 
+/** Longest criterion wording kept; anything longer is cut. */
+export const MAX_WORDING = 400;
+
+/** Form field name for one criterion's wording on the Scoring sheet screen. */
+export const wordingField = (half: Half, catKey: string, i: number) => `crit:${half}:${catKey}:${i}`;
+
+/**
+ * A copy of the rubric with new criterion wording. `get` returns the typed text for a field, or null when the form
+ * did not send that field, in which case the stored wording is kept. Only wording changes; points never do.
+ */
+export function withCriterionWording(rubric: Rubric, get: (field: string) => string | null): { rubric: Rubric; worded: number } {
+  const next: Rubric = structuredClone(rubric);
+  let worded = 0;
+  for (const half of HALVES) {
+    for (const cat of next.halves[half].categories) {
+      cat.criteria = cat.maxes.map((_, i) => {
+        const typed = get(wordingField(half, cat.key, i));
+        const text = typed === null ? (cat.criteria?.[i] ?? '') : typed.replace(/\s+/g, ' ').trim().slice(0, MAX_WORDING);
+        if (text) worded++;
+        return text;
+      });
+    }
+  }
+  return { rubric: next, worded };
+}
+
+/** Lines pasted from Word or Excel, one criterion per line, with list numbering and bullets removed. */
+export function splitPastedLines(text: string): string[] {
+  return text
+    .split(/\r?\n/)
+    .map((l) => l.replace(/^\s*(?:\(?\d{1,2}[.):]|[-•*–])\s+/, '').replace(/\t+/g, ' ').trim())
+    .filter(Boolean);
+}
+
 /** Every criterion in a half, in sheet order, with its storage key and maximum. */
 export function criteriaOf(rubric: Rubric, half: Half) {
   return rubric.halves[half].categories.flatMap((c) =>

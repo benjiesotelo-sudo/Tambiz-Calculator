@@ -130,6 +130,14 @@ input[type=file].input { padding: 9px 12px; }
 .letter { display: inline-grid; place-items: center; min-width: 42px; height: 42px; padding: 0 6px; border-radius: 10px; background: var(--dark-green); color: var(--gold); font-weight: 800; font-size: 18px; }
 .letter.f { background: var(--error); color: #fff; }
 
+/* scoring sheet wording */
+.wording { display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; gap: 10px; align-items: center; margin-top: 10px; }
+.wording .num { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font-weight: 800; font-size: 13px; background: var(--half-soft); color: var(--half-ink); }
+.wording textarea.input { min-height: 52px; padding: 8px 12px; resize: vertical; line-height: 1.35; }
+.savebar { position: sticky; bottom: 0; z-index: 10; background: var(--bg); border-top: 1px solid var(--line); margin: 16px -16px 0; padding: 10px 16px calc(10px + env(safe-area-inset-bottom)); }
+.savebar-inner { display: flex; gap: 10px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+.savebar-inner .sub { flex: 1 1 200px; min-width: 0; }
+
 /* progress */
 .prog { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 8px; align-items: center; }
 .judgechips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }

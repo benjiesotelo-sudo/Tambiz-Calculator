@@ -3,6 +3,7 @@ import type { EventRow } from '@/lib/repo';
 
 const TABS = [
   ['', 'Home'],
+  ['sheet', 'Scoring sheet'],
   ['groups', 'Groups'],
   ['roll', 'Class roll'],
   ['advisers', 'Advisers'],

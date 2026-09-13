@@ -7,7 +7,7 @@ import { newId, one, query, transaction, type Statement } from '@/lib/db';
 import { ADVISER_COLUMNS, ImportError, parseWorkbook, ROLL_COLUMNS } from '@/lib/excel-import';
 import { generatePassword, hashPassword } from '@/lib/passwords';
 import { getEvent, listEvents } from '@/lib/repo';
-import { DEFAULT_RUBRIC } from '@/lib/rubric';
+import { DEFAULT_RUBRIC, HALVES, withCriterionWording } from '@/lib/rubric';
 import { nameKey } from '@/lib/seed';
 
 const s = (fd: FormData, k: string) => String(fd.get(k) ?? '').trim();
@@ -56,6 +56,18 @@ export async function setEventStatus(fd: FormData) {
   await log(event.id, acc.id, 'event.status', { from: event.status, to: status });
   const words = { setup: 'Back in set-up.', judging: 'Judging is open. Judges can score.', finalised: 'Judging is closed. Scores are locked and results are final.' } as const;
   back(`/admin/events/${event.id}`, { ok: words[status as keyof typeof words] });
+}
+
+// ── scoring sheet wording ─────────────────────────────────────
+
+export async function saveCriteria(fd: FormData) {
+  const acc = await requireAdmin();
+  const event = await eventOr404(s(fd, 'eventId'));
+  const { rubric, worded } = withCriterionWording(event.rubric, (field) => (fd.has(field) ? String(fd.get(field)) : null));
+  await query('UPDATE event SET rubric = $2::jsonb WHERE id = $1', [event.id, JSON.stringify(rubric)]);
+  await log(event.id, acc.id, 'rubric.wording', { worded });
+  const total = HALVES.reduce((n, h) => n + rubric.halves[h].categories.reduce((m, c) => m + c.maxes.length, 0), 0);
+  back(`/admin/events/${event.id}/sheet`, { ok: `Wording saved: ${worded} of ${total} criteria have wording. Judges see it the next time they open a group.` });
 }
 
 // ── groups and members ────────────────────────────────────────

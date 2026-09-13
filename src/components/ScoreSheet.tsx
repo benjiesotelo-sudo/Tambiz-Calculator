@@ -193,7 +193,9 @@ export function ScoreSheet(props: Props) {
       const k = critKey(cat.key, i);
       const raw = rawRef.current[k];
       const c = checkScore(raw, m);
-      const label = criterionLabel(cat, i);
+      // Review lists stay short even when the coordinator has entered long criterion wording.
+      const full = criterionLabel(cat, i);
+      const label = cat.criteria?.[i] ? `${i + 1}. ${full.length > 48 ? `${full.slice(0, 46)}…` : full}` : full;
       if (c.state === 'ok') {
         filled++;
         sum += c.n;

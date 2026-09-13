@@ -29,9 +29,27 @@ You do not need to remember anything from last year.
 6. Check the **Year** box shows the right year, for example `2027`. Change it if not.
 7. Leave **Title** empty to call it "Tambiz 2027", or type another title.
 8. Press **Create event**. You land on the event's home page.
-9. Scroll to **Scoring sheet** and check the categories and maximums are right. (They are copied from the newest event. To change them, see "Not built yet" at the end.)
+9. Scroll to **Scoring sheet** and check the categories and maximums are right. (They are copied from the newest event. Points cannot be changed on screen; see "Not built yet" at the end.)
 
 ☐ Done: the event exists and its status says **Set-up**.
+
+---
+
+## Part A2. Enter the criterion wording
+
+Judges see this wording on their phones. Without it, the rows read "Criterion 1, Criterion 2…". You can do this at any time, even during judging: wording never changes a score.
+
+1. On the event page, press the **Scoring sheet** tab.
+2. Each category is a card with one box per criterion. The points for that criterion are printed beside its box, for example **/20**.
+3. Type the wording into each box.
+4. To paste the whole list instead: in Word or Excel, copy the criteria **one per line, in sheet order** (the 21 defense criteria, then the 18 booth criteria). Click the first box under **Elevator Pitch** and paste. Each line fills the next box, carrying on into the next category. Numbers and bullets at the start of a line are removed. The bar at the bottom says how many boxes were filled.
+5. Check a few boxes against your list, especially the last box of each category.
+6. Press **Save wording**. The green message says how many criteria have wording.
+7. Judges see the new wording the next time they open a group.
+
+The event page's **Scoring sheet** section says how many of the 39 criteria have wording. A new event copies the wording from the newest event, so next year you only change what changed.
+
+☐ Done: the event page says all 39 criteria have their wording.
 
 ---
 
@@ -244,7 +262,7 @@ Be aware of these gaps in this first version.
 
 - **Student and adviser links.** Students and advisers cannot see their results in the app yet. Share results from the Excel workbook.
 - **Mailing sheet.** There is no mailing sheet for Power Automate yet.
-- **Editing the scoring sheet.** Criterion wording, maximums, weights and letter bands cannot be changed from the screens. Each event keeps the copy it was created with. A developer can change the default in `src/lib/rubric.ts` before creating next year's event.
+- **Changing points, weights or letter bands.** Only the criterion wording can be changed on screen (Part A2). Maximums, weights and letter bands cannot. Each event keeps the copy it was created with. A developer can change the default in `src/lib/rubric.ts` before creating next year's event.
 - **Full offline mode.** Scores typed while offline are kept on the phone and sent later, but a phone that has never opened the app cannot load it offline, and reloading the page with no connection shows the browser's offline page.
 - **Coordinator corrections.** You cannot change a judge's score yourself; ask the judge to reopen the group with **Edit scores** (judging must be open).
 - **Deleting scores.** There is no button to delete a judge's sheet (for example after a rehearsal). A group with scores cannot be deleted.
