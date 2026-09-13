@@ -152,7 +152,7 @@ Give this part to the judges.
 4. Check the group name at the top matches the group in front of you.
 5. You are on the first category. Each row has a number, the criterion, a large box, and the maximum beside it (for example **/20**).
 6. Tap the first box and type the score. Press **Next** (or **Enter**) on the keypad to move to the next box. After the last box, Next moves to the next category.
-7. If you type more than the maximum, the row turns red and says, for example, "Max is 20. You typed 25, so it is not counted yet." Tap the box and type the correct score.
+7. Scores can have up to two decimal places, for example `17.5` or `8.75`. If you type more than the maximum, or a third decimal place, the row turns red and says why, for example "Max is 20. You typed 25, so it is not counted yet." Tap the box and type the correct score.
 8. A 0 shows an amber "0 points. Intended?" note. It is allowed; it is only a reminder.
 9. Defense judges only: the **Members** step shows one card per student, each with **Presentation /20**, **Communication /40** and **Q&A /40**. Score every member.
 10. Tap **Review**. It lists every category with your percentage, and every blank box and every error. Tap **Go** beside any of them to jump straight to that box.
@@ -193,7 +193,7 @@ If a group shows **No scores** in a half at the end of the night, find the judge
 
 What this does: judges can no longer change any score. Results and grades stop moving.
 
-Anything still blank at this point counts as zero, exactly as in the old calculator.
+A blank score is never counted as zero. Anything nobody scored is left out, and a group that is not fully judged reads **Incomplete** and has no rank. A judge who means zero types `0`, and that counts.
 
 If you closed too early, press **Reopen judging** on the same page.
 
@@ -201,16 +201,23 @@ If you closed too early, press **Reopen judging** on the same page.
 
 ## Part J. Read the results
 
+How scores are worked out:
+
+- **A blank is never a zero.** A criterion, category or half that nobody scored shows a dash and is left out of the arithmetic. A category percentage uses only the criteria that have a score; a half averages only the categories that have a percentage; a group with no booth scores has its defense half as its overall.
+- **Incomplete groups are not ranked.** A group reads **Incomplete** until every criterion in both halves has at least one judge's score. It gets no rank and no place on the leaderboard, so a half-judged group never looks like a low score.
+- **Two decimal places.** Every percentage shows two decimals, for example 89.85%. The screens and the Excel workbook use the same rounding, so they always show the same number.
+- **Ties.** Groups are ranked on the percentages you see. When two groups show the same category percentage, the one with the higher overall score goes first; they share a place only when both are equal. This rule is the same on the leaderboard and in the table.
+
 1. Press the **Results** tab.
-2. **Top 10 leaderboard** shows one card per category plus **Overall**. Tied groups share a place and are listed alphabetically.
-3. **Every group by category** shows each group's overall percentage and rank at the top right, its Defense and Booth halves, and every category percentage with its rank. In this table a tie in a category is broken by the overall score, as in the old calculator.
+2. **Top 10 leaderboard** shows one card per category plus **Overall**. Groups that still share a place are listed alphabetically.
+3. **Every group by category** shows each group's overall percentage and rank at the top right (or **Incomplete**), its Defense and Booth halves, and every category percentage with its rank.
 4. Press the **Grades** tab. Students are grouped by section. Each card shows:
-   - **Member total**: the average across defense judges of Presentation + Communication + Q&A (out of 100).
+   - **Member total**: for Presentation /20, Communication /40 and Q&A /40, the average across the defense judges who scored it, added up (out of 100). A field one judge left blank is not counted as zero.
    - **Group overall**: the group's overall percentage.
-   - **Final grade**: (member total + group overall) ÷ 2.
+   - **Final grade**: (member total + group overall) ÷ 2, using the two-decimal numbers shown.
    - **Rounded up**: the final grade rounded up to a whole number (84.5 becomes 85).
    - The **letter** and **quality points**, from the rounded number: 92–100 A (4), 85–91 B+ (3.5), 78–84 B (3), 71–77 C+ (2.5), 64–70 C (2), 57–63 D+ (1.5), 50–56 D (1), 0–49 F (0).
-5. A red **No grade yet** means that student has no member scores, or their group has no scores. Check with the defense judges.
+5. A red **No grade yet** says why: the student's member scores are incomplete, or their group is not fully judged. Check with the defense judges.
 
 ---
 

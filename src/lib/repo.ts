@@ -2,7 +2,7 @@
 
 import { one, query } from './db';
 import { criteriaOf, DEFAULT_RUBRIC, HALVES, type Half, type MemberFieldKey, type Rubric } from './rubric';
-import { computeResults, finalGrade, letterGrade, memberTotal, type EventResults, type MemberSet, type ScoredGroup, type SheetValues } from './scoring';
+import { computeResults, finalGrade, letterGrade, memberScore, type EventResults, type MemberSet, type ScoredGroup, type SheetValues } from './scoring';
 
 export interface EventRow {
   id: string;
@@ -164,7 +164,11 @@ export interface GradeRow {
   group: GroupRow;
   perJudge: { judge: string; set: MemberSet }[];
   total: number | null;
+  /** Every member field has at least one defense judge's score. */
+  memberComplete: boolean;
   overall: number | null;
+  /** The group is fully judged, or the coordinator accepted it at finalising. */
+  groupReady: boolean;
   final: number | null;
   letter: string | null;
   rounded: number | null;
@@ -211,11 +215,26 @@ export async function eventReport(event: EventRow): Promise<EventReport> {
       .map(([sheetId, set]) => ({ sheet: sheetById.get(sheetId), set }))
       .filter((x) => x.sheet && x.sheet.group_id === st.group_id && x.sheet.half === 'defense')
       .map((x) => ({ judge: x.sheet!.judge_name, set: x.set }));
-    const total = memberTotal(perJudge.map((p) => p.set));
-    const overall = resultById.get(group.id)?.overall ?? null;
-    const final = finalGrade(total, overall);
+    const member = memberScore(perJudge.map((p) => p.set), event.rubric.memberFields);
+    const result = resultById.get(group.id);
+    const overall = result?.overall ?? null;
+    const groupReady = !!result && (result.complete || result.accepted);
+    // No grade from incomplete scores: a missing member field or an unjudged part of the group is never a zero.
+    const final = finalGrade(member.complete ? member.total : null, groupReady ? overall : null);
     const lg = letterGrade(final, event.rubric.grades);
-    return { student: st, group, perJudge, total, overall, final, letter: lg?.letter ?? null, rounded: lg?.rounded ?? null, qualityPoints: lg?.qualityPoints ?? null };
+    return {
+      student: st,
+      group,
+      perJudge,
+      total: member.total,
+      memberComplete: member.complete,
+      overall,
+      groupReady,
+      final,
+      letter: lg?.letter ?? null,
+      rounded: lg?.rounded ?? null,
+      qualityPoints: lg?.qualityPoints ?? null,
+    };
   });
 
   return { event, groups, results, resultById, grades, sheets: scores.sheets, sheetValues: scores.sheetValues, filled: scores.filled };

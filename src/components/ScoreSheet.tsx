@@ -6,6 +6,7 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { categoryMax, criterionLabel, type Category, type Half, type Rubric } from '@/lib/rubric';
+import { fmtPct } from '@/lib/scoring';
 import { checkScore, critKey, fmtScore, memberKey } from '@/lib/sheet';
 import { readDraft, writeDraft } from './draft';
 
@@ -183,7 +184,8 @@ export function ScoreSheet(props: Props) {
   const catStats = (cat: Category) => {
     let filled = 0,
       errors = 0,
-      sum = 0;
+      sum = 0,
+      scoredMax = 0;
     const errs: Issue[] = [],
       blanks: Issue[] = [],
       warns: Issue[] = [];
@@ -195,13 +197,14 @@ export function ScoreSheet(props: Props) {
       if (c.state === 'ok') {
         filled++;
         sum += c.n;
+        scoredMax += m;
         if (c.n === 0) warns.push({ t: 'w', key: k, text: `${label} is 0. Intended?` });
       } else if (c.state === 'error') {
         errors++;
         errs.push({ t: 'e', key: k, text: `${label}: ${raw} is over the max of ${m}` });
       } else blanks.push({ t: 'b', key: k, text: `${label} is blank` });
     });
-    return { filled, total: cat.maxes.length, errors, sum, max: categoryMax(cat), issues: [...errs, ...blanks, ...warns] };
+    return { filled, total: cat.maxes.length, errors, sum, scoredMax, max: categoryMax(cat), issues: [...errs, ...blanks, ...warns] };
   };
   const memberStats = () => {
     let filled = 0,
@@ -493,7 +496,8 @@ export function ScoreSheet(props: Props) {
           {halfDef.categories.map((st) => {
             const x = catStats(st);
             const state = x.errors ? 'err' : x.filled === x.total ? 'ok' : x.filled === 0 ? 'none' : 'part';
-            const pct = x.filled ? `${fmtScore(Math.round((x.sum / x.max) * 1000) / 10)}%` : '–';
+            // Blanks are left out, never counted as zero (decision 1), with the same two-decimal rounding as results.
+            const pct = x.filled ? fmtPct((x.sum / x.scoredMax) * 100) : '–';
             const issues = x.filled === 0 && !x.errors ? [{ t: 'b' as const, key: critKey(st.key, 0), text: `Not started · ${x.total} blank` }] : x.issues;
             return (
               <li key={st.key} className={`ritem ${state}`}>

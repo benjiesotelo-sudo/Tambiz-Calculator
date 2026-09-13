@@ -5,11 +5,20 @@
 import ExcelJS from 'exceljs';
 import { fullName, rollName, type EventReport } from './repo';
 import { criteriaOf, type Half } from './rubric';
+import { fmt2, round2 } from './scoring';
 
 const GREEN = 'FF1A6B3C';
 const DARK = 'FF0D4F2B';
 const GOLD = 'FFF0B429';
-const r1 = (n: number | null) => (n === null ? '' : Math.round(n * 10) / 10);
+/** The same two-decimal rounding as the screens (scoring.round2), stored as a number and shown with two decimals. */
+const n2 = (n: number | null) => (n === null ? '' : round2(n));
+const TWO_DECIMALS = '0.00';
+const twoDecimals = (row: ExcelJS.Row, cols: number[]) =>
+  cols.forEach((c) => {
+    const cell = row.getCell(c);
+    if (typeof cell.value === 'number') cell.numFmt = TWO_DECIMALS;
+  });
+const judged = (g: { complete: boolean; accepted: boolean }) => (g.complete ? 'Complete' : g.accepted ? 'Finalised incomplete' : 'Incomplete');
 
 function header(ws: ExcelJS.Worksheet, row: ExcelJS.Row, fill = GREEN, font = 'FFFFFFFF') {
   row.eachCell((c) => {
@@ -67,21 +76,26 @@ export async function buildWorkbook(report: EventReport): Promise<Buffer> {
       { header: 'Booth %', width: 11 },
       { header: 'Overall %', width: 11 },
       { header: 'Overall Rank', width: 12 },
+      { header: 'Judged', width: 20 },
     ];
     header(ws, ws.getRow(1), DARK, GOLD);
     const code = new Map(groups.map((g) => [g.id, g.code]));
     const order = [...results.groups].sort((a, b) => (a.overallRank ?? 1e9) - (b.overallRank ?? 1e9));
     for (const g of order) {
-      ws.addRow([
+      const row = ws.addRow([
         code.get(g.id),
         g.name,
-        ...g.categories.flatMap((c) => [r1(c.pct), c.rank === null ? '' : `Rank ${c.rank}`]),
-        r1(g.defense),
-        r1(g.booth),
-        r1(g.overall),
+        ...g.categories.flatMap((c) => [n2(c.pct), c.rank === null ? '' : `Rank ${c.rank}`]),
+        n2(g.defense),
+        n2(g.booth),
+        n2(g.overall),
         g.overallRank === null ? '' : `Rank ${g.overallRank}`,
+        judged(g),
       ]);
+      twoDecimals(row, Array.from({ length: row.cellCount }, (_, i) => i + 1));
     }
+    ws.addRow([]);
+    ws.addRow(['A blank score is never counted as zero. A part nobody scored is left empty and left out; incomplete groups have no rank.']);
   }
 
   // Leaderboard: Position 1-10 down, one column per category.
@@ -90,7 +104,7 @@ export async function buildWorkbook(report: EventReport): Promise<Buffer> {
     ws.columns = [{ header: '', width: 12 }, ...results.leaderboards.map((lb) => ({ header: lb.name, width: 30 }))];
     header(ws, ws.getRow(1), DARK, GOLD);
     for (let pos = 0; pos < 10; pos++) {
-      ws.addRow([`Position ${pos + 1}`, ...results.leaderboards.map((lb) => (lb.entries[pos] ? `${lb.entries[pos].rank}. ${lb.entries[pos].name}: ${r1(lb.entries[pos].score)}%` : ''))]);
+      ws.addRow([`Position ${pos + 1}`, ...results.leaderboards.map((lb) => (lb.entries[pos] ? `${lb.entries[pos].rank}. ${lb.entries[pos].name}: ${fmt2(lb.entries[pos].score)}%` : ''))]);
     }
   }
 
@@ -113,19 +127,21 @@ export async function buildWorkbook(report: EventReport): Promise<Buffer> {
     const sorted = [...grades].sort((a, b) => a.group.code.localeCompare(b.group.code, undefined, { numeric: true }) || a.student.surname.localeCompare(b.student.surname));
     for (const g of sorted) {
       const judges = g.perJudge.length ? g.perJudge : [{ judge: '', set: {} }];
+      const nFields = rubric.memberFields.length;
       judges.forEach((p, i) => {
-        ws.addRow([
+        const row = ws.addRow([
           g.group.name,
           fullName(g.student),
           g.student.student_number,
           g.student.section,
           p.judge,
           ...rubric.memberFields.map((f) => p.set[f.key] ?? null),
-          i === 0 ? r1(g.total) : '',
-          i === 0 ? r1(g.overall) : '',
-          i === 0 ? r1(g.final) : '',
+          i === 0 ? n2(g.total) : '',
+          i === 0 ? n2(g.overall) : '',
+          i === 0 ? n2(g.final) : '',
           i === 0 ? (g.letter ?? '') : '',
         ]);
+        twoDecimals(row, [6 + nFields, 7 + nFields, 8 + nFields]);
       });
     }
   }
@@ -148,7 +164,8 @@ export async function buildWorkbook(report: EventReport): Promise<Buffer> {
       (a, b) => a.student.section.localeCompare(b.student.section) || a.student.surname.localeCompare(b.student.surname) || a.student.first_name.localeCompare(b.student.first_name),
     );
     for (const g of sorted) {
-      ws.addRow([fullName(g.student), rollName(g.student), g.student.student_number, g.student.section, r1(g.total), r1(g.overall), g.rounded ?? '', g.letter ?? '']);
+      const row = ws.addRow([fullName(g.student), rollName(g.student), g.student.student_number, g.student.section, n2(g.total), n2(g.overall), g.rounded ?? '', g.letter ?? '']);
+      twoDecimals(row, [5, 6]);
     }
     ws.addRow([]);
     ws.addRow([`Final Grade is (Total Score + Group Overall %) ÷ 2, rounded up to a whole number. Generated ${new Date().toLocaleString('en-PH', { timeZone: 'Asia/Manila' })}.`]);

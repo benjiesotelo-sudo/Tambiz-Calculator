@@ -1,8 +1,18 @@
-// Scoring rules, ported from index.html (lines 662-746, 808-820, 1153-1175, 1254).
-// Pure functions only: the live screens, results, and the Excel export all call these.
-// tests/golden.test.ts and tests/crosscheck.test.ts hold them to the original file.
+// Scoring rules, ported from index.html (lines 662-746, 808-820, 1153-1175, 1254) and then changed by the
+// coordinator's decisions of 14 September 2026. Where a rule differs from index.html, the comment says so and why.
+//
+//  1. A blank is never a zero. An unscored criterion, category, half or member field stays out of the arithmetic
+//     and the result is marked incomplete. index.html counted an unscored criterion or category as zero against the
+//     full maximum, an unscored half as zero in the overall, and a judge's blank member field as zero.
+//  2. Percentages are rounded once, by round2(), to two decimals; the screens and the Excel workbook both use it.
+//     index.html showed toFixed(1), and the first app's workbook rounded differently from its screens.
+//  4. A category tie is broken by overall score everywhere, including the leaderboard, and ranks are worked out
+//     on the rounded values people see. index.html's leaderboard ignored overall, and ranked on unrounded values.
+//
+// Pure functions only: the live screens, results, student and adviser pages, and the Excel export all call these.
+// tests/golden.test.ts holds the rules; tests/crosscheck.test.ts holds them to index.html wherever nothing is blank.
 
-import { categoryMax, type Category, type GradeBand, type Half, type MemberFieldKey, type Rubric } from './rubric';
+import { DEFAULT_RUBRIC, HALVES, type Category, type GradeBand, type Half, type MemberField, type MemberFieldKey, type Rubric } from './rubric';
 
 /** One judge's sheet: for each category key, one value per criterion (null = left blank). */
 export type SheetValues = Record<string, (number | null)[]>;
@@ -15,16 +25,46 @@ export interface ScoredGroup {
   name: string;
   defense: SheetValues[];
   booth: SheetValues[];
+  /** The coordinator finalised this group without every score, with a recorded reason (decision 5). */
+  accepted?: boolean;
 }
 
-/** Criterion averages across the judges who filled each one in (index.html:662-671). */
+/** A percentage worked out from whatever was scored, and whether everything was scored. */
+export interface Part {
+  pct: number | null;
+  complete: boolean;
+}
+
+const has = (v: number | null | undefined): v is number => v !== null && v !== undefined;
+
+// ── rounding (decision 2) ───────────────────────────────────────────
+
+/**
+ * The one rounding rule: two decimals, halves away from zero. Floating-point noise below one millionth is removed
+ * first, so an average that is really 89.845 becomes 89.85 even when the computer holds it as 89.84499999999999.
+ */
+export function round2(n: number): number {
+  const abs = Math.abs(Math.round(n * 1e6) / 1e6);
+  const r = Number(`${Math.round(Number(`${abs}e2`))}e-2`);
+  return n < 0 && r !== 0 ? -r : r;
+}
+
+/** Two decimals as text, or '' for nothing. */
+export const fmt2 = (n: number | null | undefined) => (has(n) ? round2(n).toFixed(2) : '');
+
+/** A percentage for the screen: "89.85%", or a dash when nothing was scored. */
+export const fmtPct = (n: number | null | undefined) => (has(n) ? `${fmt2(n)}%` : '—');
+
+// ── one group ───────────────────────────────────────────────────────
+
+/** Criterion averages across the judges who filled each one in (index.html:662-671, unchanged). */
 export function criterionAverages(sheets: SheetValues[], cat: Category): (number | null)[] {
   return cat.maxes.map((_, i) => {
     let sum = 0;
     let count = 0;
     for (const s of sheets) {
       const v = s[cat.key]?.[i];
-      if (v !== null && v !== undefined) {
+      if (has(v)) {
         sum += v;
         count++;
       }
@@ -33,36 +73,56 @@ export function criterionAverages(sheets: SheetValues[], cat: Category): (number
   });
 }
 
-/** Category percentage, or null when nothing was entered (index.html:673-682). */
-export function categoryPct(sheets: SheetValues[], cat: Category): number | null {
+/**
+ * Category percentage over the criteria that have at least one score: their averages added up, divided by their
+ * maximums added up. Complete when every criterion has a score. index.html (673-682) divided by the whole
+ * category's maximum, so an unscored criterion counted as zero.
+ */
+export function categoryScore(sheets: SheetValues[], cat: Category): Part {
+  const avgs = criterionAverages(sheets, cat);
   let sum = 0;
-  let hasAny = false;
-  for (const v of criterionAverages(sheets, cat)) {
+  let max = 0;
+  avgs.forEach((v, i) => {
     if (v !== null) {
       sum += v;
-      hasAny = true;
+      max += cat.maxes[i];
     }
-  }
-  return hasAny ? (sum / categoryMax(cat)) * 100 : null;
+  });
+  return { pct: max > 0 ? (sum / max) * 100 : null, complete: avgs.every((v) => v !== null) };
 }
 
-/** Half percentage: plain average of category percentages, empty categories count 0 (index.html:706-718). */
-export function halfPct(sheets: SheetValues[], cats: Category[]): number | null {
-  const anyEntered = sheets.some((s) => cats.some((c) => (s[c.key] ?? []).some((v) => v !== null && v !== undefined)));
-  if (!anyEntered) return null;
-  const pcts = cats.map((c) => categoryPct(sheets, c) ?? 0);
-  return pcts.reduce((a, b) => a + b, 0) / cats.length;
-}
-
-/** Overall = defense x 0.7 + booth x 0.3, a missing half counts 0 (index.html:720-725). */
-export function overallPct(defense: number | null, booth: number | null, rubric: Rubric): number | null {
-  if (defense === null && booth === null) return null;
-  return (defense ?? 0) * rubric.halves.defense.weight + (booth ?? 0) * rubric.halves.booth.weight;
-}
+export const categoryPct = (sheets: SheetValues[], cat: Category) => categoryScore(sheets, cat).pct;
 
 /**
- * Results-table ranking (index.html:727-746). Tied scores share a rank and the next rank is skipped;
- * with a tie-breaker, ties are broken by it and share a rank only when both values match.
+ * Half percentage: the plain average of the categories that have a percentage, so every category weighs the same.
+ * Complete when every category is. index.html (706-718) counted an empty category as zero.
+ */
+export function halfScore(sheets: SheetValues[], cats: Category[]): Part {
+  const parts = cats.map((c) => categoryScore(sheets, c));
+  const scored = parts.filter((p) => p.pct !== null);
+  return {
+    pct: scored.length ? scored.reduce((a, p) => a + p.pct!, 0) / scored.length : null,
+    complete: parts.every((p) => p.complete),
+  };
+}
+
+export const halfPct = (sheets: SheetValues[], cats: Category[]) => halfScore(sheets, cats).pct;
+
+/**
+ * Overall = defense × 0.7 + booth × 0.3 when both halves have a percentage. When only one does, the overall is that
+ * half alone: the missing half stays out rather than counting as zero, as it did in index.html (720-725).
+ */
+export function overallPct(defense: number | null, booth: number | null, rubric: Rubric): number | null {
+  if (defense !== null && booth !== null) return defense * rubric.halves.defense.weight + booth * rubric.halves.booth.weight;
+  return defense ?? booth;
+}
+
+// ── ranking (decision 4) ────────────────────────────────────────────
+
+/**
+ * Tied scores share a rank and the next rank is skipped (1, 1, 3), as in index.html:727-746. With a tie-breaker,
+ * ties are broken by it and share a rank only when both values match. A null score gets no rank.
+ * Callers pass rounded values (round2), so ranks follow what people see.
  */
 export function rankMap<T>(items: T[], scoreFn: (t: T) => number | null, tiebreakerFn?: (t: T) => number | null) {
   const scored = items
@@ -98,43 +158,64 @@ export interface LeaderboardEntry {
 
 const byName = (a: string, b: string) => a.localeCompare(b, undefined, { sensitivity: 'base', numeric: true });
 
-/** Top-10 leaderboard (index.html:1153-1175): score only, ties share a rank, tied groups listed by name. */
-export function leaderboard<T extends { id: string; name: string }>(items: T[], scoreFn: (t: T) => number | null, limit = 10): LeaderboardEntry[] {
-  const sorted = items
-    .map((t) => ({ id: t.id, name: t.name, score: scoreFn(t) }))
-    .filter((x): x is { id: string; name: string; score: number } => x.score !== null)
-    .sort((a, b) => (b.score !== a.score ? b.score - a.score : byName(a.name, b.name)));
-  let prevScore: number | null = null;
-  let prevRank = 0;
-  return sorted
-    .map((it, idx) => {
-      const rank = idx === 0 ? 1 : it.score === prevScore ? prevRank : idx + 1;
-      prevScore = it.score;
-      prevRank = rank;
-      return { ...it, rank };
-    })
+/**
+ * Top-10 leaderboard. Scores are rounded, ranked with the same rule and tie-breaker as the results table, and groups
+ * that still share a rank are listed by name. index.html (1153-1175) ignored the overall score here.
+ */
+export function leaderboard<T extends { id: string; name: string }>(
+  items: T[],
+  scoreFn: (t: T) => number | null,
+  tiebreakerFn?: (t: T) => number | null,
+  limit = 10,
+): LeaderboardEntry[] {
+  const rounded = (x: number | null) => (x === null ? null : round2(x));
+  const rank = rankMap(items, (t) => rounded(scoreFn(t)), tiebreakerFn ? (t) => rounded(tiebreakerFn(t)) : undefined);
+  return items
+    .map((t, i) => ({ id: t.id, name: t.name, score: rounded(scoreFn(t)), rank: rank(i) }))
+    .filter((x): x is LeaderboardEntry => x.score !== null && x.rank !== null)
+    .sort((a, b) => a.rank - b.rank || byName(a.name, b.name))
     .slice(0, limit);
 }
 
-/**
- * A member's total (index.html:808-820): the average across judges of each judge's fields added together.
- * A judge who filled any field has blanks counted as 0; a judge who filled none is skipped.
- */
-export function memberTotal(sets: MemberSet[], fields: MemberFieldKey[] = ['presentation', 'communication', 'qa']): number | null {
-  const totals = sets
-    .map((set) => {
-      const vals = fields.map((f) => set[f]);
-      const hasAny = vals.some((v) => v !== null && v !== undefined);
-      return hasAny ? vals.reduce<number>((sum, v) => sum + (v ?? 0), 0) : null;
-    })
-    .filter((v): v is number => v !== null);
-  if (!totals.length) return null;
-  return totals.reduce((a, b) => a + b, 0) / totals.length;
+// ── members and grades ──────────────────────────────────────────────
+
+export interface MemberResult {
+  /** Out of the member fields' full total (100). Worked out from the fields that have a score. */
+  total: number | null;
+  /** Every field has at least one judge's score. */
+  complete: boolean;
 }
 
-/** Final grade = (member total + group overall %) / 2 (index.html:1254). */
+/**
+ * A member's total: for each field, the average across the judges who filled it in; then those averages added up.
+ * A field nobody filled stays out, and the total is scaled to the fields that were scored and marked incomplete.
+ * index.html (808-820) added up each judge's fields with that judge's blanks counted as zero, then averaged.
+ */
+export function memberScore(sets: MemberSet[], fields: MemberField[] = DEFAULT_RUBRIC.memberFields): MemberResult {
+  let sum = 0;
+  let max = 0;
+  let scoredFields = 0;
+  for (const f of fields) {
+    const vals = sets.map((s) => s[f.key]).filter(has);
+    if (!vals.length) continue;
+    sum += vals.reduce((a, b) => a + b, 0) / vals.length;
+    max += f.max;
+    scoredFields++;
+  }
+  if (!scoredFields) return { total: null, complete: false };
+  const fullMax = fields.reduce((a, f) => a + f.max, 0);
+  const complete = scoredFields === fields.length;
+  return { total: complete ? sum : (sum / max) * fullMax, complete };
+}
+
+export const memberTotal = (sets: MemberSet[], fields?: MemberField[]) => memberScore(sets, fields).total;
+
+/**
+ * Final grade = (member total + group overall %) / 2 (index.html:1254), from the two-decimal values shown on screen
+ * and in the workbook (decision 2), so the numbers people see always explain the rounded-up grade and its letter.
+ */
 export function finalGrade(total: number | null, overall: number | null): number | null {
-  return total === null || overall === null ? null : (total + overall) / 2;
+  return total === null || overall === null ? null : (round2(total) + round2(overall)) / 2;
 }
 
 /**
@@ -148,16 +229,14 @@ export function letterGrade(final: number | null, bands: GradeBand[]): { rounded
   return { rounded, letter: band.letter, qualityPoints: band.qualityPoints };
 }
 
-/** One decimal, as the original shows and exports (toFixed(1)). */
-export const fmt1 = (n: number | null | undefined) => (n === null || n === undefined ? '' : n.toFixed(1));
-
-// ── Whole-event results ─────────────────────────────────────────────
+// ── whole-event results ─────────────────────────────────────────────
 
 export interface CategoryResult {
   half: Half;
   key: string;
   name: string;
   pct: number | null;
+  complete: boolean;
   rank: number | null;
 }
 
@@ -167,7 +246,13 @@ export interface GroupResult {
   categories: CategoryResult[];
   defense: number | null;
   booth: number | null;
+  defenseComplete: boolean;
+  boothComplete: boolean;
   overall: number | null;
+  /** Every criterion in both halves has at least one judge's score. */
+  complete: boolean;
+  /** Not complete, but the coordinator finalised it anyway with a reason; it is ranked on what it has. */
+  accepted: boolean;
   overallRank: number | null;
 }
 
@@ -176,42 +261,72 @@ export interface EventResults {
   leaderboards: { key: string; name: string; half: Half | 'overall'; entries: LeaderboardEntry[] }[];
 }
 
+/** The overall a group is ranked on, rounded; null when the group is incomplete and not accepted. */
+export const rankableOverall = (g: GroupResult) => (g.overall !== null && (g.complete || g.accepted) ? round2(g.overall) : null);
+
+const rankableCategory = (g: GroupResult, ci: number) => {
+  const c = g.categories[ci];
+  return c.pct !== null && (c.complete || g.accepted) ? round2(c.pct) : null;
+};
+
+/**
+ * Percentages, completeness and ranks for every group. Only complete scores are ranked: an incomplete category or
+ * group has no rank and reads as incomplete, unless the coordinator accepted the group at finalising.
+ */
 export function computeResults(rubric: Rubric, groups: ScoredGroup[]): EventResults {
-  const base = groups.map((g) => {
-    const defense = halfPct(g.defense, rubric.halves.defense.categories);
-    const booth = halfPct(g.booth, rubric.halves.booth.categories);
-    const cats = (['defense', 'booth'] as Half[]).flatMap((half) =>
-      rubric.halves[half].categories.map((c) => ({
-        half,
-        key: c.key,
-        name: c.name,
-        pct: categoryPct(half === 'defense' ? g.defense : g.booth, c),
-        rank: null as number | null,
-      })),
+  const base: GroupResult[] = groups.map((g) => {
+    const d = halfScore(g.defense, rubric.halves.defense.categories);
+    const b = halfScore(g.booth, rubric.halves.booth.categories);
+    const categories = HALVES.flatMap((half) =>
+      rubric.halves[half].categories.map((c) => {
+        const s = categoryScore(half === 'defense' ? g.defense : g.booth, c);
+        return { half, key: c.key, name: c.name, pct: s.pct, complete: s.complete, rank: null as number | null };
+      }),
     );
-    return { id: g.id, name: g.name, categories: cats, defense, booth, overall: overallPct(defense, booth, rubric), overallRank: null as number | null };
+    const complete = d.complete && b.complete;
+    return {
+      id: g.id,
+      name: g.name,
+      categories,
+      defense: d.pct,
+      booth: b.pct,
+      defenseComplete: d.complete,
+      boothComplete: b.complete,
+      overall: overallPct(d.pct, b.pct, rubric),
+      complete,
+      accepted: !complete && !!g.accepted,
+      overallRank: null as number | null,
+    };
   });
 
-  const catKeys = base[0]?.categories.map((c) => c.key) ?? [];
-  catKeys.forEach((key, ci) => {
-    const rank = rankMap(base, (g) => g.categories[ci].pct, (g) => g.overall);
+  const catCount = base[0]?.categories.length ?? 0;
+  for (let ci = 0; ci < catCount; ci++) {
+    const rank = rankMap(base, (g) => rankableCategory(g, ci), rankableOverall);
     base.forEach((g, gi) => (g.categories[ci].rank = rank(gi)));
-  });
-  const ovRank = rankMap(base, (g) => g.overall);
+  }
+  const ovRank = rankMap(base, rankableOverall);
   base.forEach((g, gi) => (g.overallRank = ovRank(gi)));
 
+  // The leaderboard shows the same ranks as the table, top 10 by rank, ties listed by name.
+  const board = (key: string, name: string, half: Half | 'overall', rankOf: (g: GroupResult) => number | null, scoreOf: (g: GroupResult) => number | null) => ({
+    key,
+    name,
+    half,
+    entries: base
+      .map((g) => ({ id: g.id, name: g.name, score: scoreOf(g), rank: rankOf(g) }))
+      .filter((e): e is LeaderboardEntry => e.rank !== null && e.score !== null)
+      .sort((a, b) => a.rank - b.rank || byName(a.name, b.name))
+      .slice(0, 10),
+  });
   const leaderboards: EventResults['leaderboards'] = [];
-  (['defense', 'booth'] as Half[]).forEach((half) =>
-    rubric.halves[half].categories.forEach((c) => {
-      leaderboards.push({
-        key: c.key,
-        name: c.name,
-        half,
-        entries: leaderboard(base, (g) => g.categories.find((x) => x.key === c.key)?.pct ?? null),
-      });
-    }),
-  );
-  leaderboards.push({ key: 'overall', name: 'Overall', half: 'overall', entries: leaderboard(base, (g) => g.overall) });
+  let ci = 0;
+  for (const half of HALVES) {
+    for (const c of rubric.halves[half].categories) {
+      const i = ci++;
+      leaderboards.push(board(c.key, c.name, half, (g) => g.categories[i].rank, (g) => rankableCategory(g, i)));
+    }
+  }
+  leaderboards.push(board('overall', 'Overall', 'overall', (g) => g.overallRank, rankableOverall));
 
   return { groups: base, leaderboards };
 }

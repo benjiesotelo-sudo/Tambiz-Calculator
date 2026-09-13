@@ -124,8 +124,8 @@ export default async function ProgressPage({ params, searchParams }: { params: P
             <input type="hidden" name="eventId" value={id} />
             <input type="hidden" name="status" value="finalised" />
             <p style={{ margin: 0 }}>
-              Closing judging locks every judge’s scores. Results and grades are then final, and the Excel workbook is ready to download. Anything still blank counts as zero, exactly as in
-              the old calculator, so check the list above first.
+              Closing judging locks every judge’s scores. Results and grades are then final, and the Excel workbook is ready to download. Anything still blank is left out, never
+              counted as zero, and a group that is not fully judged stays incomplete without a rank, so check the list above first.
             </p>
             <label style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
               <input type="checkbox" name="confirm" value="yes" style={{ width: 22, height: 22 }} /> I have checked the progress above
