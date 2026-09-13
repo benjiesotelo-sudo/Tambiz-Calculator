@@ -29,7 +29,7 @@ You do not need to remember anything from last year.
 6. Check the **Year** box shows the right year, for example `2027`. Change it if not.
 7. Leave **Title** empty to call it "Tambiz 2027", or type another title.
 8. Press **Create event**. You land on the event's home page.
-9. Scroll to **Scoring sheet** and check the categories and maximums are right. (They are copied from the newest event. Points cannot be changed on screen; see "Not built yet" at the end.)
+9. Scroll to **Scoring sheet** and check the categories and maximums are right. (They are copied from the newest event, with the criterion wording. Points cannot be changed on screen; see "Not built yet" at the end.) A new event spells the second defense category **Infomercial**; an older event that stored "Informercial" keeps the spelling it was judged under.
 
 ☐ Done: the event exists and its status says **Set-up**.
 
@@ -382,6 +382,8 @@ Be aware of these gaps.
 - **Frozen results.** Closing judging locks the scores, but results are recalculated each time you open them; there is no stored snapshot or file history.
 - **Change history screen.** Corrections are listed on each group's scores page, but other changes (imports, groups, status) are recorded in the database with no screen to read them.
 - **First sign-in password change.** Judges are not forced to change the temporary password; they can do it under **Account**.
+- **More on links.** Wrong tries are counted per link only, not also per network. A link's 30 days cannot be extended on its own; reissue it instead. A mailing sheet cannot be downloaded again: if it is lost, reissue the links.
+- **Corrections after release.** Once results are released nothing can be corrected in the app; there is no "issue corrected results" step.
 
 ## If something goes wrong
 

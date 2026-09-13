@@ -49,7 +49,7 @@ export const DEFAULT_RUBRIC: Rubric = {
       weight: 0.7,
       categories: [
         { key: 'ep', name: 'Elevator Pitch', maxes: [20, 20, 20, 20, 20] },
-        { key: 'inf', name: 'Informercial', maxes: [10, 10, 10, 10] },
+        { key: 'inf', name: 'Infomercial', maxes: [10, 10, 10, 10] },
         { key: 'paper', name: 'Paper', maxes: [5, 20, 10, 10, 10, 10, 10, 10, 15] },
         { key: 'pd', name: 'Product Demo', maxes: [25, 25, 50] },
       ],
@@ -80,6 +80,19 @@ export const DEFAULT_RUBRIC: Rubric = {
     { min: 0, max: 49, letter: 'F', qualityPoints: 0 },
   ],
 };
+
+/** Misspellings corrected when a new event copies an older scoring sheet (decision 12). */
+const CORRECTED_NAMES: Record<string, string> = { Informercial: 'Infomercial' };
+
+/**
+ * The scoring sheet for a new event: a copy of the newest event's (or the default), with known misspellings
+ * corrected. Events already stored are never touched, so they keep the spelling they were judged under.
+ */
+export function rubricForNewEvent(latest?: Rubric | null): Rubric {
+  const next: Rubric = structuredClone(latest ?? DEFAULT_RUBRIC);
+  for (const half of HALVES) for (const c of next.halves[half].categories) c.name = CORRECTED_NAMES[c.name] ?? c.name;
+  return next;
+}
 
 export const categoryMax = (c: Category) => c.maxes.reduce((a, b) => a + b, 0);
 

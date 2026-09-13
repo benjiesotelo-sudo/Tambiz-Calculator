@@ -7,7 +7,7 @@ import { newId, one, query, transaction, type Statement } from '@/lib/db';
 import { ADVISER_COLUMNS, ImportError, parseWorkbook, ROLL_COLUMNS } from '@/lib/excel-import';
 import { generatePassword, hashPassword } from '@/lib/passwords';
 import { eventFinaliseChecks, eventReport, getEvent, listEvents } from '@/lib/repo';
-import { criterionLabel, DEFAULT_RUBRIC, findCriterion, HALVES, withCriterionWording } from '@/lib/rubric';
+import { criterionLabel, findCriterion, HALVES, rubricForNewEvent, withCriterionWording } from '@/lib/rubric';
 import { nameKey } from '@/lib/seed';
 import { emailGivesAway, makeAdviserCode, MAX_TRIES, normaliseCheck } from '@/lib/link-rules';
 import { checkScore, fmtScore } from '@/lib/sheet';
@@ -40,10 +40,11 @@ export async function createEvent(fd: FormData) {
   const year = parseInt(s(fd, 'year'), 10);
   const title = s(fd, 'title') || `Tambiz ${year}`;
   if (!Number.isInteger(year) || year < 2000 || year > 2100) back('/admin', { error: 'Type the year as four digits, for example 2027.' });
-  // Start from the newest event's scoring sheet, copied so editing it can never change an old event.
+  // Start from the newest event's scoring sheet, copied so editing it can never change an old event,
+  // with known misspellings corrected for the new event only ("Informercial" → "Infomercial", decision 12).
   const latest = (await listEvents())[0];
   const id = newId();
-  await query(`INSERT INTO event (id, year, title, rubric) VALUES ($1, $2, $3, $4::jsonb)`, [id, year, title, JSON.stringify(latest?.rubric ?? DEFAULT_RUBRIC)]);
+  await query(`INSERT INTO event (id, year, title, rubric) VALUES ($1, $2, $3, $4::jsonb)`, [id, year, title, JSON.stringify(rubricForNewEvent(latest?.rubric))]);
   await log(id, acc.id, 'event.create', { year, title });
   back(`/admin/events/${id}`, { ok: `Created ${title}.` });
 }

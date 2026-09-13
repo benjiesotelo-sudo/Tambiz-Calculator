@@ -1,6 +1,24 @@
 // Criterion wording typed or pasted on the Scoring sheet screen.
 import { describe, expect, it } from 'vitest';
-import { criterionLabel, DEFAULT_RUBRIC, MAX_WORDING, splitPastedLines, withCriterionWording, wordingField } from '@/lib/rubric';
+import { criterionLabel, DEFAULT_RUBRIC, MAX_WORDING, rubricForNewEvent, splitPastedLines, withCriterionWording, wordingField, type Rubric } from '@/lib/rubric';
+
+describe('"Informercial" becomes "Infomercial" for new events only (decision 12)', () => {
+  it('the default scoring sheet spells it Infomercial', () => {
+    expect(DEFAULT_RUBRIC.halves.defense.categories[1].name).toBe('Infomercial');
+  });
+
+  it('a new event copied from a stored event that says Informercial is corrected, keeping points and wording', () => {
+    const stored: Rubric = structuredClone(DEFAULT_RUBRIC);
+    stored.halves.defense.categories[1].name = 'Informercial';
+    stored.halves.defense.categories[1].criteria = ['Script', '', '', ''];
+    const next = rubricForNewEvent(stored);
+    expect(next.halves.defense.categories[1]).toMatchObject({ key: 'inf', name: 'Infomercial', maxes: [10, 10, 10, 10], criteria: ['Script', '', '', ''] });
+    // The stored event keeps the spelling it was judged under.
+    expect(stored.halves.defense.categories[1].name).toBe('Informercial');
+  });
+
+  it('with no earlier event, the default is used', () => expect(rubricForNewEvent(null)).toEqual(DEFAULT_RUBRIC));
+});
 
 describe('criterion wording', () => {
   it('judges see "Criterion n" until wording is entered', () => {
