@@ -100,7 +100,7 @@ export async function listStudents(eventId: string) {
 }
 
 export async function listAdvisers(eventId: string) {
-  return query<{ id: string; name: string; email: string; group_count: number }>(
+  return query<{ id: string; name: string; email: string; link_code: string; group_count: number }>(
     `SELECT a.*, (SELECT count(*)::int FROM tgroup g WHERE g.adviser_id = a.id) AS group_count FROM adviser a WHERE a.event_id = $1 ORDER BY a.name`,
     [eventId],
   );

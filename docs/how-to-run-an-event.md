@@ -98,7 +98,15 @@ Choose **one** of these.
 4. Press **Save adviser**.
 5. Repeat for each adviser.
 
-☐ Done: every adviser is listed.
+**Adviser codes.** After results are released, each adviser opens a private link and types an **adviser code** to see their groups. The code is never in the email, so you hand it out yourself.
+
+1. On the **Advisers** tab, press **Make codes for the advisers without one**. Each adviser gets a code such as `K7Q-4MP`.
+2. To choose a code yourself, press **Set code…** beside the adviser, type it, and press **Save code**. (Or add an **Adviser Code** column to the adviser file.)
+3. Give each adviser their code, for example on a slip at a faculty meeting. Do not email it.
+
+An adviser without an email or without a code gets no link.
+
+☐ Done: every adviser is listed, with an email and a code.
 
 ---
 
@@ -285,14 +293,55 @@ How scores are worked out:
 
 You can download the workbook as often as you like. It always shows the scores as they are at that moment.
 
+The **Results** sheet has a **Judged** column (Complete, Incomplete, or Finalised incomplete). **Individual Grades** and **For Encoding** have a **Note** column that says why a grade is blank, for example "Absent from the defense: grade to be entered by the coordinator". Students you left out of every group are listed at the end of For Encoding with your reason.
+
+---
+
+## Part L. Release results to students and advisers
+
+Releasing gives every student and adviser a private link to their own results. **The app never sends email.** It gives you a mailing sheet to send from your own faculty mailbox with Microsoft Power Automate.
+
+What people see:
+
+- **A student** sees their own letter grade and final grade, their own average Presentation, Communication and Q&A scores and total, and their group's percentages. No ranks anywhere.
+- **An adviser** sees only their own groups' results (percentages and each group's overall rank) and their own position in the adviser ranking, for example "2nd of 4 advisers". Never the full table of advisers, and no student grades.
+
+The **adviser ranking** is the average of the overall percentages of each adviser's groups. Advisers with the same average share a position. Only you see the full table, at the bottom of the **Results** tab.
+
+How a link works:
+
+- Opening the link shows nothing until the person types a check: **a student types their student number; an adviser types their adviser code** (Part C). Neither is in the email.
+- **Five wrong tries lock the link.** You can unlock it.
+- A link stays open for **30 days** from when it was issued, and can be opened any number of times. An email scanner that opens it first does no harm.
+
+Before you start: judging is closed (Part I), every adviser has a code (Part C), and you have checked the grades (Part J). **After release, scores can no longer be corrected and judging cannot be reopened.**
+
+1. Press the **Release** tab.
+2. Read **Check before sending**. It lists students with no email, advisers with no email or code, and any email that contains the person's student number or code. Fix what you can on the Class roll and Advisers tabs.
+3. Tick **Results are final and ready for students and advisers**.
+4. Press **Release results and download the mailing sheet**. An Excel file downloads.
+5. **Save the file to OneDrive straight away.** The links in it cannot be shown again. Keep it private: each link is personal.
+6. Reload the **Release** tab. It now says when results were released and shows **Link status**.
+
+**Sending the emails with Power Automate.** The mailing sheet's first sheet is an Excel table named **Mailing** with the columns **Name**, **Email**, **Link** and **Role**. Its **Read me** sheet has the steps. In short:
+
+1. In Power Automate, add the Excel Online (Business) action **List rows present in a table**, choose the saved file, and choose the table **Mailing**.
+2. In that action's **Settings**, turn **Pagination** on and set the threshold to `1000`. **Without this, only the first 256 rows are read.**
+3. Add **Apply to each** over the rows with an Outlook **Send an email (V2)** action using the Email, Name and Link columns.
+4. In the email, tell students the page will ask for their student number, and advisers for the code you gave them. Never put the number or the code in the email.
+
+**Link status** (on the Release tab after release) lists every link: **Sent** (not opened yet), **Opened**, **Locked** or **Expired**.
+
+- **Unlock**: a locked link can be tried again.
+- **Reissue**: makes a new link for one person, open for another 30 days, and downloads a mailing sheet with just their row. Their old link stops working. Use it for an expired link, or when someone lost their email.
+- **Download links for the people with none yet**: for example an adviser whose code you set after release.
+- **Reissue every link…**: only if the mailing sheet was lost or shared by mistake. Every earlier link stops working.
+
 ---
 
 ## Not built yet
 
-Be aware of these gaps in this first version.
-
-- **Student and adviser links.** Students and advisers cannot see their results in the app yet. Share results from the Excel workbook.
-- **Mailing sheet.** There is no mailing sheet for Power Automate yet.
+Be aware of these gaps.
 - **Changing points, weights or letter bands.** Only the criterion wording can be changed on screen (Part A2). Maximums, weights and letter bands cannot. Each event keeps the copy it was created with. A developer can change the default in `src/lib/rubric.ts` before creating next year's event.
 - **Full offline mode.** Scores typed while offline are kept on the phone and sent later, but a phone that has never opened the app cannot load it offline, and reloading the page with no connection shows the browser's offline page.
 - **Deleting scores.** There is no button to delete a whole judge's sheet (for example after a rehearsal); you can only remove scores one at a time with **Correct**. A group with scores cannot be deleted.

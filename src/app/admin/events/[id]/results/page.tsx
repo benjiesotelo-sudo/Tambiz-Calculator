@@ -3,7 +3,7 @@ import { AppBar } from '@/components/AppBar';
 import { EventHeader } from '@/components/EventNav';
 import { requireAdmin } from '@/lib/auth';
 import { eventReport, getEvent } from '@/lib/repo';
-import { fmtPct } from '@/lib/scoring';
+import { adviserRanking, fmtPct } from '@/lib/scoring';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,6 +18,11 @@ export default async function ResultsPage({ params }: { params: Promise<{ id: st
   const rows = [...report.results.groups].sort((a, b) => (a.overallRank ?? 1e9) - (b.overallRank ?? 1e9) || a.name.localeCompare(b.name));
   const codeOf = new Map(report.groups.map((g) => [g.id, g.code]));
   const incomplete = rows.filter((g) => !g.complete && !g.accepted).length;
+  const standings = adviserRanking(report.groups.map((g) => ({ adviserId: g.adviser_id, result: report.resultById.get(g.id)! })));
+  const advisers = report.groups
+    .filter((g, i, all) => g.adviser_id && standings.has(g.adviser_id) && all.findIndex((x) => x.adviser_id === g.adviser_id) === i)
+    .map((g) => ({ id: g.adviser_id!, name: g.adviser_name ?? '', ...standings.get(g.adviser_id!)! }))
+    .sort((a, b) => a.rank - b.rank || a.name.localeCompare(b.name));
 
   return (
     <>
@@ -96,6 +101,29 @@ export default async function ResultsPage({ params }: { params: Promise<{ id: st
           </div>
         ))}
         {!rows.length ? <p className="sub">No groups yet.</p> : null}
+
+        <div className="section-title">Adviser ranking</div>
+        <p className="sub" style={{ marginTop: 0 }}>
+          The average of the overall percentages of each adviser’s ranked groups; advisers with the same average share a position. Only you see this table: each adviser sees just
+          their own position.
+        </p>
+        <ul className="list">
+          {advisers.map((a) => (
+            <li key={a.id}>
+              <Rank r={a.rank} />
+              <span className="grow-1">
+                <span className="title">{a.name}</span>
+                <span className="sub" style={{ display: 'block' }}>
+                  {a.groups} ranked group{a.groups === 1 ? '' : 's'}
+                </span>
+              </span>
+              <span className="bignum" style={{ fontSize: 17 }}>
+                {fmtPct(a.average)}
+              </span>
+            </li>
+          ))}
+          {!advisers.length ? <li className="sub">No adviser has a ranked group yet.</li> : null}
+        </ul>
       </main>
     </>
   );

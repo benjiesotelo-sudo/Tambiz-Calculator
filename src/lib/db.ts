@@ -48,8 +48,19 @@ async function pgliteDriver(): Promise<Driver> {
 type Ready = { driver: Driver };
 const g = globalThis as unknown as { __tambizDb?: Promise<Ready> };
 
+/**
+ * The database address to use, or undefined for PGlite. A Vercel preview deployment (a pull request's test copy)
+ * never touches the real database, even when DATABASE_URL is set for previews, so reviewing a change cannot alter
+ * live data or apply its schema early. It runs on its own throwaway sample data instead.
+ * Set TAMBIZ_PREVIEW_DATABASE=1 in Vercel's Preview environment to let previews use DATABASE_URL after all.
+ */
+export function databaseUrl(env: Record<string, string | undefined> = process.env): string | undefined {
+  if (env.VERCEL_ENV === 'preview' && env.TAMBIZ_PREVIEW_DATABASE !== '1') return undefined;
+  return env.DATABASE_URL || undefined;
+}
+
 async function init(): Promise<Ready> {
-  const url = process.env.DATABASE_URL;
+  const url = databaseUrl();
   const driver = url ? await neonDriver(url) : await pgliteDriver();
   await driver.transaction(SCHEMA.map((text) => ({ text })));
   const { seedIfEmpty, syncSeedPasswords } = await import('./seed');

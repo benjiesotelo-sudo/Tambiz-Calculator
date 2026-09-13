@@ -269,6 +269,32 @@ const rankableCategory = (g: GroupResult, ci: number) => {
   return c.pct !== null && (c.complete || g.accepted) ? round2(c.pct) : null;
 };
 
+export interface AdviserStanding {
+  /** Average of the overall percentages of the adviser's ranked groups, rounded to two decimals. */
+  average: number;
+  rank: number;
+  /** How many advisers were ranked. */
+  of: number;
+  groups: number;
+}
+
+/**
+ * The adviser ranking (decision 10): the average of the overall percentages people see for the groups an adviser
+ * advises, ranked highest first, tied advisers sharing a position. Only groups that are ranked count, so an
+ * incomplete group neither helps nor hurts its adviser; an adviser with no ranked group has no position.
+ */
+export function adviserRanking(groups: { adviserId: string | null; result: GroupResult }[]): Map<string, AdviserStanding> {
+  const byAdviser = new Map<string, number[]>();
+  for (const { adviserId, result } of groups) {
+    const ov = rankableOverall(result);
+    if (!adviserId || ov === null) continue;
+    byAdviser.set(adviserId, [...(byAdviser.get(adviserId) ?? []), ov]);
+  }
+  const rows = [...byAdviser.entries()].map(([id, list]) => ({ id, average: round2(list.reduce((a, b) => a + b, 0) / list.length), groups: list.length }));
+  const rank = rankMap(rows, (r) => r.average);
+  return new Map(rows.map((r, i) => [r.id, { average: r.average, rank: rank(i)!, of: rows.length, groups: r.groups }]));
+}
+
 /**
  * Percentages, completeness and ranks for every group. Only complete scores are ranked: an incomplete category or
  * group has no rank and reads as incomplete, unless the coordinator accepted the group at finalising.

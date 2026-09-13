@@ -9,6 +9,7 @@ import { generatePassword, hashPassword } from '@/lib/passwords';
 import { eventFinaliseChecks, eventReport, getEvent, listEvents } from '@/lib/repo';
 import { criterionLabel, DEFAULT_RUBRIC, findCriterion, HALVES, withCriterionWording } from '@/lib/rubric';
 import { nameKey } from '@/lib/seed';
+import { emailGivesAway, makeAdviserCode, MAX_TRIES, normaliseCheck } from '@/lib/link-rules';
 import { checkScore, fmtScore } from '@/lib/sheet';
 
 const s = (fd: FormData, k: string) => String(fd.get(k) ?? '').trim();
@@ -398,14 +399,16 @@ export async function importAdvisers(fd: FormData) {
   for (const r of parsed.rows) {
     const key = nameKey(r.values.name);
     let id = idByKey.get(key);
+    const adviserCode = cleanCode(r.values.link_code ?? '');
     if (!id) {
       id = newId();
       idByKey.set(key, id);
       added++;
-      statements.push({ text: 'INSERT INTO adviser (id, event_id, name, name_key, email) VALUES ($1, $2, $3, $4, $5)', params: [id, event.id, r.values.name, key, r.values.email] });
+      statements.push({ text: 'INSERT INTO adviser (id, event_id, name, name_key, email, link_code) VALUES ($1, $2, $3, $4, $5, $6)', params: [id, event.id, r.values.name, key, r.values.email, adviserCode] });
     } else if (!seen.has(key) && r.values.email) {
       statements.push({ text: 'UPDATE adviser SET email = $2, name = $3 WHERE id = $1', params: [id, r.values.email, r.values.name] });
     }
+    if (adviserCode && !seen.has(key)) statements.push({ text: 'UPDATE adviser SET link_code = $2 WHERE id = $1', params: [id, adviserCode] });
     seen.add(key);
     const code = r.values.group_code.toUpperCase();
     const gkey = nameKey(r.values.group_name);
@@ -441,6 +444,54 @@ export async function addAdviser(fd: FormData) {
     s(fd, 'email'),
   ]);
   back(`/admin/events/${event.id}/advisers`, { ok: `Saved ${name}.` });
+}
+
+// ── adviser codes and links (decision 8) ──────────────────────
+
+/** An adviser code as stored: capitals, spaces removed. Checking ignores dashes and case anyway. */
+const cleanCode = (v: string) => v.toUpperCase().replace(/\s+/g, '').slice(0, 20);
+
+export async function setAdviserCode(fd: FormData) {
+  const acc = await requireAdmin();
+  const event = await eventOr404(s(fd, 'eventId'));
+  const path = `/admin/events/${event.id}/advisers`;
+  const code = cleanCode(s(fd, 'code'));
+  const adviser = await one<{ id: string; name: string; email: string }>('SELECT id, name, email FROM adviser WHERE id = $1 AND event_id = $2', [s(fd, 'adviserId'), event.id]);
+  if (!adviser) back(path, { error: 'Adviser not found.' });
+  if (code && normaliseCheck(code).length < 4) back(path, { error: 'Use at least four letters or numbers, for example K7Q-4MP.' });
+  if (code && emailGivesAway(adviser.email, code)) back(path, { error: `${adviser.name}’s email contains that code, so it would not protect the link. Choose another.` });
+  if (code) {
+    const others = await query<{ link_code: string }>(`SELECT link_code FROM adviser WHERE event_id = $1 AND id <> $2 AND link_code <> ''`, [event.id, adviser.id]);
+    if (others.some((o) => normaliseCheck(o.link_code) === normaliseCheck(code))) back(path, { error: 'Another adviser already has that code.' });
+  }
+  await query('UPDATE adviser SET link_code = $2 WHERE id = $1', [adviser.id, code]);
+  await log(event.id, acc.id, 'adviser.code', { adviserId: adviser.id, set: !!code });
+  back(path, { ok: code ? `${adviser.name}’s code is ${code}.` : `Removed ${adviser.name}’s code.` });
+}
+
+export async function makeAdviserCodes(fd: FormData) {
+  const acc = await requireAdmin();
+  const event = await eventOr404(s(fd, 'eventId'));
+  const all = await query<{ id: string; link_code: string }>('SELECT id, link_code FROM adviser WHERE event_id = $1', [event.id]);
+  const used = new Set(all.map((a) => normaliseCheck(a.link_code)).filter(Boolean));
+  const statements: Statement[] = [];
+  for (const a of all.filter((x) => !x.link_code.trim())) {
+    let code = makeAdviserCode();
+    while (used.has(normaliseCheck(code))) code = makeAdviserCode();
+    used.add(normaliseCheck(code));
+    statements.push({ text: 'UPDATE adviser SET link_code = $2 WHERE id = $1', params: [a.id, code] });
+  }
+  await transaction(statements);
+  await log(event.id, acc.id, 'adviser.codes', { made: statements.length });
+  back(`/admin/events/${event.id}/advisers`, { ok: statements.length ? `Made codes for ${statements.length} adviser${statements.length === 1 ? '' : 's'}.` : 'Every adviser already has a code.' });
+}
+
+export async function unlockLink(fd: FormData) {
+  const acc = await requireAdmin();
+  const event = await eventOr404(s(fd, 'eventId'));
+  await query('UPDATE access_link SET locked_at = NULL, failed_attempts = 0 WHERE id = $1 AND event_id = $2', [s(fd, 'linkId'), event.id]);
+  await log(event.id, acc.id, 'link.unlock', { linkId: s(fd, 'linkId') });
+  back(`/admin/events/${event.id}/release`, { ok: `Unlocked. The link can be tried again (${MAX_TRIES} tries).` });
 }
 
 // ── judges ────────────────────────────────────────────────────

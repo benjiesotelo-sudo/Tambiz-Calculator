@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { AppBar, Notice } from '@/components/AppBar';
-import { STATUS_LABEL } from '@/components/EventNav';
+import { statusLabel } from '@/components/EventNav';
 import { requireAdmin } from '@/lib/auth';
 import { listEvents } from '@/lib/repo';
 import { createEvent } from './actions';
@@ -30,7 +30,7 @@ export default async function AdminHome({ searchParams }: { searchParams: Promis
                     {e.year}
                   </span>
                 </span>
-                <span className={`pill ${e.status === 'judging' ? 'part' : e.status === 'finalised' ? 'done' : 'none'}`}>{STATUS_LABEL[e.status]}</span>
+                <span className={`pill ${e.status === 'judging' ? 'part' : e.status === 'finalised' ? 'done' : 'none'}`}>{statusLabel(e)}</span>
               </Link>
             </li>
           ))}

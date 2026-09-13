@@ -69,7 +69,11 @@ npm test
    | `SEED_ADMIN_PASSWORD` | Password for `admin@tambiz.demo` | Recommended. See “Changing the sample account passwords” below. |
    | `SEED_JUDGE_PASSWORD` | Password for the three sample judges (`judge1@`, `judge2@`, `judge3@tambiz.demo`) | Recommended. Same. |
 
+   | `APP_URL` | The app's address, for example `https://tambiz-calculator-lyart.vercel.app` | Recommended. Students' and advisers' private links are built from it. Without it, the production deployment uses Vercel's production address. |
+
    If you use Vercel's Neon integration instead of pasting the string, it creates `DATABASE_URL` for you. Turn off “create a database branch for every preview deployment”; the free plan allows only 10 branches.
+
+   **Preview deployments never use `DATABASE_URL`.** A pull request's preview runs on its own throwaway sample data (in-memory PGlite), so reviewing a change can never alter live data or apply its schema early. To let previews use the real database anyway, set `TAMBIZ_PREVIEW_DATABASE=1` in the Preview environment.
 5. **Deploy.** Press Deploy, open the address Vercel gives you, and sign in as the coordinator.
 6. **Before real data:** change the coordinator password, remove or reset the sample judges, and create the real event.
 
