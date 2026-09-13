@@ -147,10 +147,18 @@ To fix a mistake: open the group, press **Remove** beside a member, or change th
 
 ## Part E. Create the judge accounts
 
-Do this once for every judge.
+Judges are a standing department list: an account made one year is kept for the next. **If a judge has judged before, pick them from the list instead of making a new account**, so their record in Judge profiles (Part M) stays together.
+
+**A judge who has judged before**
 
 1. Press the **Judges** tab.
-2. Scroll to **Add a judge**.
+2. Scroll to **Add from the department list**.
+3. Press **Add to this event** beside their name. Their password is unchanged; press **Reset password** if they have forgotten it.
+
+**A new judge.** Do this once for every new judge.
+
+1. Press the **Judges** tab.
+2. Scroll to **Add a new judge**.
 3. Type the name the judge will see, for example `Dr. Liza Manalo`.
 4. Type their email (or a short login such as `lmanalo`).
 5. Press **Create judge account**.
@@ -336,6 +344,32 @@ Before you start: judging is closed (Part I), every adviser has a code (Part C),
 - **Reissue**: makes a new link for one person, open for another 30 days, and downloads a mailing sheet with just their row. Their old link stops working. Use it for an expired link, or when someone lost their email.
 - **Download links for the people with none yet**: for example an adviser whose code you set after release.
 - **Reissue every link…**: only if the mailing sheet was lost or shared by mistake. Every earlier link stops working.
+
+---
+
+## Part M. Judge profiles
+
+A basis for knowing your panel, **not for removing anyone**. Only you see this tab. It describes how each judge scored; it does not say what to do about it.
+
+1. Press the **Judge profiles** tab. Each judge has one row:
+   - **Groups**: how many groups they scored, in each half.
+   - **Marks at**: on the same groups, how far above or below the other judges they score, on average. `−4.20 pts` is about four points lower.
+   - **Separates groups**: whether they use the range or give nearly everyone the same mark. **Narrow**, **normal** or **wide**, compared with the other judges on the same groups. The numbers beside it are their lowest and highest score.
+   - **Agrees with co-judges**: line the groups up by this judge's scores, then by the other judges'. **High** means much the same order, even when the numbers differ; **medium** partly; **low** a different order.
+   - A sentence saying the same in words.
+2. Press a judge's name to see them in detail. Choose **Defense** or **Booth** at the top. For every group: **their score**, **the others' average**, the **gap**, where the group comes in **their order and the panel's**, and anything **to look at**:
+   - the same mark entered down every criterion of a category, for example "8 entered down all 9 criteria of Paper";
+   - criteria left blank;
+   - a score far (6 points or more) from every co-judge's, for example "Far from both co-judges (72.50, 70.50)".
+3. **Across events** shows one line per event the judge has scored in, so a judge picked again next year builds one record.
+
+Every comparison uses only the co-judges who scored **the same group in the same half**, and only the criteria both scored. A group nobody else scored is listed but not compared. Spread and agreement need at least three compared groups.
+
+Worth remembering, as the page says:
+
+- **Marking hard is not a fault.** Every group's score is averaged across its judges, so a strict judge is absorbed completely.
+- Three judges on one evening is a small sample, and the panel's consensus is not the truth.
+- A judge who disagrees may be the one paying attention.
 
 ---
 

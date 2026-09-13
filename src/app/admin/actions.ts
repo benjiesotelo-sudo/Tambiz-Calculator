@@ -531,6 +531,21 @@ export async function createJudge(fd: FormData) {
   back(path, { ok: `Created a judge account for ${name}.` });
 }
 
+/** Picks a judge from the department's standing list for this event; their record in Judge profiles carries on. */
+export async function addExistingJudge(fd: FormData) {
+  const acc = await requireAdmin();
+  const event = await eventOr404(s(fd, 'eventId'));
+  const path = `/admin/events/${event.id}/judges`;
+  const judge = await one<{ id: string; display_name: string }>(`SELECT id, display_name FROM account WHERE id = $1 AND role = 'judge'`, [s(fd, 'accountId')]);
+  if (!judge) back(path, { error: 'Judge not found.' });
+  await transaction([
+    { text: 'INSERT INTO event_judge (event_id, account_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', params: [event.id, judge.id] },
+    { text: 'UPDATE account SET disabled_at = NULL WHERE id = $1', params: [judge.id] },
+  ]);
+  await log(event.id, acc.id, 'judge.add', { id: judge.id });
+  back(path, { ok: `${judge.display_name} is now a judge for ${event.title}. Their password is unchanged; use Reset password if they have forgotten it.` });
+}
+
 export async function resetJudgePassword(fd: FormData) {
   const acc = await requireAdmin();
   const event = await eventOr404(s(fd, 'eventId'));

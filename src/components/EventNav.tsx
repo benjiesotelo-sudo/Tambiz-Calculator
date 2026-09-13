@@ -10,6 +10,7 @@ const TABS = [
   ['judges', 'Judges'],
   ['progress', 'Progress'],
   ['results', 'Results'],
+  ['profiles', 'Judge profiles'],
   ['grades', 'Grades'],
   ['release', 'Release'],
 ] as const;

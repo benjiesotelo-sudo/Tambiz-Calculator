@@ -113,7 +113,17 @@ export async function eventJudges(eventId: string) {
   );
 }
 
-export const fullName = (s: Pick<StudentRow, 'first_name' | 'surname'>) => `${s.first_name} ${s.surname}`;
+/** The department's standing list of judges who are not yet judging this event, with how many events each has judged. */
+export async function departmentJudges(eventId: string) {
+  return query<{ id: string; email: string; display_name: string; events: number }>(
+    `SELECT a.id, a.email, a.display_name, (SELECT count(*)::int FROM event_judge j WHERE j.account_id = a.id) AS events
+     FROM account a WHERE a.role = 'judge' AND NOT EXISTS (SELECT 1 FROM event_judge j WHERE j.account_id = a.id AND j.event_id = $1)
+     ORDER BY a.display_name`,
+    [eventId],
+  );
+}
+
+export const fullName =(s: Pick<StudentRow, 'first_name' | 'surname'>) => `${s.first_name} ${s.surname}`;
 export const rollName = (s: Pick<StudentRow, 'first_name' | 'surname' | 'middle_name'>) =>
   `${s.surname.toUpperCase()}, ${s.first_name}${s.middle_name ? ' ' + s.middle_name : ''}`;
 
