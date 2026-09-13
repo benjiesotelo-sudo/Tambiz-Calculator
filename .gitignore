@@ -7,3 +7,18 @@ data/
 
 # Local noise
 .DS_Store
+settings.local.json
+
+# App build and local state
+node_modules/
+.next/
+out/
+next-env.d.ts
+*.tsbuildinfo
+.vercel
+.local-db/
+
+# Secrets: connection strings and passwords live only here
+.env
+.env.local
+.env*.local
