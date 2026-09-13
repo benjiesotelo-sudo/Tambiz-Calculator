@@ -6,9 +6,10 @@ import { requireAdmin } from '@/lib/auth';
 import { newId, one, query, transaction, type Statement } from '@/lib/db';
 import { ADVISER_COLUMNS, ImportError, parseWorkbook, ROLL_COLUMNS } from '@/lib/excel-import';
 import { generatePassword, hashPassword } from '@/lib/passwords';
-import { getEvent, listEvents } from '@/lib/repo';
-import { DEFAULT_RUBRIC, HALVES, withCriterionWording } from '@/lib/rubric';
+import { eventFinaliseChecks, eventReport, getEvent, listEvents } from '@/lib/repo';
+import { criterionLabel, DEFAULT_RUBRIC, findCriterion, HALVES, withCriterionWording } from '@/lib/rubric';
 import { nameKey } from '@/lib/seed';
+import { checkScore, fmtScore } from '@/lib/sheet';
 
 const s = (fd: FormData, k: string) => String(fd.get(k) ?? '').trim();
 
@@ -50,12 +51,164 @@ export async function setEventStatus(fd: FormData) {
   const acc = await requireAdmin();
   const event = await eventOr404(s(fd, 'eventId'));
   const status = s(fd, 'status');
+  const progress = `/admin/events/${event.id}/progress`;
   if (!['setup', 'judging', 'finalised'].includes(status)) back(`/admin/events/${event.id}`, { error: 'Unknown status.' });
-  if (status === 'finalised' && s(fd, 'confirm') !== 'yes') back(`/admin/events/${event.id}/progress`, { error: 'Tick the box to confirm before closing judging.' });
+  if (event.released_at && status !== 'finalised') back(progress, { error: 'Results have been released, so judging cannot be reopened.' });
+  if (status === 'finalised') {
+    if (s(fd, 'confirm') !== 'yes') back(progress, { error: 'Tick the box to confirm before closing judging.' });
+    // Decisions 5 and 6: every group fully judged or accepted, every student placed or left out, every member scored or absent.
+    const { blockers } = await eventFinaliseChecks(await eventReport(event));
+    if (blockers.length) back(progress, { error: `Judging cannot be closed yet: ${blockers.length} item${blockers.length === 1 ? ' needs' : 's need'} you first. They are listed under Close judging.` });
+  }
   await query(`UPDATE event SET status = $2, finalised_at = CASE WHEN $2 = 'finalised' THEN now() ELSE NULL END WHERE id = $1`, [event.id, status]);
   await log(event.id, acc.id, 'event.status', { from: event.status, to: status });
   const words = { setup: 'Back in set-up.', judging: 'Judging is open. Judges can score.', finalised: 'Judging is closed. Scores are locked and results are final.' } as const;
   back(`/admin/events/${event.id}`, { ok: words[status as keyof typeof words] });
+}
+
+// ── finalising: accepted groups, students left out, absences (decisions 5 and 6) ──
+
+const REASON_MAX = 200;
+const reasonOf = (fd: FormData) => s(fd, 'reason').replace(/\s+/g, ' ').slice(0, REASON_MAX);
+/** Where to return to: only paths inside this event are accepted. */
+const returnTo = (fd: FormData, eventId: string, fallback: string) => {
+  const r = s(fd, 'return');
+  return r.startsWith(`/admin/events/${eventId}/`) && !r.includes('//') ? r : fallback;
+};
+
+export async function acceptGroup(fd: FormData) {
+  const acc = await requireAdmin();
+  const event = await eventOr404(s(fd, 'eventId'));
+  const path = returnTo(fd, event.id, `/admin/events/${event.id}/progress`);
+  if (event.released_at) back(path, { error: 'Results have been released; nothing can change now.' });
+  const reason = reasonOf(fd);
+  if (reason.length < 3) back(path, { error: 'Type a short reason, for example “Did not run a booth”.' });
+  const g = await one<{ code: string }>('UPDATE tgroup SET accept_reason = $3, accepted_at = now() WHERE id = $1 AND event_id = $2 RETURNING code', [s(fd, 'groupId'), event.id, reason]);
+  if (!g) back(path, { error: 'Group not found.' });
+  await log(event.id, acc.id, 'group.accept', { groupId: s(fd, 'groupId'), reason });
+  back(path, { ok: `${g.code} will be finalised with the scores it has. Reason recorded.` });
+}
+
+export async function clearAcceptance(fd: FormData) {
+  const acc = await requireAdmin();
+  const event = await eventOr404(s(fd, 'eventId'));
+  const path = returnTo(fd, event.id, `/admin/events/${event.id}/progress`);
+  if (event.released_at) back(path, { error: 'Results have been released; nothing can change now.' });
+  await query('UPDATE tgroup SET accept_reason = NULL, accepted_at = NULL WHERE id = $1 AND event_id = $2', [s(fd, 'groupId'), event.id]);
+  await log(event.id, acc.id, 'group.accept.clear', { groupId: s(fd, 'groupId') });
+  back(path, { ok: 'Removed. That group again needs every score before judging can close.' });
+}
+
+export async function excludeStudent(fd: FormData) {
+  const acc = await requireAdmin();
+  const event = await eventOr404(s(fd, 'eventId'));
+  const path = returnTo(fd, event.id, `/admin/events/${event.id}/roll`);
+  const reason = reasonOf(fd);
+  if (reason.length < 3) back(path, { error: 'Type a short reason, for example “Dropped the course”.' });
+  const st = await one<{ first_name: string; surname: string }>(
+    `UPDATE student SET excluded_reason = $3, excluded_at = now() WHERE id = $1 AND event_id = $2
+       AND NOT EXISTS (SELECT 1 FROM group_member m WHERE m.student_id = student.id) RETURNING first_name, surname`,
+    [s(fd, 'studentId'), event.id, reason],
+  );
+  if (!st) back(path, { error: 'That student is in a group. Remove them from the group first.' });
+  await log(event.id, acc.id, 'student.exclude', { studentId: s(fd, 'studentId'), reason });
+  back(path, { ok: `${st.first_name} ${st.surname} is left out of every group. Reason recorded.` });
+}
+
+export async function includeStudent(fd: FormData) {
+  const acc = await requireAdmin();
+  const event = await eventOr404(s(fd, 'eventId'));
+  const path = returnTo(fd, event.id, `/admin/events/${event.id}/roll`);
+  await query('UPDATE student SET excluded_reason = NULL, excluded_at = NULL WHERE id = $1 AND event_id = $2', [s(fd, 'studentId'), event.id]);
+  await log(event.id, acc.id, 'student.include', { studentId: s(fd, 'studentId') });
+  back(path, { ok: 'Undone. Place this student in a group before judging closes.' });
+}
+
+export async function setMemberAbsent(fd: FormData) {
+  const acc = await requireAdmin();
+  const event = await eventOr404(s(fd, 'eventId'));
+  const groupId = s(fd, 'groupId');
+  const path = returnTo(fd, event.id, `/admin/events/${event.id}/groups/${groupId}`);
+  if (event.released_at) back(path, { error: 'Results have been released; nothing can change now.' });
+  const absent = s(fd, 'absent') === 'yes';
+  const row = await one<{ student_id: string }>(
+    `UPDATE group_member SET absent_at = CASE WHEN $4::boolean THEN coalesce(absent_at, now()) ELSE NULL END, absent_by = CASE WHEN $4::boolean THEN $5 ELSE NULL END
+     WHERE event_id = $1 AND group_id = $2 AND student_id = $3 RETURNING student_id`,
+    [event.id, groupId, s(fd, 'studentId'), absent, acc.id],
+  );
+  if (!row) back(path, { error: 'That student is not in this group.' });
+  await log(event.id, acc.id, absent ? 'member.absent' : 'member.present', { groupId, studentId: row.student_id });
+  back(path, { ok: absent ? 'Marked absent from the defense. Their grade will be blank in the workbook for you to enter.' : 'Marked present. They need member scores from the defense judges.' });
+}
+
+// ── coordinator corrections (decision 7) ──────────────────────
+
+export async function correctScore(fd: FormData) {
+  const acc = await requireAdmin();
+  const event = await eventOr404(s(fd, 'eventId'));
+  const sheet = await one<{ id: string; group_id: string; half: 'defense' | 'booth'; judge_name: string }>(
+    `SELECT s.id, s.group_id, s.half, a.display_name AS judge_name FROM score_sheet s JOIN account a ON a.id = s.judge_id WHERE s.id = $1 AND s.event_id = $2`,
+    [s(fd, 'sheetId'), event.id],
+  );
+  if (!sheet) back(`/admin/events/${event.id}/progress`, { error: 'Score sheet not found.' });
+  const path = `/admin/events/${event.id}/groups/${sheet.group_id}/scores?half=${sheet.half}`;
+  if (event.released_at) back(path, { error: 'Results have been released, so scores can no longer be corrected.' });
+  const reason = reasonOf(fd);
+  if (reason.length < 3) back(path, { error: 'Type a short reason for the correction, for example “Judge confirmed 18, typed 13”.' });
+
+  const key = s(fd, 'key');
+  const [kind, a, b] = key.split(':');
+  let max: number | null = null;
+  let label = '';
+  if (kind === 'c') {
+    const crit = findCriterion(event.rubric, sheet.half, `${a}:${b}`);
+    if (crit) {
+      max = crit.max;
+      label = `${crit.category.name} ${crit.index + 1} (${criterionLabel(crit.category, crit.index)})`;
+    }
+  } else if (kind === 'm' && sheet.half === 'defense') {
+    const field = event.rubric.memberFields.find((f) => f.key === b);
+    const member = await one<{ first_name: string; surname: string }>(
+      'SELECT s.first_name, s.surname FROM group_member m JOIN student s ON s.id = m.student_id WHERE m.group_id = $1 AND m.student_id = $2',
+      [sheet.group_id, a],
+    );
+    if (field && member) {
+      max = field.max;
+      label = `${member.first_name} ${member.surname}, ${field.name}`;
+    }
+  }
+  if (max === null) back(path, { error: 'Unknown score box.' });
+  const check = checkScore(s(fd, 'value'), max);
+  if (check.state === 'error') back(path, { error: `${label}: ${check.msg}` });
+  const to = check.state === 'ok' ? check.n : null;
+
+  const table = kind === 'c' ? { name: 'score_value', where: 'sheet_id = $1 AND criterion_key = $2', ids: [sheet.id, `${a}:${b}`] } : { name: 'member_score', where: 'sheet_id = $1 AND student_id = $2 AND field = $3', ids: [sheet.id, a, b] };
+  const current = await one<{ value: number; corrected_by: string | null; judge_value: number | null }>(`SELECT value, corrected_by, judge_value FROM ${table.name} WHERE ${table.where}`, table.ids);
+  const from = current ? Number(current.value) : null;
+  if (from === to) back(path, { error: `${label} is already ${to === null ? 'blank' : fmtScore(to)}.` });
+  // The judge's own value is kept from before the first correction; later corrections leave it alone.
+  const judgeValue = current ? (current.corrected_by ? current.judge_value : from) : null;
+
+  if (to === null) {
+    await query(`DELETE FROM ${table.name} WHERE ${table.where}`, table.ids);
+  } else if (kind === 'c') {
+    await query(
+      `INSERT INTO score_value (sheet_id, criterion_key, value, corrected_by, corrected_at, correction_reason, judge_value) VALUES ($1, $2, $3, $4, now(), $5, $6)
+       ON CONFLICT (sheet_id, criterion_key) DO UPDATE SET value = EXCLUDED.value, updated_at = now(), corrected_by = EXCLUDED.corrected_by,
+         corrected_at = now(), correction_reason = EXCLUDED.correction_reason, judge_value = EXCLUDED.judge_value`,
+      [sheet.id, `${a}:${b}`, to, acc.id, reason, judgeValue],
+    );
+  } else {
+    await query(
+      `INSERT INTO member_score (sheet_id, student_id, field, value, corrected_by, corrected_at, correction_reason, judge_value) VALUES ($1, $2, $3, $4, $5, now(), $6, $7)
+       ON CONFLICT (sheet_id, student_id, field) DO UPDATE SET value = EXCLUDED.value, updated_at = now(), corrected_by = EXCLUDED.corrected_by,
+         corrected_at = now(), correction_reason = EXCLUDED.correction_reason, judge_value = EXCLUDED.judge_value`,
+      [sheet.id, a, b, to, acc.id, reason, judgeValue],
+    );
+  }
+  await log(event.id, acc.id, 'score.correct', { group: sheet.group_id, half: sheet.half, sheet: sheet.id, judge: sheet.judge_name, key, label, from, to, reason });
+  const show = (v: number | null) => (v === null ? 'blank' : fmtScore(v));
+  back(path, { ok: `Corrected ${label} for ${sheet.judge_name}: ${show(from)} → ${show(to)}.` });
 }
 
 // ── scoring sheet wording ─────────────────────────────────────
@@ -144,9 +297,11 @@ export async function addMembers(fd: FormData) {
   );
   if (taken.length) back(path, { error: `Already in another group: ${taken.map((t) => `${t.first_name} ${t.surname} (${t.code})`).join(', ')}. A student can belong to only one group.` });
   const valid = await query<{ id: string }>('SELECT id FROM student WHERE event_id = $1 AND id = ANY($2::text[])', [event.id, ids]);
-  await transaction(
-    valid.map((v) => ({ text: 'INSERT INTO group_member (event_id, group_id, student_id) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING', params: [event.id, groupId, v.id] })),
-  );
+  await transaction([
+    ...valid.map((v) => ({ text: 'INSERT INTO group_member (event_id, group_id, student_id) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING', params: [event.id, groupId, v.id] })),
+    // A student placed in a group is no longer left out.
+    { text: 'UPDATE student SET excluded_reason = NULL, excluded_at = NULL WHERE event_id = $1 AND id = ANY($2::text[])', params: [event.id, valid.map((v) => v.id)] },
+  ]);
   await log(event.id, acc.id, 'member.add', { groupId, students: ids });
   back(path, { ok: `Added ${valid.length} member${valid.length === 1 ? '' : 's'}.` });
 }

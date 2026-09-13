@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation';
 import { AppBar, Notice } from '@/components/AppBar';
 import { requireAdmin } from '@/lib/auth';
 import { getEvent, getGroup, groupMembers, listAdvisers, listStudents, rollName } from '@/lib/repo';
-import { addMembers, deleteGroup, removeMember, saveGroup } from '../../../../actions';
+import { addMembers, deleteGroup, removeMember, saveGroup, setMemberAbsent } from '../../../../actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -47,16 +47,38 @@ export default async function GroupPage({
         </p>
         <Notice ok={sp.ok} error={sp.error} />
 
+        <div className="section-title">Scores</div>
+        <div className="actions" style={{ marginTop: 0 }}>
+          <Link className="btn small secondary" href={`${base}/scores?half=defense`}>
+            Defense scores and corrections
+          </Link>
+          <Link className="btn small secondary" href={`${base}/scores?half=booth`}>
+            Booth scores and corrections
+          </Link>
+        </div>
+
         <div className="section-title">Members ({members.length})</div>
         <ul className="list">
           {members.map((m) => (
-            <li key={m.id}>
-              <span className="grow-1">
+            <li key={m.id} style={{ flexWrap: 'wrap' }}>
+              <span className="grow-1" style={{ minWidth: 180 }}>
                 <span className="title">{rollName(m)}</span>
                 <span className="sub" style={{ display: 'block' }}>
                   {m.student_number} · {m.section}
+                  {m.absent_at ? ' · Absent from the defense: no grade from the app; you enter it' : ''}
                 </span>
               </span>
+              {m.absent_at ? <span className="pill part">Absent</span> : null}
+              <form action={setMemberAbsent}>
+                <input type="hidden" name="eventId" value={id} />
+                <input type="hidden" name="groupId" value={gid} />
+                <input type="hidden" name="studentId" value={m.id} />
+                <input type="hidden" name="absent" value={m.absent_at ? 'no' : 'yes'} />
+                <input type="hidden" name="return" value={base} />
+                <button className="btn small secondary" type="submit" disabled={!!event.released_at}>
+                  {m.absent_at ? 'Not absent' : 'Mark absent'}
+                </button>
+              </form>
               <form action={removeMember}>
                 <input type="hidden" name="eventId" value={id} />
                 <input type="hidden" name="groupId" value={gid} />

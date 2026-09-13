@@ -61,6 +61,19 @@ export async function POST(req: Request) {
 
     for (const ch of changes) {
       const parts = String(ch.key).split(':');
+      // A member absent from the defense (decision 6). It belongs to the student, so every judge sees it.
+      if (parts[0] === 'a' && parts.length === 3 && parts[2] === 'absent' && half === 'defense' && memberIds.has(parts[1])) {
+        if (ch.value !== null && ch.value !== 1) {
+          refused.push({ key: ch.key, message: 'Unknown absence value.' });
+          continue;
+        }
+        statements.push({
+          text: `UPDATE group_member SET absent_at = CASE WHEN $3::boolean THEN coalesce(absent_at, now()) ELSE NULL END, absent_by = CASE WHEN $3::boolean THEN $4 ELSE NULL END
+                 WHERE group_id = $1 AND student_id = $2`,
+          params: [group.id, parts[1], ch.value === 1, acc.id],
+        });
+        continue;
+      }
       let max: number | null = null;
       if (parts[0] === 'c' && parts.length === 3) {
         max = findCriterion(event.rubric, half, `${parts[1]}:${parts[2]}`)?.max ?? null;
@@ -76,6 +89,8 @@ export async function POST(req: Request) {
         refused.push({ key: ch.key, message: reason });
         continue;
       }
+      // A judge's own new value replaces any earlier coordinator correction of that box.
+      const clearCorrection = 'corrected_by = NULL, corrected_at = NULL, correction_reason = NULL, judge_value = NULL';
       if (parts[0] === 'c') {
         const ck = `${parts[1]}:${parts[2]}`;
         statements.push(
@@ -83,7 +98,7 @@ export async function POST(req: Request) {
             ? { text: 'DELETE FROM score_value WHERE sheet_id = $1 AND criterion_key = $2', params: [sheet.id, ck] }
             : {
                 text: `INSERT INTO score_value (sheet_id, criterion_key, value) VALUES ($1, $2, $3)
-                       ON CONFLICT (sheet_id, criterion_key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()`,
+                       ON CONFLICT (sheet_id, criterion_key) DO UPDATE SET value = EXCLUDED.value, updated_at = now(), ${clearCorrection}`,
                 params: [sheet.id, ck, ch.value],
               },
         );
@@ -93,7 +108,7 @@ export async function POST(req: Request) {
             ? { text: 'DELETE FROM member_score WHERE sheet_id = $1 AND student_id = $2 AND field = $3', params: [sheet.id, parts[1], parts[2]] }
             : {
                 text: `INSERT INTO member_score (sheet_id, student_id, field, value) VALUES ($1, $2, $3, $4)
-                       ON CONFLICT (sheet_id, student_id, field) DO UPDATE SET value = EXCLUDED.value, updated_at = now()`,
+                       ON CONFLICT (sheet_id, student_id, field) DO UPDATE SET value = EXCLUDED.value, updated_at = now(), ${clearCorrection}`,
                 params: [sheet.id, parts[1], parts[2], ch.value],
               },
         );
@@ -113,10 +128,11 @@ export async function POST(req: Request) {
 
   let status = body.complete === false ? 'in_progress' : sheet.status;
   if (body.complete === true) {
+    // Members marked absent from the defense need no member scores.
     const counts = await one<{ values: number; members: number; needed_members: number }>(
       `SELECT (SELECT count(*)::int FROM score_value WHERE sheet_id = $1) AS values,
-              (SELECT count(*)::int FROM member_score ms JOIN group_member gm ON gm.student_id = ms.student_id AND gm.group_id = $2 WHERE ms.sheet_id = $1) AS members,
-              (SELECT count(*)::int FROM group_member WHERE group_id = $2) AS needed_members`,
+              (SELECT count(*)::int FROM member_score ms JOIN group_member gm ON gm.student_id = ms.student_id AND gm.group_id = $2 AND gm.absent_at IS NULL WHERE ms.sheet_id = $1) AS members,
+              (SELECT count(*)::int FROM group_member WHERE group_id = $2 AND absent_at IS NULL) AS needed_members`,
       [sheet.id, group.id],
     );
     const neededValues = criteriaOf(event.rubric, half).length;

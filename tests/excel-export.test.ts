@@ -21,6 +21,8 @@ function report(overall: number): EventReport {
     sheets: [],
     sheetValues: new Map(),
     filled: new Map(),
+    corrections: new Map(),
+    excluded: [],
   } as unknown as EventReport;
 }
 

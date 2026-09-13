@@ -26,8 +26,12 @@ export function refuseReason(value: unknown, max: number): string | null {
   return null;
 }
 
-/** Storage keys: criteria are "c:<category>:<index>", member fields are "m:<student id>:<field>". */
+/**
+ * Storage keys: criteria are "c:<category>:<index>", member fields are "m:<student id>:<field>",
+ * and a member's absence from the defense is "a:<student id>:absent" (1 = absent, null = present).
+ */
 export const critKey = (cat: string, i: number) => `c:${cat}:${i}`;
 export const memberKey = (studentId: string, field: string) => `m:${studentId}:${field}`;
+export const absentKey = (studentId: string) => `a:${studentId}:absent`;
 
 export const fmtScore = (n: number) => (Number.isInteger(n) ? String(n) : String(Math.round(n * 100) / 100));

@@ -138,6 +138,27 @@ input[type=file].input { padding: 9px 12px; }
 .savebar-inner { display: flex; gap: 10px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
 .savebar-inner .sub { flex: 1 1 200px; min-width: 0; }
 
+/* small forms that open in place */
+details.inline-form { margin-top: 6px; min-width: 0; }
+details.inline-form > summary { display: inline-flex; align-items: center; min-height: 34px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--line-strong); background: var(--surface); font-size: 13px; font-weight: 700; cursor: pointer; list-style: none; }
+details.inline-form > summary::-webkit-details-marker { display: none; }
+details.inline-form[open] > summary { background: var(--surface-2); }
+details.inline-form > form { margin-top: 8px; padding: 10px; border: 1px dashed var(--line-strong); border-radius: var(--radius); background: var(--surface-2); }
+
+/* coordinator corrections */
+.corr-crit { border-top: 1px solid var(--line); padding: 10px 0 4px; }
+.corr-crit:first-of-type { border-top: 0; }
+.corr-head { display: flex; gap: 8px; align-items: baseline; font-weight: 700; overflow-wrap: anywhere; }
+.corr-head .num { flex: 0 0 auto; width: 26px; height: 26px; border-radius: 50%; display: inline-grid; place-items: center; font-size: 12px; background: var(--half-soft); color: var(--half-ink); }
+.corr-head .max { font-size: 14px; }
+.corr { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 4px 10px; align-items: center; padding: 6px 0 2px 34px; }
+.corr-judge { font-size: 14px; overflow-wrap: anywhere; }
+.corr-val { font-weight: 800; font-size: 17px; font-variant-numeric: tabular-nums; min-width: 34px; text-align: right; }
+.corr-note { grid-column: 1 / -1; font-size: 12.5px; color: var(--warn-ink); background: var(--warn-soft); border-radius: 8px; padding: 4px 8px; overflow-wrap: anywhere; }
+.corr-form { margin-top: 0; }
+.corr-form[open] { grid-column: 1 / -1; }
+.member.absent { background: var(--surface-2); border-style: dashed; }
+
 /* progress */
 .prog { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 8px; align-items: center; }
 .judgechips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }

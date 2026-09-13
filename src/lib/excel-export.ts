@@ -3,7 +3,7 @@
 // All export code lives here so the library can be swapped without touching the rest of the app.
 
 import ExcelJS from 'exceljs';
-import { fullName, rollName, type EventReport } from './repo';
+import { fullName, rollName, type EventReport, type GradeRow } from './repo';
 import { criteriaOf, type Half } from './rubric';
 import { fmt2, round2 } from './scoring';
 
@@ -19,6 +19,12 @@ const twoDecimals = (row: ExcelJS.Row, cols: number[]) =>
     if (typeof cell.value === 'number') cell.numFmt = TWO_DECIMALS;
   });
 const judged = (g: { complete: boolean; accepted: boolean }) => (g.complete ? 'Complete' : g.accepted ? 'Finalised incomplete' : 'Incomplete');
+const gradeNote = (g: GradeRow) =>
+  g.absent
+    ? 'Absent from the defense: grade to be entered by the coordinator'
+    : g.letter
+      ? ''
+      : [!g.memberComplete ? 'member scores incomplete' : '', !g.groupReady ? 'group not fully judged' : ''].filter(Boolean).join('; ').replace(/^./, (c) => `No grade: ${c}`);
 
 function header(ws: ExcelJS.Worksheet, row: ExcelJS.Row, fill = GREEN, font = 'FFFFFFFF') {
   row.eachCell((c) => {
@@ -48,13 +54,19 @@ export async function buildWorkbook(report: EventReport): Promise<Buffer> {
       { header: 'Panelist', width: 22 },
       { header: 'Status', width: 12 },
       ...crits.map((c) => ({ header: `${c.category.name} #${c.index + 1} (/${c.max})`, width: 13 })),
+      { header: 'Corrected by the coordinator', width: 50 },
     ];
     header(ws, ws.getRow(1));
+    const critName = new Map(crits.map((c) => [`c:${c.key}`, `${c.category.name} #${c.index + 1}`]));
     for (const g of groups) {
       const sheets = report.sheets.filter((s) => s.group_id === g.id && s.half === half);
       for (const s of sheets) {
         const vals = report.sheetValues.get(s.id)!;
-        ws.addRow([g.code, g.name, s.judge_name, s.status === 'complete' ? 'Complete' : 'In progress', ...crits.map((c) => vals[c.category.key]?.[c.index] ?? null)]);
+        const corrected = (report.corrections.get(s.id) ?? [])
+          .filter((c) => critName.has(c.key))
+          .map((c) => `${critName.get(c.key)}: judge gave ${c.judgeValue ?? 'no score'}, now ${c.value} (${c.reason})`)
+          .join('; ');
+        ws.addRow([g.code, g.name, s.judge_name, s.status === 'complete' ? 'Complete' : 'In progress', ...crits.map((c) => vals[c.category.key]?.[c.index] ?? null), corrected]);
       }
     }
   };
@@ -122,6 +134,7 @@ export async function buildWorkbook(report: EventReport): Promise<Buffer> {
       { header: 'Group Overall %', width: 15 },
       { header: 'Final Grade', width: 12 },
       { header: 'Letter Grade', width: 12 },
+      { header: 'Note', width: 44 },
     ];
     header(ws, ws.getRow(1));
     const sorted = [...grades].sort((a, b) => a.group.code.localeCompare(b.group.code, undefined, { numeric: true }) || a.student.surname.localeCompare(b.student.surname));
@@ -140,6 +153,7 @@ export async function buildWorkbook(report: EventReport): Promise<Buffer> {
           i === 0 ? n2(g.overall) : '',
           i === 0 ? n2(g.final) : '',
           i === 0 ? (g.letter ?? '') : '',
+          i === 0 ? gradeNote(g) : '',
         ]);
         twoDecimals(row, [6 + nFields, 7 + nFields, 8 + nFields]);
       });
@@ -157,15 +171,30 @@ export async function buildWorkbook(report: EventReport): Promise<Buffer> {
       row.getCell(1).alignment = { horizontal: 'center' };
     });
     ws.addRow([]);
-    const head = ws.addRow(['Member Name', 'STUDENT NAME (per Class Roll)', 'Student ID', 'Section', 'Total Score', 'Group Overall %', 'Final Grade', 'Letter Grade']);
+    const head = ws.addRow(['Member Name', 'STUDENT NAME (per Class Roll)', 'Student ID', 'Section', 'Total Score', 'Group Overall %', 'Final Grade', 'Letter Grade', 'Note']);
     header(ws, head, DARK, GOLD);
-    ws.columns.forEach((c, i) => (c.width = [26, 34, 15, 10, 12, 15, 12, 12][i]));
+    ws.columns.forEach((c, i) => (c.width = [26, 34, 15, 10, 12, 15, 12, 12, 44][i]));
     const sorted = [...grades].sort(
       (a, b) => a.student.section.localeCompare(b.student.section) || a.student.surname.localeCompare(b.student.surname) || a.student.first_name.localeCompare(b.student.first_name),
     );
     for (const g of sorted) {
-      const row = ws.addRow([fullName(g.student), rollName(g.student), g.student.student_number, g.student.section, n2(g.total), n2(g.overall), g.rounded ?? '', g.letter ?? '']);
+      // An absent member's grade is left blank, with a note, for the coordinator to enter (decision 6).
+      const row = ws.addRow([
+        fullName(g.student),
+        rollName(g.student),
+        g.student.student_number,
+        g.student.section,
+        g.absent ? '' : n2(g.total),
+        n2(g.overall),
+        g.rounded ?? '',
+        g.letter ?? '',
+        gradeNote(g),
+      ]);
       twoDecimals(row, [5, 6]);
+    }
+    // Students deliberately left out of every group are listed too, so nobody disappears from the grade sheet.
+    for (const st of report.excluded) {
+      ws.addRow([fullName(st), rollName(st), st.student_number, st.section, '', '', '', '', `Not in any group: ${st.excluded_reason}`]);
     }
     ws.addRow([]);
     ws.addRow([`Final Grade is (Total Score + Group Overall %) ÷ 2, rounded up to a whole number. Generated ${new Date().toLocaleString('en-PH', { timeZone: 'Asia/Manila' })}.`]);

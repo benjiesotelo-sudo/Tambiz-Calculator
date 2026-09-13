@@ -1,6 +1,7 @@
 // Reads shared by pages, actions and the export. All SQL outside db.ts, auth.ts and seed.ts lives here or in actions.
 
 import { one, query } from './db';
+import { finaliseChecks } from './finalise';
 import { criteriaOf, DEFAULT_RUBRIC, HALVES, type Half, type MemberFieldKey, type Rubric } from './rubric';
 import { computeResults, finalGrade, letterGrade, memberScore, type EventResults, type MemberSet, type ScoredGroup, type SheetValues } from './scoring';
 
@@ -11,6 +12,8 @@ export interface EventRow {
   status: 'setup' | 'judging' | 'finalised';
   rubric: Rubric;
   created_at: Date;
+  /** Results released to students and advisers; only possible once finalised. Nothing can be corrected after. */
+  released_at?: Date | null;
 }
 
 export interface GroupRow {
@@ -22,6 +25,8 @@ export interface GroupRow {
   adviser_id: string | null;
   adviser_name: string | null;
   member_count: number;
+  /** Set when the coordinator finalised this group without every score (decision 5). */
+  accept_reason?: string | null;
 }
 
 export interface StudentRow {
@@ -35,6 +40,10 @@ export interface StudentRow {
   group_id?: string | null;
   group_code?: string | null;
   group_name?: string | null;
+  /** Set when the coordinator left this student out of every group, with this reason (decision 6). */
+  excluded_reason?: string | null;
+  /** Only from groupMembers: marked absent from the defense. */
+  absent_at?: Date | null;
 }
 
 const parseRubric = (r: unknown): Rubric => (typeof r === 'string' ? JSON.parse(r) : (r as Rubric)) ?? DEFAULT_RUBRIC;
@@ -76,7 +85,7 @@ export async function getGroup(eventId: string, groupId: string) {
 
 export async function groupMembers(groupId: string) {
   return query<StudentRow>(
-    `SELECT s.* FROM group_member m JOIN student s ON s.id = m.student_id WHERE m.group_id = $1 ORDER BY s.surname, s.first_name`,
+    `SELECT s.*, m.absent_at FROM group_member m JOIN student s ON s.id = m.student_id WHERE m.group_id = $1 ORDER BY s.surname, s.first_name`,
     [groupId],
   );
 }
@@ -124,15 +133,27 @@ export async function loadEventScores(event: EventRow) {
       `SELECT s.id, s.group_id, s.half, s.judge_id, s.status, a.display_name AS judge_name FROM score_sheet s JOIN account a ON a.id = s.judge_id WHERE s.event_id = $1 ORDER BY a.display_name`,
       [event.id],
     ),
-    query<{ sheet_id: string; criterion_key: string; value: number }>(
-      `SELECT v.sheet_id, v.criterion_key, v.value FROM score_value v JOIN score_sheet s ON s.id = v.sheet_id WHERE s.event_id = $1`,
+    query<{ sheet_id: string; criterion_key: string; value: number; corrected: boolean; judge_value: number | null; correction_reason: string | null }>(
+      `SELECT v.sheet_id, v.criterion_key, v.value, v.corrected_by IS NOT NULL AS corrected, v.judge_value, v.correction_reason
+       FROM score_value v JOIN score_sheet s ON s.id = v.sheet_id WHERE s.event_id = $1`,
       [event.id],
     ),
-    query<{ sheet_id: string; student_id: string; field: MemberFieldKey; value: number }>(
-      `SELECT v.sheet_id, v.student_id, v.field, v.value FROM member_score v JOIN score_sheet s ON s.id = v.sheet_id WHERE s.event_id = $1`,
+    query<{ sheet_id: string; student_id: string; field: MemberFieldKey; value: number; corrected: boolean; judge_value: number | null; correction_reason: string | null }>(
+      `SELECT v.sheet_id, v.student_id, v.field, v.value, v.corrected_by IS NOT NULL AS corrected, v.judge_value, v.correction_reason
+       FROM member_score v JOIN score_sheet s ON s.id = v.sheet_id WHERE s.event_id = $1`,
       [event.id],
     ),
   ]);
+  /** Coordinator corrections per sheet, keyed like the phone (c:… or m:…). */
+  const corrections = new Map<string, { key: string; value: number; judgeValue: number | null; reason: string }[]>();
+  const noteCorrection = (sheetId: string, key: string, v: { value: number; corrected: boolean; judge_value: number | null; correction_reason: string | null }) => {
+    if (!v.corrected) return;
+    const list = corrections.get(sheetId) ?? [];
+    list.push({ key, value: Number(v.value), judgeValue: v.judge_value === null ? null : Number(v.judge_value), reason: v.correction_reason ?? '' });
+    corrections.set(sheetId, list);
+  };
+  values.forEach((v) => noteCorrection(v.sheet_id, `c:${v.criterion_key}`, v));
+  members.forEach((m) => noteCorrection(m.sheet_id, `m:${m.student_id}:${m.field}`, m));
 
   const sheetValues = new Map<string, SheetValues>();
   for (const sh of sheets) {
@@ -156,12 +177,14 @@ export async function loadEventScores(event: EventRow) {
     set[m.field] = Number(m.value);
     byJudge.set(m.sheet_id, set);
   }
-  return { sheets, sheetValues, filled, memberSets };
+  return { sheets, sheetValues, filled, memberSets, corrections };
 }
 
 export interface GradeRow {
   student: StudentRow;
   group: GroupRow;
+  /** Marked absent from the defense: no grade from the app; the coordinator enters it (decision 6). */
+  absent: boolean;
   perJudge: { judge: string; set: MemberSet }[];
   total: number | null;
   /** Every member field has at least one defense judge's score. */
@@ -184,21 +207,30 @@ export interface EventReport {
   sheets: SheetRow[];
   sheetValues: Map<string, SheetValues>;
   filled: Map<string, number>;
+  corrections: Map<string, { key: string; value: number; judgeValue: number | null; reason: string }[]>;
+  /** Students on the roll deliberately left out of every group, with the coordinator's reason. */
+  excluded: StudentRow[];
 }
 
 /** Results, leaderboards and individual grades for a whole event, computed live from the stored scores. */
 export async function eventReport(event: EventRow): Promise<EventReport> {
-  const [groups, scores, memberRows] = await Promise.all([
+  const [groups, scores, excluded, memberRows] = await Promise.all([
     listGroups(event.id),
     loadEventScores(event),
-    query<StudentRow & { group_id: string }>(
-      `SELECT s.*, m.group_id FROM group_member m JOIN student s ON s.id = m.student_id WHERE m.event_id = $1 ORDER BY s.surname, s.first_name`,
+    query<StudentRow>(
+      `SELECT s.* FROM student s WHERE s.event_id = $1 AND s.excluded_reason IS NOT NULL AND NOT EXISTS (SELECT 1 FROM group_member m WHERE m.student_id = s.id)
+       ORDER BY s.section, s.surname, s.first_name`,
+      [event.id],
+    ),
+    query<StudentRow & { group_id: string; absent_at: Date | null }>(
+      `SELECT s.*, m.group_id, m.absent_at FROM group_member m JOIN student s ON s.id = m.student_id WHERE m.event_id = $1 ORDER BY s.surname, s.first_name`,
       [event.id],
     ),
   ]);
   const scored: ScoredGroup[] = groups.map((g) => ({
     id: g.id,
     name: g.name,
+    accepted: !!g.accept_reason,
     defense: scores.sheets.filter((s) => s.group_id === g.id && s.half === 'defense').map((s) => scores.sheetValues.get(s.id)!),
     booth: scores.sheets.filter((s) => s.group_id === g.id && s.half === 'booth').map((s) => scores.sheetValues.get(s.id)!),
   }));
@@ -219,12 +251,15 @@ export async function eventReport(event: EventRow): Promise<EventReport> {
     const result = resultById.get(group.id);
     const overall = result?.overall ?? null;
     const groupReady = !!result && (result.complete || result.accepted);
+    const absent = !!st.absent_at;
     // No grade from incomplete scores: a missing member field or an unjudged part of the group is never a zero.
-    const final = finalGrade(member.complete ? member.total : null, groupReady ? overall : null);
+    // A member absent from the defense gets no grade from the app at all; the coordinator enters it.
+    const final = absent ? null : finalGrade(member.complete ? member.total : null, groupReady ? overall : null);
     const lg = letterGrade(final, event.rubric.grades);
     return {
       student: st,
       group,
+      absent,
       perJudge,
       total: member.total,
       memberComplete: member.complete,
@@ -237,7 +272,80 @@ export async function eventReport(event: EventRow): Promise<EventReport> {
     };
   });
 
-  return { event, groups, results, resultById, grades, sheets: scores.sheets, sheetValues: scores.sheetValues, filled: scores.filled };
+  return {
+    event,
+    groups,
+    results,
+    resultById,
+    grades,
+    sheets: scores.sheets,
+    sheetValues: scores.sheetValues,
+    filled: scores.filled,
+    corrections: scores.corrections,
+    excluded,
+  };
+}
+
+/** The finalise checklist (decisions 5 and 6) for an event's current report. */
+export async function eventFinaliseChecks(report: EventReport) {
+  const { event } = report;
+  const students = await listStudents(event.id);
+  return finaliseChecks({
+    halfLabel: { defense: event.rubric.halves.defense.label, booth: event.rubric.halves.booth.label },
+    groups: report.groups.map((g) => ({ id: g.id, code: g.code, name: g.name, acceptReason: g.accept_reason ?? null, complete: report.resultById.get(g.id)?.complete ?? false })),
+    sheets: report.sheets.map((s) => ({ groupId: s.group_id, half: s.half, status: s.status, judgeName: s.judge_name, filled: report.filled.get(s.id) ?? 0 })),
+    members: report.grades.map((g) => ({ studentId: g.student.id, name: fullName(g.student), groupId: g.group.id, absent: g.absent, memberComplete: g.memberComplete })),
+    unplaced: students.filter((s) => !s.group_id).map((s) => ({ studentId: s.id, name: fullName(s), section: s.section, excludedReason: s.excluded_reason ?? null })),
+  });
+}
+
+/** One stored score as the coordinator sees it: the value, and any correction made to it (decision 7). */
+export interface StoredScore {
+  value: number;
+  correctedByName: string | null;
+  correctedAt: Date | null;
+  reason: string | null;
+  /** The judge's own value before the coordinator's first correction; null if the judge left it blank. */
+  judgeValue: number | null;
+}
+
+/** Every judge's sheet for one group and half, keyed like the phone (sheet.ts: c:…, m:…), with corrections. */
+export async function groupScoreDetail(event: EventRow, groupId: string, half: Half) {
+  const sheets = await query<SheetRow>(
+    `SELECT s.id, s.group_id, s.half, s.judge_id, s.status, a.display_name AS judge_name FROM score_sheet s JOIN account a ON a.id = s.judge_id
+     WHERE s.event_id = $1 AND s.group_id = $2 AND s.half = $3 ORDER BY a.display_name`,
+    [event.id, groupId, half],
+  );
+  const ids = sheets.map((s) => s.id);
+  type Raw = { sheet_id: string; key: string; value: number; corrected_by_name: string | null; corrected_at: Date | null; correction_reason: string | null; judge_value: number | null };
+  const [values, members, history] = await Promise.all([
+    query<Raw>(
+      `SELECT v.sheet_id, 'c:' || v.criterion_key AS key, v.value, a.display_name AS corrected_by_name, v.corrected_at, v.correction_reason, v.judge_value
+       FROM score_value v LEFT JOIN account a ON a.id = v.corrected_by WHERE v.sheet_id = ANY($1::text[])`,
+      [ids],
+    ),
+    query<Raw>(
+      `SELECT v.sheet_id, 'm:' || v.student_id || ':' || v.field AS key, v.value, a.display_name AS corrected_by_name, v.corrected_at, v.correction_reason, v.judge_value
+       FROM member_score v LEFT JOIN account a ON a.id = v.corrected_by WHERE v.sheet_id = ANY($1::text[])`,
+      [ids],
+    ),
+    query<{ created_at: Date; who: string | null; detail: { judge?: string; label?: string; from?: number | null; to?: number | null; reason?: string } }>(
+      `SELECT c.created_at, a.display_name AS who, c.detail FROM change_log c LEFT JOIN account a ON a.id = c.account_id
+       WHERE c.event_id = $1 AND c.action = 'score.correct' AND c.detail->>'group' = $2 AND c.detail->>'half' = $3 ORDER BY c.created_at DESC`,
+      [event.id, groupId, half],
+    ),
+  ]);
+  const scores = new Map<string, Map<string, StoredScore>>(ids.map((id) => [id, new Map()]));
+  for (const r of [...values, ...members]) {
+    scores.get(r.sheet_id)?.set(r.key, {
+      value: Number(r.value),
+      correctedByName: r.corrected_by_name,
+      correctedAt: r.corrected_at,
+      reason: r.correction_reason,
+      judgeValue: r.judge_value === null ? null : Number(r.judge_value),
+    });
+  }
+  return { sheets, scores, history };
 }
 
 export const criteriaCount = (rubric: Rubric, half: Half) => criteriaOf(rubric, half).length;

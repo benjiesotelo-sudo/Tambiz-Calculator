@@ -58,7 +58,13 @@ export default async function GradesPage({ params }: { params: Promise<{ id: str
                       {g.student.student_number} · {g.group.code} {g.group.name}
                     </div>
                   </div>
-                  {g.letter ? <span className={`letter${g.letter === 'F' ? ' f' : ''}`}>{g.letter}</span> : <span className="pill err">No grade yet</span>}
+                  {g.letter ? (
+                    <span className={`letter${g.letter === 'F' ? ' f' : ''}`}>{g.letter}</span>
+                  ) : g.absent ? (
+                    <span className="pill part">Absent</span>
+                  ) : (
+                    <span className="pill err">No grade yet</span>
+                  )}
                 </div>
                 <div className="kv">
                   <div>
@@ -82,7 +88,11 @@ export default async function GradesPage({ params }: { params: Promise<{ id: str
                     <b>{g.qualityPoints ?? '—'}</b>
                   </div>
                 </div>
-                {!g.letter && why(g) ? (
+                {g.absent ? (
+                  <div className="sub" style={{ marginTop: 6, fontWeight: 700 }}>
+                    Absent from the defense. The app gives no grade; enter it yourself. The workbook leaves it blank with a note.
+                  </div>
+                ) : !g.letter && why(g) ? (
                   <div className="sub" style={{ marginTop: 6, color: 'var(--error-ink)', fontWeight: 700 }}>
                     No grade because: {why(g)}.
                   </div>

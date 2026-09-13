@@ -67,6 +67,14 @@ The file must have these columns: **Student No.**, **Student Email**, **Surname*
 
 If students are added or dropped later, import the new file again. Importing the same file twice **updates** students; it never adds them twice.
 
+**A student who dropped the course** stays on the roll file but should not be in a group. Judging cannot close while anyone on the roll is in no group, so leave them out on purpose:
+
+1. On the **Class roll** tab, find the student under **Not in any group**.
+2. Press **Leave out with a reason…**, type the reason (for example `Dropped the course`), and press **Leave out**.
+3. They now show **Left out** with your reason. Press **Undo** if you change your mind. Adding them to a group also undoes it.
+
+Students left out are listed at the bottom of the **For Encoding** sheet with your reason and no grade.
+
 ☐ Done: the roll shows every student.
 
 ---
@@ -172,7 +180,7 @@ Give this part to the judges.
 6. Tap the first box and type the score. Press **Next** (or **Enter**) on the keypad to move to the next box. After the last box, Next moves to the next category.
 7. Scores can have up to two decimal places, for example `17.5` or `8.75`. If you type more than the maximum, or a third decimal place, the row turns red and says why, for example "Max is 20. You typed 25, so it is not counted yet." Tap the box and type the correct score.
 8. A 0 shows an amber "0 points. Intended?" note. It is allowed; it is only a reminder.
-9. Defense judges only: the **Members** step shows one card per student, each with **Presentation /20**, **Communication /40** and **Q&A /40**. Score every member.
+9. Defense judges only: the **Members** step shows one card per student, each with **Presentation /20**, **Communication /40** and **Q&A /40**. Score every member. If a student is **not at the defense**, tap **Absent** on their card instead: their boxes disappear, they need no scores, and every judge sees them as absent. Tap **Not absent** to undo. Never type zeros for an absent student.
 10. Tap **Review**. It lists every category with your percentage, and every blank box and every error. Tap **Go** beside any of them to jump straight to that box.
 11. When nothing is blank or red, **Mark group complete** turns green. Tap it.
 12. Tap **All groups** and pick the next group.
@@ -198,22 +206,45 @@ About saving:
 4. **By judge** shows how far each judge has got.
 5. Reload the page to see the latest.
 
-If a group shows **No scores** in a half at the end of the night, find the judge for that half before closing judging.
+If a group shows **No scores** in a half at the end of the night, find the judge for that half before closing judging. A gold **only 1** means a half has just one completed sheet: it counts, but a second judge makes the result steadier.
+
+### Correcting a judge's score
+
+You can correct any judge's score yourself, for example when a judge tells you they typed 13 instead of 18.
+
+1. On the **Progress** tab, tap the **Defense** or **Booth** pill beside the group. (Or open the group and press **Defense scores and corrections**.)
+2. Each criterion lists every judge's score. Find the one to change and press **Correct** beside it.
+3. Type the new score. Leave the box empty to remove the score altogether.
+4. Type a short **Reason**, for example `Judge confirmed 18, typed 13`. A reason is required.
+5. Press **Save correction**. The green message shows the old and new score.
+
+The judge's own score is kept. The entry shows **Corrected by the coordinator**, with what the judge gave and your reason, and **Corrections made** at the bottom of the page lists every correction with who and when. The Excel **Scores** and **Booth Scores** sheets list corrections in their last column.
+
+You can correct scores while judging is open and after it is closed, until results are released.
 
 ---
 
 ## Part I. Close judging (finalise)
 
-1. Press the **Progress** tab and scroll to **Close judging**.
-2. Check every group has at least one complete sheet in each half.
-3. Tick **I have checked the progress above**.
-4. Press **Close judging**. The status changes to **Judging closed**.
+Judging can close only when nothing is left unsettled. The **Close judging** section of the **Progress** tab lists every item that **Needs you**, and the **Close judging** button stays grey until the list is empty.
 
-What this does: judges can no longer change any score. Results and grades stop moving.
+1. Press the **Progress** tab and scroll to **Close judging**.
+2. Settle each **Needs you** item:
+   - **"G07 Pandesal Plus: no completed Booth sheet"** (or "a criterion nobody has scored"). Ask the judge to finish and tap **Mark group complete**. If the group genuinely cannot be fully judged, for example it never ran a booth, press **Close judging for this group with the scores it has…**, type the reason, and press **Accept with this reason**. Its missing half stays out of its score; it is not counted as zero.
+   - **"Carlo Lacson (BA-3A) is on the roll but in no group."** Place them in a group (Part D), or press **Leave this student out with a reason…** (see Part B).
+   - **"Andrea Dela Cruz (G01) has incomplete member scores."** Ask the defense judges to score them, correct the scores yourself, or, if the student missed the defense, press **Mark absent from the defense**.
+3. Read the gold **Check** items. They do not block closing: a half with only one completed sheet, and sheets a judge has not marked complete (their scores so far still count).
+4. **Already decided by you** lists accepted groups, absent students and students left out, each with **Undo**.
+5. Tick **I have checked the progress above**.
+6. Press **Close judging**. The status changes to **Judging closed**.
+
+What this does: judges can no longer change any score. Results and grades stop moving, except for corrections you make yourself.
 
 A blank score is never counted as zero. Anything nobody scored is left out, and a group that is not fully judged reads **Incomplete** and has no rank. A judge who means zero types `0`, and that counts.
 
-If you closed too early, press **Reopen judging** on the same page.
+**A student absent from the defense** gets no grade from the app. On the **Grades** tab they show **Absent**, and in the workbook their Final Grade and Letter Grade are blank with the note "Absent from the defense: grade to be entered by the coordinator". Enter their grade yourself in the official encoding system. You can also mark a student absent, or not absent, from the group's page.
+
+If you closed too early, press **Reopen judging** on the same page. Judging can be reopened until results are released.
 
 ---
 
@@ -264,11 +295,9 @@ Be aware of these gaps in this first version.
 - **Mailing sheet.** There is no mailing sheet for Power Automate yet.
 - **Changing points, weights or letter bands.** Only the criterion wording can be changed on screen (Part A2). Maximums, weights and letter bands cannot. Each event keeps the copy it was created with. A developer can change the default in `src/lib/rubric.ts` before creating next year's event.
 - **Full offline mode.** Scores typed while offline are kept on the phone and sent later, but a phone that has never opened the app cannot load it offline, and reloading the page with no connection shows the browser's offline page.
-- **Coordinator corrections.** You cannot change a judge's score yourself; ask the judge to reopen the group with **Edit scores** (judging must be open).
-- **Deleting scores.** There is no button to delete a judge's sheet (for example after a rehearsal). A group with scores cannot be deleted.
+- **Deleting scores.** There is no button to delete a whole judge's sheet (for example after a rehearsal); you can only remove scores one at a time with **Correct**. A group with scores cannot be deleted.
 - **Frozen results.** Closing judging locks the scores, but results are recalculated each time you open them; there is no stored snapshot or file history.
-- **Excluding dropped students.** The roll shows students in no group, but there is no "excluded, dropped" marker; they simply stay unplaced.
-- **Change history screen.** Changes are recorded in the database but there is no screen to read them.
+- **Change history screen.** Corrections are listed on each group's scores page, but other changes (imports, groups, status) are recorded in the database with no screen to read them.
 - **First sign-in password change.** Judges are not forced to change the temporary password; they can do it under **Account**.
 
 ## If something goes wrong

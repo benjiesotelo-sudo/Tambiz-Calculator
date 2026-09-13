@@ -7,7 +7,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { categoryMax, criterionLabel, type Category, type Half, type Rubric } from '@/lib/rubric';
 import { fmtPct } from '@/lib/scoring';
-import { checkScore, critKey, fmtScore, memberKey } from '@/lib/sheet';
+import { absentKey, checkScore, critKey, fmtScore, memberKey } from '@/lib/sheet';
 import { readDraft, writeDraft } from './draft';
 
 interface Member {
@@ -49,6 +49,7 @@ export function ScoreSheet(props: Props) {
     (key: string) => {
       const [kind, a, b] = key.split(':');
       if (kind === 'c') return halfDef.categories.find((c) => c.key === a)?.maxes[+b] ?? 0;
+      if (kind === 'a') return 1;
       return rubric.memberFields.find((f) => f.key === b)?.max ?? 0;
     },
     [halfDef, rubric],
@@ -101,6 +102,7 @@ export function ScoreSheet(props: Props) {
       if (!keys.length && !extra) return true;
       const snapshot = keys.map((k) => [k, rawRef.current[k] ?? ''] as const);
       const changes = snapshot.map(([k, r]) => {
+        if (k.startsWith('a:')) return { key: k, value: r === '1' ? 1 : null };
         const c = checkScore(r, maxOf(k));
         return { key: k, value: c.state === 'ok' ? c.n : null };
       });
@@ -215,6 +217,11 @@ export function ScoreSheet(props: Props) {
       done = 0;
     const issues: Issue[] = [];
     for (const m of members) {
+      // A member marked absent from the defense needs no scores.
+      if (rawRef.current[absentKey(m.id)] === '1') {
+        done++;
+        continue;
+      }
       let ok = 0;
       for (const f of rubric.memberFields) {
         total++;
@@ -438,6 +445,26 @@ export function ScoreSheet(props: Props) {
         </div>
         {!members.length ? <div className="banner offline">This group has no members yet. The coordinator adds them from the class roll.</div> : null}
         {members.map((m) => {
+          const absent = rawRef.current[absentKey(m.id)] === '1';
+          const absentButton = (
+            <button className="go" disabled={locked} onClick={() => onType(absentKey(m.id), absent ? '' : '1')}>
+              {absent ? 'Not absent' : 'Absent'}
+            </button>
+          );
+          if (absent) {
+            return (
+              <div className="member absent" key={m.id}>
+                <div className="mhead">
+                  <span className="avatar">{m.initials}</span>
+                  <div style={{ minWidth: 0 }}>
+                    <div className="mname">{m.name}</div>
+                    <div className="sub">Absent from the defense. No scores needed; the coordinator gives their grade.</div>
+                  </div>
+                  <div className="mtotal">{absentButton}</div>
+                </div>
+              </div>
+            );
+          }
           let tot = 0,
             any = false;
           rubric.memberFields.forEach((f) => {
@@ -458,6 +485,7 @@ export function ScoreSheet(props: Props) {
                 <div className="mtotal">
                   <b>{any ? fmtScore(tot) : '–'}</b>
                   <span className="sub"> / 100</span>
+                  <div>{absentButton}</div>
                 </div>
               </div>
               <div className="mfields">

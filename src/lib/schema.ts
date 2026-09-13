@@ -120,4 +120,45 @@ export const SCHEMA: string[] = [
   )`,
   `CREATE INDEX IF NOT EXISTS score_sheet_event ON score_sheet(event_id, half)`,
   `CREATE INDEX IF NOT EXISTS student_event ON student(event_id, section)`,
+
+  // ── Added 14 September 2026 (finalising, corrections, absences, private links). ──
+  // Additive only: new nullable or defaulted columns and new tables. The first version of the app ignores all of it,
+  // so these statements are safe to apply to its database before or after this version is deployed.
+  `ALTER TABLE event ADD COLUMN IF NOT EXISTS released_at timestamptz`,
+  // A group finalised without every score (decision 5), with the coordinator's reason.
+  `ALTER TABLE tgroup ADD COLUMN IF NOT EXISTS accept_reason text, ADD COLUMN IF NOT EXISTS accepted_at timestamptz`,
+  // A student on the roll deliberately left out of every group (decision 6).
+  `ALTER TABLE student ADD COLUMN IF NOT EXISTS excluded_reason text, ADD COLUMN IF NOT EXISTS excluded_at timestamptz`,
+  // A member absent from the defense (decision 6).
+  `ALTER TABLE group_member ADD COLUMN IF NOT EXISTS absent_at timestamptz, ADD COLUMN IF NOT EXISTS absent_by text`,
+  // A coordinator's correction of a judge's score (decision 7): who, when, why, and the judge's own value.
+  `ALTER TABLE score_value ADD COLUMN IF NOT EXISTS corrected_by text, ADD COLUMN IF NOT EXISTS corrected_at timestamptz,
+     ADD COLUMN IF NOT EXISTS correction_reason text, ADD COLUMN IF NOT EXISTS judge_value double precision`,
+  `ALTER TABLE member_score ADD COLUMN IF NOT EXISTS corrected_by text, ADD COLUMN IF NOT EXISTS corrected_at timestamptz,
+     ADD COLUMN IF NOT EXISTS correction_reason text, ADD COLUMN IF NOT EXISTS judge_value double precision`,
+  // The short code the coordinator hands an adviser to open their private link (decision 8).
+  `ALTER TABLE adviser ADD COLUMN IF NOT EXISTS link_code text NOT NULL DEFAULT ''`,
+  // Private links (decision 8). Only a fingerprint of each link's code is stored.
+  `CREATE TABLE IF NOT EXISTS access_link (
+    id text PRIMARY KEY,
+    event_id text NOT NULL REFERENCES event(id) ON DELETE CASCADE,
+    recipient_type text NOT NULL CHECK (recipient_type IN ('student', 'adviser')),
+    recipient_id text NOT NULL,
+    code_hash text NOT NULL UNIQUE,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    expires_at timestamptz,
+    revoked_at timestamptz,
+    failed_attempts integer NOT NULL DEFAULT 0,
+    locked_at timestamptz,
+    first_opened_at timestamptz,
+    last_opened_at timestamptz,
+    open_count integer NOT NULL DEFAULT 0
+  )`,
+  `CREATE INDEX IF NOT EXISTS access_link_recipient ON access_link(event_id, recipient_type, recipient_id)`,
+  `CREATE TABLE IF NOT EXISTS link_session (
+    token_hash text PRIMARY KEY,
+    link_id text NOT NULL REFERENCES access_link(id) ON DELETE CASCADE,
+    expires_at timestamptz NOT NULL,
+    created_at timestamptz NOT NULL DEFAULT now()
+  )`,
 ];

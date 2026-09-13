@@ -5,7 +5,7 @@ import { EventHeader } from '@/components/EventNav';
 import { requireAdmin } from '@/lib/auth';
 import { query } from '@/lib/db';
 import { getEvent, listStudents, rollName } from '@/lib/repo';
-import { importRoll } from '../../../actions';
+import { excludeStudent, importRoll, includeStudent } from '../../../actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,10 +22,12 @@ export default async function RollPage({ params, searchParams }: { params: Promi
       [id],
     ),
   ]);
-  const unplaced = students.filter((s) => !s.group_id);
+  const unplaced = students.filter((s) => !s.group_id && !s.excluded_reason);
+  const leftOut = students.filter((s) => !s.group_id && s.excluded_reason);
   const showAll = sp.show === 'all';
-  const shown = showAll ? students : unplaced;
+  const shown = showAll ? students : [...unplaced, ...leftOut];
   const sections = [...new Set(students.map((s) => s.section))];
+  const here = `/admin/events/${id}/roll${showAll ? '?show=all' : ''}`;
 
   return (
     <>
@@ -63,11 +65,16 @@ export default async function RollPage({ params, searchParams }: { params: Promi
             <div className="stat" style={{ color: unplaced.length ? 'var(--error)' : undefined }}>
               {unplaced.length}
             </div>
-            <div className="sub">{unplaced.length ? 'Place each one in a group, or leave them out if they dropped' : 'Everyone is placed'}</div>
+            <div className="sub">{unplaced.length ? 'Place each one in a group, or leave them out with a reason. Judging cannot close until you do.' : 'Everyone is placed or left out'}</div>
+          </div>
+          <div className="tile">
+            <b>Left out</b>
+            <div className="stat">{leftOut.length}</div>
+            <div className="sub">In no group, with your reason</div>
           </div>
         </div>
 
-        <div className="section-title">{showAll ? `Everyone (${students.length})` : `Not in any group (${unplaced.length})`}</div>
+        <div className="section-title">{showAll ? `Everyone (${students.length})` : `Not in any group (${unplaced.length + leftOut.length})`}</div>
         <div className="actions" style={{ marginTop: 0, marginBottom: 8 }}>
           <Link className="btn small secondary" href={`/admin/events/${id}/roll${showAll ? '' : '?show=all'}`}>
             {showAll ? 'Show only students not in a group' : 'Show everyone'}
@@ -75,19 +82,53 @@ export default async function RollPage({ params, searchParams }: { params: Promi
         </div>
         <ul className="list">
           {shown.map((s) => (
-            <li key={s.id}>
-              <span className="grow-1">
+            <li key={s.id} style={{ flexWrap: 'wrap' }}>
+              <span className="grow-1" style={{ minWidth: 200 }}>
                 <span className="title">{rollName(s)}</span>
                 <span className="sub" style={{ display: 'block', overflowWrap: 'anywhere' }}>
                   {s.student_number} · {s.section} · {s.email}
                 </span>
+                {s.excluded_reason && !s.group_id ? (
+                  <span className="sub" style={{ display: 'block', overflowWrap: 'anywhere' }}>
+                    Left out: {s.excluded_reason}
+                  </span>
+                ) : null}
               </span>
               {s.group_id ? (
                 <Link className="pill done" href={`/admin/events/${id}/groups/${s.group_id}`}>
                   {s.group_code}
                 </Link>
+              ) : s.excluded_reason ? (
+                <>
+                  <span className="pill none">Left out</span>
+                  <form action={includeStudent}>
+                    <input type="hidden" name="eventId" value={id} />
+                    <input type="hidden" name="studentId" value={s.id} />
+                    <input type="hidden" name="return" value={here} />
+                    <button className="btn small secondary" type="submit">
+                      Undo
+                    </button>
+                  </form>
+                </>
               ) : (
-                <span className="pill err">No group</span>
+                <>
+                  <span className="pill err">No group</span>
+                  <details className="inline-form" style={{ flexBasis: '100%' }}>
+                    <summary>Leave out with a reason…</summary>
+                    <form action={excludeStudent} className="form">
+                      <input type="hidden" name="eventId" value={id} />
+                      <input type="hidden" name="studentId" value={s.id} />
+                      <input type="hidden" name="return" value={here} />
+                      <label className="field">
+                        <span className="label-text">Reason</span>
+                        <input className="input" name="reason" required minLength={3} maxLength={200} placeholder="For example: dropped the course" />
+                      </label>
+                      <button className="btn small" type="submit">
+                        Leave out
+                      </button>
+                    </form>
+                  </details>
+                </>
               )}
             </li>
           ))}
