@@ -2,7 +2,7 @@
 // Every business, person, student number and email here is invented. Runs only when there are no accounts.
 
 import { DEFAULT_RUBRIC, criteriaOf, type Half } from './rubric';
-import { hashPassword } from './passwords';
+import { hashPassword, verifyPassword } from './passwords';
 import type { Row, Statement } from './db';
 
 type Db = { query: (text: string, params?: unknown[]) => Promise<Row[]>; transaction: (s: Statement[]) => Promise<void> };
@@ -63,6 +63,40 @@ const PLAN: [number, Half, number[], number][] = [
   [0, 'booth', [0, 2, 4], -1],
   [1, 'booth', [1, 3], -1],
 ];
+
+/**
+ * Keeps the sample accounts' stored passwords in step with SEED_ADMIN_PASSWORD and SEED_JUDGE_PASSWORD.
+ * Runs on every server start. While a variable is set, it wins: a differing stored password is replaced,
+ * lockouts are cleared and that account is signed out everywhere. Accounts created in the app are never touched.
+ * Returns the emails whose password was changed.
+ */
+export async function syncSeedPasswords(db: Db): Promise<string[]> {
+  const wanted = new Map<string, string>();
+  if (process.env.SEED_ADMIN_PASSWORD) wanted.set(DEMO_ADMIN_EMAIL, process.env.SEED_ADMIN_PASSWORD);
+  if (process.env.SEED_JUDGE_PASSWORD) for (const [email] of JUDGES) wanted.set(email, process.env.SEED_JUDGE_PASSWORD);
+  if (!wanted.size) return [];
+
+  const rows = await db.query('SELECT id, email, password_hash FROM account WHERE lower(email) = ANY($1::text[])', [[...wanted.keys()]]);
+  const updates = (
+    await Promise.all(
+      rows.map(async (r) => {
+        const password = wanted.get(String(r.email).toLowerCase())!;
+        if (await verifyPassword(password, String(r.password_hash))) return null;
+        return { id: String(r.id), email: String(r.email), hash: await hashPassword(password) };
+      }),
+    )
+  ).filter((u): u is { id: string; email: string; hash: string } => u !== null);
+
+  if (updates.length) {
+    await db.transaction(
+      updates.flatMap((u) => [
+        { text: 'UPDATE account SET password_hash = $2, failed_logins = 0, locked_until = NULL WHERE id = $1', params: [u.id, u.hash] },
+        { text: 'DELETE FROM session WHERE account_id = $1', params: [u.id] },
+      ]),
+    );
+  }
+  return updates.map((u) => u.email);
+}
 
 export async function seedIfEmpty(db: Db) {
   const existing = await db.query('SELECT count(*)::int AS n FROM account');
