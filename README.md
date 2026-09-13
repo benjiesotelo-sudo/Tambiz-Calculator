@@ -34,7 +34,7 @@ Delete `.local-db/` to start again from the sample data.
 
 ### Sample sign-ins
 
-The sample data creates one coordinator and three judges. Unless `SEED_ADMIN_PASSWORD` / `SEED_JUDGE_PASSWORD` were set when the database was first filled, their password is `tambiz-demo-2027`.
+The sample data creates one coordinator and three judges. Their passwords come from `SEED_ADMIN_PASSWORD` and `SEED_JUDGE_PASSWORD` when those are set (applied on every server start); otherwise the password is `tambiz-demo-2027`.
 
 | Role | Email |
 |---|---|
@@ -66,12 +66,22 @@ npm test
    | Name | Value | Required |
    |---|---|---|
    | `DATABASE_URL` | The Neon connection string | **Yes.** Without it the deployed app runs on a temporary in-memory database that is wiped whenever Vercel restarts it. |
-   | `SEED_ADMIN_PASSWORD` | Password for `admin@tambiz.demo` | Only used if the database is empty when the app first starts |
-   | `SEED_JUDGE_PASSWORD` | Password for the three sample judges | Same |
+   | `SEED_ADMIN_PASSWORD` | Password for `admin@tambiz.demo` | Recommended. See “Changing the sample account passwords” below. |
+   | `SEED_JUDGE_PASSWORD` | Password for the three sample judges (`judge1@`, `judge2@`, `judge3@tambiz.demo`) | Recommended. Same. |
 
    If you use Vercel's Neon integration instead of pasting the string, it creates `DATABASE_URL` for you. Turn off “create a database branch for every preview deployment”; the free plan allows only 10 branches.
 5. **Deploy.** Press Deploy, open the address Vercel gives you, and sign in as the coordinator.
 6. **Before real data:** change the coordinator password, remove or reset the sample judges, and create the real event.
+
+### Changing the sample account passwords
+
+`SEED_ADMIN_PASSWORD` and `SEED_JUDGE_PASSWORD` are applied every time the server starts, not only when the database is first filled:
+
+1. In Vercel, change the variable's value (Project → Settings → Environment Variables).
+2. Redeploy (Deployments → the latest one → Redeploy).
+3. On its first request, the app compares each sample account's stored password with the variable. Where they differ, it stores the new password, clears any lockout, and signs that account out everywhere. The server log says which accounts changed.
+
+While a variable is set, it wins: a password someone changed under **Account** is put back to the variable's value on the next server start. If you would rather people keep the passwords they choose, delete the variable and redeploy. Judge accounts created on the Judges tab are never touched by these variables.
 
 ### Database migrations
 

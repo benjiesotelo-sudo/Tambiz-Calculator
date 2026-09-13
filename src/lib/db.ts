@@ -52,8 +52,11 @@ async function init(): Promise<Ready> {
   const url = process.env.DATABASE_URL;
   const driver = url ? await neonDriver(url) : await pgliteDriver();
   await driver.transaction(SCHEMA.map((text) => ({ text })));
-  const { seedIfEmpty } = await import('./seed');
-  await seedIfEmpty({ query: driver.query, transaction: driver.transaction });
+  const { seedIfEmpty, syncSeedPasswords } = await import('./seed');
+  const db = { query: driver.query, transaction: driver.transaction };
+  await seedIfEmpty(db);
+  const changed = await syncSeedPasswords(db);
+  if (changed.length) console.log(`Seed passwords applied from environment variables for: ${changed.join(', ')}`);
   return { driver };
 }
 
