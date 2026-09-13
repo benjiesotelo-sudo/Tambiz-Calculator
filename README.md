@@ -1,35 +1,104 @@
-# Tambiz Calculator
+# Tambiz
 
-Group scoring, ranking and individual grading for the annual Tambiz awarding at FEU Manila.
+Judging, results and individual grades for the annual Tambiz awarding in MGT1114 Business Plan 2, FEU Manila.
 
-Open `index.html` in any browser.
-There is nothing to install and nothing to set up.
+This repository holds two things:
 
-## What it does
+| What | Where | Status |
+|---|---|---|
+| **The hosted Tambiz app** (Next.js, TypeScript, Postgres) | `src/`, deployed on Vercel | First working version |
+| **The original single-file calculator** | `index.html` | Unchanged. It is the authority on the scoring rules and the fallback if the app is unavailable: open it in any browser. |
 
-Groups are judged in two halves.
+The coordinator's click-by-click guide is [`docs/how-to-run-an-event.md`](docs/how-to-run-an-event.md).
 
-**Defense**: Elevator Pitch, Informercial, Paper, Product Demo.
-**Booth**: Best Business Plan Booth, Student Innovation, Best Product Demonstration.
+## What the app does
 
-Each half has its own panel of judges, and each judge scores every component.
-Scores are averaged across the judges who filled them in, converted to a percentage per category, then ranked.
+- **Coordinator** (admin): creates the year's event, imports the class roll and adviser list from Excel, creates groups and chooses their members from the roll, creates judge accounts, watches judging progress, closes judging, reads results and grades, and downloads the Excel workbook.
+- **Judges**: sign in on a phone, pick Defense or Booth, pick a group, and score one category per screen with the maximum printed beside every box. A score above the maximum is refused with a message. Review lists every blank and error with a Go button, and “Mark group complete” stays locked until the sheet is clean. Defense judges also score each member. Scores are kept on the phone the moment they are typed and sent in the background.
+- **Results**: every category percentage with its rank, the defense and booth halves, the overall score and rank, a top-10 leaderboard per category, and each student's member total, final grade and letter grade.
 
-A group's overall score is the defense half weighted 70 percent and the booth half weighted 30 percent.
-Within each half, every category counts equally regardless of how many raw points it carries.
+Scoring is a direct port of `index.html`; see `src/lib/scoring.ts`. Overall = Defense × 0.7 + Booth × 0.3, every category weighs the same within its half, and a final grade is rounded **up** to a whole number before its letter is looked up (84.5 → 85 → B+).
 
-Individual members are scored by the defense panel on presentation skills out of 20, communication skills out of 40, and question and answer out of 40.
-A member's final grade is their own score and their group's overall score, averaged.
+## Run it on your computer
 
-## Saving your work
+Needs Node.js 22 or newer.
 
-Nothing is stored automatically.
-Use **Save as Excel** to keep a copy, and **Import Excel** to load it back in.
-The Excel buttons need an internet connection, because the spreadsheet library is loaded from the web.
+```bash
+npm install
+npm run dev
+```
 
-## Status
+Open http://localhost:3000. With no `DATABASE_URL`, the app uses PGlite (a real Postgres compiled to WebAssembly) stored in `.local-db/`, and fills it with a sample event the first time it starts.
 
-This is the working single file version, unchanged, as used for the awarding.
-It is the starting point for a hosted version with accounts for judges, students and the administrator.
+Delete `.local-db/` to start again from the sample data.
 
-Real student names, numbers, emails and grades must never be committed to this repository.
+### Sample sign-ins
+
+The sample data creates one coordinator and three judges. Unless `SEED_ADMIN_PASSWORD` / `SEED_JUDGE_PASSWORD` were set when the database was first filled, their password is `tambiz-demo-2027`.
+
+| Role | Email |
+|---|---|
+| Coordinator | `admin@tambiz.demo` |
+| Judge | `judge1@tambiz.demo`, `judge2@tambiz.demo`, `judge3@tambiz.demo` |
+
+**Change these passwords (Account → Change password) before any real student data goes in.** The sample event, groups, students and advisers are invented.
+
+## Tests
+
+```bash
+npm test
+```
+
+- `tests/golden.test.ts`: the 14 reference answers taken from the original `index.html` (design research, `evidence/golden-rules.js`), plus the letter-grade rounding rule.
+- `tests/crosscheck.test.ts`: runs the original scoring functions extracted from `index.html` on 40 random events and checks the new code gives identical percentages and ranks.
+
+## Deploy to Vercel with Neon
+
+1. **Create the database.** In Neon, create a project in the Singapore region (AWS ap-southeast-1). Copy the connection string (it starts `postgresql://` and ends `?sslmode=require`). In the project settings, cap autoscaling at 1 compute unit.
+2. **Create the tables and the sample data.** On your computer, in this folder:
+   ```bash
+   DATABASE_URL="postgresql://…your connection string…" SEED_ADMIN_PASSWORD="a long coordinator password" SEED_JUDGE_PASSWORD="a long judge password" npm run db:setup
+   ```
+   It prints `Database ready (Postgres from DATABASE_URL): 4 accounts, 1 events.` Running it again is safe: it only adds missing tables and never duplicates the sample data. (The app also runs this set-up by itself on its first request, so this step is optional, but running it yourself shows any connection problem straight away.)
+3. **Create the Vercel project.** In Vercel, choose Add New → Project, import this GitHub repository, and keep the detected framework (Next.js) and default build settings.
+4. **Set the environment variables** (Project → Settings → Environment Variables, for Production and Preview):
+
+   | Name | Value | Required |
+   |---|---|---|
+   | `DATABASE_URL` | The Neon connection string | **Yes.** Without it the deployed app runs on a temporary in-memory database that is wiped whenever Vercel restarts it. |
+   | `SEED_ADMIN_PASSWORD` | Password for `admin@tambiz.demo` | Only used if the database is empty when the app first starts |
+   | `SEED_JUDGE_PASSWORD` | Password for the three sample judges | Same |
+
+   If you use Vercel's Neon integration instead of pasting the string, it creates `DATABASE_URL` for you. Turn off “create a database branch for every preview deployment”; the free plan allows only 10 branches.
+5. **Deploy.** Press Deploy, open the address Vercel gives you, and sign in as the coordinator.
+6. **Before real data:** change the coordinator password, remove or reset the sample judges, and create the real event.
+
+### Database migrations
+
+The schema is in `src/lib/schema.ts`. Every statement is idempotent (`CREATE TABLE IF NOT EXISTS`, and `ADD COLUMN IF NOT EXISTS` for future changes), and it runs automatically on each server start. To apply it by hand, run `DATABASE_URL=… npm run db:setup`.
+
+### Emergency password reset
+
+If the coordinator password is lost:
+
+```bash
+DATABASE_URL="postgresql://…" npm run reset-password -- admin@tambiz.demo "a new long password"
+```
+
+## Where things are
+
+| Path | What |
+|---|---|
+| `src/lib/scoring.ts` | Every scoring rule, ported from `index.html` with line references |
+| `src/lib/rubric.ts` | The default scoring sheet (maximums, weights, member fields, letter-grade bands). Each event stores its own copy. |
+| `src/lib/db.ts` | The only module that talks to the database (Neon when `DATABASE_URL` is set, PGlite otherwise) |
+| `src/lib/schema.ts` | Tables |
+| `src/lib/repo.ts` | Shared reads, and the whole-event report used by results, grades and export |
+| `src/lib/excel-import.ts`, `src/lib/excel-export.ts` | Class roll and adviser import; the workbook export (ExcelJS) |
+| `src/components/ScoreSheet.tsx` | The judge scoring screen |
+| `src/app/admin/actions.ts` | Every coordinator change, each checking the caller is the coordinator |
+| `src/app/api/judge/sheet/route.ts` | Where judges' scores arrive; refuses anything above a maximum |
+
+## Real student data
+
+Real student names, numbers, emails and grades must never be committed to this repository. `.gitignore` blocks Excel and CSV files, `.env*.local` and the local database folder.
