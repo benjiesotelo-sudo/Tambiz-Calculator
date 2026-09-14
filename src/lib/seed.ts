@@ -49,6 +49,8 @@ const GROUPS: [string, string, string, number, number][] = [
   ['G08', 'Abaca Threads', 'BA-3D', 3, 0.69],
 ];
 const ADVISERS = ['Prof. Maria Lourdes Santos', 'Prof. Ramon Villareal', 'Prof. Teresita Uy', 'Prof. Danilo Ocampo'];
+/** Sample adviser codes, typed to open an adviser's private link. */
+const ADVISER_CODES = ['K7Q-4MP', 'R3V-8XD', 'T9U-2HW', 'D5C-6NA'];
 const JUDGES = [
   ['judge1@tambiz.demo', 'Dr. Liza Manalo'],
   ['judge2@tambiz.demo', 'Mr. Paolo Dizon'],
@@ -122,7 +124,11 @@ export async function seedIfEmpty(db: Db) {
 
   const adviserIds = ADVISERS.map(() => id('adv'));
   s.push(
-    ...insertMany('adviser', ['id', 'event_id', 'name', 'name_key', 'email'], ADVISERS.map((n, i) => [adviserIds[i], eventId, n, nameKey(n), `adviser${i + 1}@tambiz.demo`])),
+    ...insertMany(
+      'adviser',
+      ['id', 'event_id', 'name', 'name_key', 'email', 'link_code'],
+      ADVISERS.map((n, i) => [adviserIds[i], eventId, n, nameKey(n), `adviser${i + 1}@tambiz.demo`, ADVISER_CODES[i]]),
+    ),
   );
 
   // Class roll: 6 students per group, plus 3 not yet in any group so the roster check has something to show.
@@ -134,7 +140,9 @@ export async function seedIfEmpty(db: Db) {
     const surname = SURNAMES[(n * 7) % SURNAMES.length];
     const first = FIRST[(n * 11) % FIRST.length];
     const num = `2023${(10457 + n * 37).toString().padStart(6, '0')}`;
-    studentRows.push([sid, eventId, num, `${num}@tambiz.demo`, surname, first, MIDDLE[n % MIDDLE.length], section, n % 2 ? 'M' : 'F', 'BSBA-MM', 'MGT1114']);
+    // The email must not contain the student number, which is what a student types to open their private link.
+    const email = `${first}.${surname}.${n + 1}@tambiz.demo`.toLowerCase().replace(/\s+/g, '');
+    studentRows.push([sid, eventId, num, email, surname, first, MIDDLE[n % MIDDLE.length], section, n % 2 ? 'M' : 'F', 'BSBA-MM', 'MGT1114']);
     students.push({ id: sid, section, group });
     n++;
   };

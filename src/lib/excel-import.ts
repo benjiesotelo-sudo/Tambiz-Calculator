@@ -31,6 +31,7 @@ export const ADVISER_COLUMNS: ColumnSpec[] = [
   { field: 'email', header: 'Email', aliases: ['email', 'adviseremail', 'advisoremail', 'emailaddress'], required: false },
   { field: 'group_code', header: 'Group Code', aliases: ['groupcode', 'code', 'groupno', 'groupnumber'], required: false },
   { field: 'group_name', header: 'Group Name', aliases: ['groupname', 'group', 'businessname'], required: false },
+  { field: 'link_code', header: 'Adviser Code', aliases: ['advisercode', 'linkcode', 'accesscode', 'checkcode'], required: false },
 ];
 
 export interface ParsedSheet {

@@ -29,9 +29,27 @@ You do not need to remember anything from last year.
 6. Check the **Year** box shows the right year, for example `2027`. Change it if not.
 7. Leave **Title** empty to call it "Tambiz 2027", or type another title.
 8. Press **Create event**. You land on the event's home page.
-9. Scroll to **Scoring sheet** and check the categories and maximums are right. (They are copied from the newest event. To change them, see "Not built yet" at the end.)
+9. Scroll to **Scoring sheet** and check the categories and maximums are right. (They are copied from the newest event, with the criterion wording. Points cannot be changed on screen; see "Not built yet" at the end.) A new event spells the second defense category **Infomercial**; an older event that stored "Informercial" keeps the spelling it was judged under.
 
 ☐ Done: the event exists and its status says **Set-up**.
+
+---
+
+## Part A2. Enter the criterion wording
+
+Judges see this wording on their phones. Without it, the rows read "Criterion 1, Criterion 2…". You can do this at any time, even during judging: wording never changes a score.
+
+1. On the event page, press the **Scoring sheet** tab.
+2. Each category is a card with one box per criterion. The points for that criterion are printed beside its box, for example **/20**.
+3. Type the wording into each box.
+4. To paste the whole list instead: in Word or Excel, copy the criteria **one per line, in sheet order** (the 21 defense criteria, then the 18 booth criteria). Click the first box under **Elevator Pitch** and paste. Each line fills the next box, carrying on into the next category. Numbers and bullets at the start of a line are removed. The bar at the bottom says how many boxes were filled.
+5. Check a few boxes against your list, especially the last box of each category.
+6. Press **Save wording**. The green message says how many criteria have wording.
+7. Judges see the new wording the next time they open a group.
+
+The event page's **Scoring sheet** section says how many of the 39 criteria have wording. A new event copies the wording from the newest event, so next year you only change what changed.
+
+☐ Done: the event page says all 39 criteria have their wording.
 
 ---
 
@@ -48,6 +66,14 @@ You do not need to remember anything from last year.
 The file must have these columns: **Student No.**, **Student Email**, **Surname**, **First Name**, **Section**. Any other columns are ignored. The headings do not have to be in the first row.
 
 If students are added or dropped later, import the new file again. Importing the same file twice **updates** students; it never adds them twice.
+
+**A student who dropped the course** stays on the roll file but should not be in a group. Judging cannot close while anyone on the roll is in no group, so leave them out on purpose:
+
+1. On the **Class roll** tab, find the student under **Not in any group**.
+2. Press **Leave out with a reason…**, type the reason (for example `Dropped the course`), and press **Leave out**.
+3. They now show **Left out** with your reason. Press **Undo** if you change your mind. Adding them to a group also undoes it.
+
+Students left out are listed at the bottom of the **For Encoding** sheet with your reason and no grade.
 
 ☐ Done: the roll shows every student.
 
@@ -72,7 +98,15 @@ Choose **one** of these.
 4. Press **Save adviser**.
 5. Repeat for each adviser.
 
-☐ Done: every adviser is listed.
+**Adviser codes.** After results are released, each adviser opens a private link and types an **adviser code** to see their groups. The code is never in the email, so you hand it out yourself.
+
+1. On the **Advisers** tab, press **Make codes for the advisers without one**. Each adviser gets a code such as `K7Q-4MP`.
+2. To choose a code yourself, press **Set code…** beside the adviser, type it, and press **Save code**. (Or add an **Adviser Code** column to the adviser file.)
+3. Give each adviser their code, for example on a slip at a faculty meeting. Do not email it.
+
+An adviser without an email or without a code gets no link.
+
+☐ Done: every adviser is listed, with an email and a code.
 
 ---
 
@@ -99,7 +133,7 @@ Rules the app enforces for you:
 - Two groups cannot share a code, or a name that differs only in spaces or punctuation ("PAYONG PALAY" and "PayongPalay" count as the same).
 - Members are always chosen from the roll. They are never typed.
 
-To fix a mistake: open the group, press **Remove** beside a member, or change the details under **Group details** and press **Save group**.
+To fix a mistake: open the group, press **Remove** beside a member, or change the details under **Group details** and press **Save group**. Every change to a group's code, name, section or adviser is listed at the bottom of the group's page under **Changes to this group's details**, with who made it and when.
 
 **Final check**
 
@@ -113,10 +147,18 @@ To fix a mistake: open the group, press **Remove** beside a member, or change th
 
 ## Part E. Create the judge accounts
 
-Do this once for every judge.
+Judges are a standing department list: an account made one year is kept for the next. **If a judge has judged before, pick them from the list instead of making a new account**, so their record in Judge profiles (Part M) stays together.
+
+**A judge who has judged before**
 
 1. Press the **Judges** tab.
-2. Scroll to **Add a judge**.
+2. Scroll to **Add from the department list**.
+3. Press **Add to this event** beside their name. Their password is unchanged; press **Reset password** if they have forgotten it.
+
+**A new judge.** Do this once for every new judge.
+
+1. Press the **Judges** tab.
+2. Scroll to **Add a new judge**.
 3. Type the name the judge will see, for example `Dr. Liza Manalo`.
 4. Type their email (or a short login such as `lmanalo`).
 5. Press **Create judge account**.
@@ -152,9 +194,9 @@ Give this part to the judges.
 4. Check the group name at the top matches the group in front of you.
 5. You are on the first category. Each row has a number, the criterion, a large box, and the maximum beside it (for example **/20**).
 6. Tap the first box and type the score. Press **Next** (or **Enter**) on the keypad to move to the next box. After the last box, Next moves to the next category.
-7. If you type more than the maximum, the row turns red and says, for example, "Max is 20. You typed 25, so it is not counted yet." Tap the box and type the correct score.
+7. Scores can have up to two decimal places, for example `17.5` or `8.75`. If you type more than the maximum, or a third decimal place, the row turns red and says why, for example "Max is 20. You typed 25, so it is not counted yet." Tap the box and type the correct score.
 8. A 0 shows an amber "0 points. Intended?" note. It is allowed; it is only a reminder.
-9. Defense judges only: the **Members** step shows one card per student, each with **Presentation /20**, **Communication /40** and **Q&A /40**. Score every member.
+9. Defense judges only: the **Members** step shows one card per student, each with **Presentation /20**, **Communication /40** and **Q&A /40**. Score every member. If a student is **not at the defense**, tap **Absent** on their card instead: their boxes disappear, they need no scores, and every judge sees them as absent. Tap **Not absent** to undo. Never type zeros for an absent student.
 10. Tap **Review**. It lists every category with your percentage, and every blank box and every error. Tap **Go** beside any of them to jump straight to that box.
 11. When nothing is blank or red, **Mark group complete** turns green. Tap it.
 12. Tap **All groups** and pick the next group.
@@ -180,37 +222,67 @@ About saving:
 4. **By judge** shows how far each judge has got.
 5. Reload the page to see the latest.
 
-If a group shows **No scores** in a half at the end of the night, find the judge for that half before closing judging.
+If a group shows **No scores** in a half at the end of the night, find the judge for that half before closing judging. A gold **only 1** means a half has just one completed sheet: it counts, but a second judge makes the result steadier.
+
+### Correcting a judge's score
+
+You can correct any judge's score yourself, for example when a judge tells you they typed 13 instead of 18.
+
+1. On the **Progress** tab, tap the **Defense** or **Booth** pill beside the group. (Or open the group and press **Defense scores and corrections**.)
+2. Each criterion lists every judge's score. Find the one to change and press **Correct** beside it.
+3. Type the new score. Leave the box empty to remove the score altogether.
+4. Type a short **Reason**, for example `Judge confirmed 18, typed 13`. A reason is required.
+5. Press **Save correction**. The green message shows the old and new score.
+
+The judge's own score is kept. The entry shows **Corrected by the coordinator**, with what the judge gave and your reason, and **Corrections made** at the bottom of the page lists every correction with who and when. The Excel **Scores** and **Booth Scores** sheets list corrections in their last column.
+
+You can correct scores while judging is open and after it is closed, until results are released.
 
 ---
 
 ## Part I. Close judging (finalise)
 
+Judging can close only when nothing is left unsettled. The **Close judging** section of the **Progress** tab lists every item that **Needs you**, and the **Close judging** button stays grey until the list is empty.
+
 1. Press the **Progress** tab and scroll to **Close judging**.
-2. Check every group has at least one complete sheet in each half.
-3. Tick **I have checked the progress above**.
-4. Press **Close judging**. The status changes to **Judging closed**.
+2. Settle each **Needs you** item:
+   - **"G07 Pandesal Plus: no completed Booth sheet"** (or "a criterion nobody has scored"). Ask the judge to finish and tap **Mark group complete**. If the group genuinely cannot be fully judged, for example it never ran a booth, press **Close judging for this group with the scores it has…**, type the reason, and press **Accept with this reason**. Its missing half stays out of its score; it is not counted as zero.
+   - **"Carlo Lacson (BA-3A) is on the roll but in no group."** Place them in a group (Part D), or press **Leave this student out with a reason…** (see Part B).
+   - **"Andrea Dela Cruz (G01) has incomplete member scores."** Ask the defense judges to score them, correct the scores yourself, or, if the student missed the defense, press **Mark absent from the defense**.
+3. Read the gold **Check** items. They do not block closing: a half with only one completed sheet, and sheets a judge has not marked complete (their scores so far still count).
+4. **Already decided by you** lists accepted groups, absent students and students left out, each with **Undo**.
+5. Tick **I have checked the progress above**.
+6. Press **Close judging**. The status changes to **Judging closed**.
 
-What this does: judges can no longer change any score. Results and grades stop moving.
+What this does: judges can no longer change any score. Results and grades stop moving, except for corrections you make yourself.
 
-Anything still blank at this point counts as zero, exactly as in the old calculator.
+A blank score is never counted as zero. Anything nobody scored is left out, and a group that is not fully judged reads **Incomplete** and has no rank. A judge who means zero types `0`, and that counts.
 
-If you closed too early, press **Reopen judging** on the same page.
+**A student absent from the defense** gets no grade from the app. On the **Grades** tab they show **Absent**, and in the workbook their Final Grade and Letter Grade are blank with the note "Absent from the defense: grade to be entered by the coordinator". Enter their grade yourself in the official encoding system. You can also mark a student absent, or not absent, from the group's page.
+
+If you closed too early, press **Reopen judging** on the same page. Judging can be reopened until results are released.
 
 ---
 
 ## Part J. Read the results
 
+How scores are worked out:
+
+- **A blank is never a zero.** A criterion, category or half that nobody scored shows a dash and is left out of the arithmetic. A category percentage uses only the criteria that have a score; a half averages only the categories that have a percentage; a group with no booth scores has its defense half as its overall.
+- **Incomplete groups are not ranked.** A group reads **Incomplete** until every criterion in both halves has at least one judge's score. It gets no rank and no place on the leaderboard, so a half-judged group never looks like a low score.
+- **Two decimal places.** Every percentage shows two decimals, for example 89.85%. The screens and the Excel workbook use the same rounding, so they always show the same number.
+- **Ties.** Groups are ranked on the percentages you see. When two groups show the same category percentage, the one with the higher overall score goes first; they share a place only when both are equal. This rule is the same on the leaderboard and in the table.
+
 1. Press the **Results** tab.
-2. **Top 10 leaderboard** shows one card per category plus **Overall**. Tied groups share a place and are listed alphabetically.
-3. **Every group by category** shows each group's overall percentage and rank at the top right, its Defense and Booth halves, and every category percentage with its rank. In this table a tie in a category is broken by the overall score, as in the old calculator.
+2. **Top 10 leaderboard** shows one card per category plus **Overall**. Groups that still share a place are listed alphabetically. Every group tied at 10th place is listed, so in a rare year a card shows eleven or more names; that is correct, and it matches what each group's own results page says about being in the top 10.
+3. **Every group by category** shows each group's overall percentage and rank at the top right (or **Incomplete**), its Defense and Booth halves, and every category percentage with its rank.
 4. Press the **Grades** tab. Students are grouped by section. Each card shows:
-   - **Member total**: the average across defense judges of Presentation + Communication + Q&A (out of 100).
+   - **Member total**: for Presentation /20, Communication /40 and Q&A /40, the average across the defense judges who scored it, added up (out of 100). A field one judge left blank is not counted as zero. Until every field has at least one judge's score the total shows a dash (—) and reads **(incomplete)** here; in the workbook the cell is left empty, with the note beside it saying why. A partial total is never scaled up to 100.
    - **Group overall**: the group's overall percentage.
-   - **Final grade**: (member total + group overall) ÷ 2.
+   - **Final grade**: (member total + group overall) ÷ 2, using the two-decimal numbers shown.
    - **Rounded up**: the final grade rounded up to a whole number (84.5 becomes 85).
    - The **letter** and **quality points**, from the rounded number: 92–100 A (4), 85–91 B+ (3.5), 78–84 B (3), 71–77 C+ (2.5), 64–70 C (2), 57–63 D+ (1.5), 50–56 D (1), 0–49 F (0).
-5. A red **No grade yet** means that student has no member scores, or their group has no scores. Check with the defense judges.
+5. A red **No grade yet** says why: the student's member scores are incomplete, or their group is not fully judged. Check with the defense judges.
 
 ---
 
@@ -222,29 +294,99 @@ If you closed too early, press **Reopen judging** on the same page.
    - **Scores**: every defense judge's scores, one row per judge per group.
    - **Booth Scores**: the same for booth.
    - **Results**: every category percentage and rank, the halves, and the overall, sorted by overall rank.
-   - **Leaderboard**: positions 1 to 10 for each category and overall.
+   - **Leaderboard**: positions 1 to 10 for each category and overall, with a **Tied** row for each further group sharing 10th place.
    - **Individual Grades**: every member's three scores from each judge, their total, the group overall, final grade and letter.
    - **For Encoding**: the official grade sheet. FEU header lines, then Member Name, STUDENT NAME (per Class Roll), Student ID, Section, Total Score, Group Overall %, Final Grade (rounded up) and Letter Grade, sorted by section.
 4. Copy the **For Encoding** rows into the official encoding system as usual.
 
 You can download the workbook as often as you like. It always shows the scores as they are at that moment.
 
+The **Results** sheet has a **Judged** column (Complete, Incomplete, or Finalised incomplete). **Individual Grades** and **For Encoding** have a **Note** column that says why a grade is blank, for example "Absent from the defense: grade to be entered by the coordinator". Students you left out of every group are listed at the end of For Encoding with your reason.
+
+---
+
+## Part L. Release results to students and advisers
+
+Releasing gives every student and adviser a private link to their own results. **The app never sends email.** It gives you a mailing sheet to send from your own faculty mailbox with Microsoft Power Automate.
+
+What people see:
+
+- **A student** sees their own letter grade and final grade, their own average Presentation, Communication and Q&A scores and total, and their group's percentages.
+- **An adviser** sees only their own groups' percentages and their own groups' average overall, the figure the adviser ranking uses. Never the full table of advisers, and no student grades.
+- **No place number is ever shown to a student or an adviser**: not "3rd of 8", not "7th of 57", and not an adviser's position in the adviser ranking, because the awarding reveals the order. A page may say that a group is in the **top 10** of a category or overall, for example "Top 10 in Marketing, Overall", without saying which place.
+
+The **adviser ranking** is the average of the overall percentages of each adviser's groups. Advisers with the same average share a position. Only you see the positions and the full table, at the bottom of the **Results** tab. Your own screens keep every rank.
+
+How a link works:
+
+- Opening the link shows nothing until the person types a check: **a student types their student number; an adviser types their adviser code** (Part C). Neither is in the email.
+- **Five wrong tries lock the link.** You can unlock it.
+- A link stays open for **30 days** from when it was issued, and can be opened any number of times. An email scanner that opens it first does no harm.
+
+Before you start: judging is closed (Part I), every adviser has a code (Part C), and you have checked the grades (Part J). **After release, scores can no longer be corrected or cleared, judging cannot be reopened, and a group cannot be deleted.**
+
+After release you can still correct a mistake in a group's **code**, **name** or **adviser**, on the group's page or with the adviser import. The app says what the change affects the moment you make it: a new code or name shows on the members' and adviser's pages; a new adviser changes both advisers' pages and the adviser ranking, and the mailing sheet already sent no longer matches (give an adviser who had no link one with **Download links for the people with none yet**). Every change is recorded with your name and the time on the group's page, so nothing changes out of sight.
+
+1. Press the **Release** tab. If something was changed after judging closed so that an item **Needs you** again (for example you pressed **Undo** on an accepted group, cleared a group's only score, or removed a student from a group), the tab says how many items need you instead of showing the release button. They are listed under **Close judging** on the **Progress** tab; settle them as in Part I, then come back.
+2. Read **Check before sending**. It lists students with no email, advisers with no email or code, and any email that contains the person's student number or code. Fix what you can on the Class roll and Advisers tabs.
+3. Tick **Results are final and ready for students and advisers**.
+4. Press **Release results and download the mailing sheet**. An Excel file downloads.
+5. **Save the file to OneDrive straight away.** The links in it cannot be shown again. Keep it private: each link is personal.
+6. Reload the **Release** tab. It now says when results were released and shows **Link status**.
+
+**Sending the emails with Power Automate.** The mailing sheet's first sheet is an Excel table named **Mailing** with the columns **Name**, **Email**, **Link** and **Role**. Its **Read me** sheet has the steps. In short:
+
+1. In Power Automate, add the Excel Online (Business) action **List rows present in a table**, choose the saved file, and choose the table **Mailing**.
+2. In that action's **Settings**, turn **Pagination** on and set the threshold to `1000`. **Without this, only the first 256 rows are read.**
+3. Add **Apply to each** over the rows with an Outlook **Send an email (V2)** action using the Email, Name and Link columns.
+4. In the email, tell students the page will ask for their student number, and advisers for the code you gave them. Never put the number or the code in the email.
+
+**Link status** (on the Release tab after release) lists every link: **Sent** (not opened yet), **Opened**, **Locked** or **Expired**.
+
+- **Unlock**: a locked link can be tried again.
+- **Reissue**: makes a new link for one person, open for another 30 days, and downloads a mailing sheet with just their row. Their old link stops working. Use it for an expired link, or when someone lost their email.
+- **Download links for the people with none yet**: for example an adviser whose code you set after release.
+- **Reissue every link…**: only if the mailing sheet was lost or shared by mistake. Every earlier link stops working.
+
+---
+
+## Part M. Judge profiles
+
+A basis for knowing your panel, **not for removing anyone**. Only you see this tab. It describes how each judge scored; it does not say what to do about it.
+
+1. Press the **Judge profiles** tab. Each judge has one row:
+   - **Groups**: how many groups they scored, in each half.
+   - **Marks at**: on the same groups, how far above or below the other judges they score, on average. `−4.20 pts` is about four points lower.
+   - **Separates groups**: whether they use the range or give nearly everyone the same mark. **Narrow**, **normal** or **wide**, compared with the other judges on the same groups. The numbers beside it are their lowest and highest score.
+   - **Agrees with co-judges**: line the groups up by this judge's scores, then by the other judges'. **High** means much the same order, even when the numbers differ; **medium** partly; **low** a different order.
+   - A sentence saying the same in words.
+2. Press a judge's name to see them in detail. Choose **Defense** or **Booth** at the top. For every group: **their score**, **the others' average**, the **gap**, where the group comes in **their order and the panel's**, and anything **to look at**:
+   - the same mark entered down every criterion of a category, for example "8 entered down all 9 criteria of Paper";
+   - criteria left blank;
+   - a score far (6 points or more) from every co-judge's, for example "Far from both co-judges (72.50, 70.50)".
+3. **Across events** shows one line per event the judge has scored in, so a judge picked again next year builds one record.
+
+Every comparison uses only the co-judges who scored **the same group in the same half**, and only the criteria both scored. A group nobody else scored is listed but not compared. Spread and agreement need at least three compared groups.
+
+Worth remembering, as the page says:
+
+- **Marking hard is not a fault.** Every group's score is averaged across its judges, so a strict judge is absorbed completely.
+- Three judges on one evening is a small sample, and the panel's consensus is not the truth.
+- A judge who disagrees may be the one paying attention.
+
 ---
 
 ## Not built yet
 
-Be aware of these gaps in this first version.
-
-- **Student and adviser links.** Students and advisers cannot see their results in the app yet. Share results from the Excel workbook.
-- **Mailing sheet.** There is no mailing sheet for Power Automate yet.
-- **Editing the scoring sheet.** Criterion wording, maximums, weights and letter bands cannot be changed from the screens. Each event keeps the copy it was created with. A developer can change the default in `src/lib/rubric.ts` before creating next year's event.
+Be aware of these gaps.
+- **Changing points, weights or letter bands.** Only the criterion wording can be changed on screen (Part A2). Maximums, weights and letter bands cannot. Each event keeps the copy it was created with. A developer can change the default in `src/lib/rubric.ts` before creating next year's event.
 - **Full offline mode.** Scores typed while offline are kept on the phone and sent later, but a phone that has never opened the app cannot load it offline, and reloading the page with no connection shows the browser's offline page.
-- **Coordinator corrections.** You cannot change a judge's score yourself; ask the judge to reopen the group with **Edit scores** (judging must be open).
-- **Deleting scores.** There is no button to delete a judge's sheet (for example after a rehearsal). A group with scores cannot be deleted.
+- **Deleting scores.** There is no button to delete a whole judge's sheet (for example after a rehearsal); you can only remove scores one at a time with **Correct**. A group with scores cannot be deleted.
 - **Frozen results.** Closing judging locks the scores, but results are recalculated each time you open them; there is no stored snapshot or file history.
-- **Excluding dropped students.** The roll shows students in no group, but there is no "excluded, dropped" marker; they simply stay unplaced.
-- **Change history screen.** Changes are recorded in the database but there is no screen to read them.
+- **Change history screen.** Score corrections are listed on each group's scores page and changes to a group's details on the group's page, but other changes (imports, members, status) are recorded in the database with no screen to read them.
 - **First sign-in password change.** Judges are not forced to change the temporary password; they can do it under **Account**.
+- **More on links.** Wrong tries are counted per link only, not also per network. A link's 30 days cannot be extended on its own; reissue it instead. A mailing sheet cannot be downloaded again: if it is lost, reissue the links.
+- **Corrections after release.** Once results are released, only a group's code, name or adviser can be corrected (Part L); scores cannot, and there is no "issue corrected results" step.
 
 ## If something goes wrong
 

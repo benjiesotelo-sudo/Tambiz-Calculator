@@ -3,7 +3,7 @@ import { AppBar } from '@/components/AppBar';
 import { EventHeader } from '@/components/EventNav';
 import { requireAdmin } from '@/lib/auth';
 import { eventReport, getEvent, rollName } from '@/lib/repo';
-import { fmt1 } from '@/lib/scoring';
+import { fmt2, fmtPct } from '@/lib/scoring';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,6 +20,8 @@ export default async function GradesPage({ params }: { params: Promise<{ id: str
     bySection.set(g.student.section, list);
   }
   const bands = event.rubric.grades;
+  const why = (g: (typeof report.grades)[number]) =>
+    [!g.memberComplete ? 'member scores incomplete' : '', !g.groupReady ? 'group not fully judged' : ''].filter(Boolean).join(' · ');
 
   return (
     <>
@@ -27,11 +29,12 @@ export default async function GradesPage({ params }: { params: Promise<{ id: str
       <main className="page">
         <EventHeader event={event} tab="grades" title="Individual grades" />
         <p className="lead">
-          Final grade = (member total + group overall %) ÷ 2, rounded up to a whole number, then given its letter. Member total is the average across defense judges of Presentation /20 +
-          Communication /40 + Q&amp;A /40.
+          Final grade = (member total + group overall %) ÷ 2, worked out from the two-decimal numbers shown, rounded up to a whole number, then given its letter. Member total adds
+          up the average Presentation /20, Communication /40 and Q&amp;A /40 across the defense judges who scored each one.
         </p>
         <p className="sub">
-          Bands: {bands.map((b) => `${b.min}–${b.max} ${b.letter} (${b.qualityPoints})`).join(' · ')}
+          Bands: {bands.map((b) => `${b.min}–${b.max} ${b.letter} (${b.qualityPoints})`).join(' · ')}. A missing score is never counted as zero: a student gets a grade only once
+          their member scores and their group are complete.
         </p>
         <div className="actions" style={{ marginTop: 0 }}>
           <a className="btn small secondary" href={`/api/admin/events/${id}/export`}>
@@ -55,20 +58,26 @@ export default async function GradesPage({ params }: { params: Promise<{ id: str
                       {g.student.student_number} · {g.group.code} {g.group.name}
                     </div>
                   </div>
-                  {g.letter ? <span className={`letter${g.letter === 'F' ? ' f' : ''}`}>{g.letter}</span> : <span className="pill err">No grade yet</span>}
+                  {g.letter ? (
+                    <span className={`letter${g.letter === 'F' ? ' f' : ''}`}>{g.letter}</span>
+                  ) : g.absent ? (
+                    <span className="pill part">Absent</span>
+                  ) : (
+                    <span className="pill err">No grade yet</span>
+                  )}
                 </div>
                 <div className="kv">
                   <div>
-                    <span>Member total</span>
-                    <b>{g.total === null ? '—' : fmt1(g.total)}</b>
+                    <span>Member total{!g.absent && !g.memberComplete ? ' (incomplete)' : ''}</span>
+                    <b>{g.total === null ? '—' : fmt2(g.total)}</b>
                   </div>
                   <div>
-                    <span>Group overall</span>
-                    <b>{g.overall === null ? '—' : `${fmt1(g.overall)}%`}</b>
+                    <span>Group overall{g.overall !== null && !g.groupReady ? ' (incomplete)' : ''}</span>
+                    <b>{fmtPct(g.overall)}</b>
                   </div>
                   <div>
                     <span>Final grade</span>
-                    <b>{g.final === null ? '—' : fmt1(g.final)}</b>
+                    <b>{g.final === null ? '—' : fmt2(g.final)}</b>
                   </div>
                   <div>
                     <span>Rounded up</span>
@@ -79,9 +88,18 @@ export default async function GradesPage({ params }: { params: Promise<{ id: str
                     <b>{g.qualityPoints ?? '—'}</b>
                   </div>
                 </div>
+                {g.absent ? (
+                  <div className="sub" style={{ marginTop: 6, fontWeight: 700 }}>
+                    Absent from the defense. The app gives no grade; enter it yourself. The workbook leaves it blank with a note.
+                  </div>
+                ) : !g.letter && why(g) ? (
+                  <div className="sub" style={{ marginTop: 6, color: 'var(--error-ink)', fontWeight: 700 }}>
+                    No grade because: {why(g)}.
+                  </div>
+                ) : null}
                 {g.perJudge.length ? (
                   <div className="sub" style={{ marginTop: 6 }}>
-                    {g.perJudge.map((p) => `${p.judge}: ${[p.set.presentation, p.set.communication, p.set.qa].map((v) => (v ?? '–')).join(' / ')}`).join(' · ')}
+                    {g.perJudge.map((p) => `${p.judge}: ${[p.set.presentation, p.set.communication, p.set.qa].map((v) => v ?? '–').join(' / ')}`).join(' · ')}
                   </div>
                 ) : null}
               </div>

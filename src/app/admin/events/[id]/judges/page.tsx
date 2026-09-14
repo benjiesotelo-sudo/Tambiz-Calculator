@@ -1,10 +1,11 @@
+import Link from 'next/link';
 import { cookies } from 'next/headers';
 import { notFound } from 'next/navigation';
 import { AppBar, Notice } from '@/components/AppBar';
 import { EventHeader } from '@/components/EventNav';
 import { requireAdmin } from '@/lib/auth';
-import { eventJudges, getEvent } from '@/lib/repo';
-import { createJudge, removeJudge, resetJudgePassword } from '../../../actions';
+import { departmentJudges, eventJudges, getEvent } from '@/lib/repo';
+import { addExistingJudge, createJudge, removeJudge, resetJudgePassword } from '../../../actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,7 +15,7 @@ export default async function JudgesPage({ params, searchParams }: { params: Pro
   const sp = await searchParams;
   const event = await getEvent(id);
   if (!event) notFound();
-  const judges = await eventJudges(id);
+  const [judges, department] = await Promise.all([eventJudges(id), departmentJudges(id)]);
   let flash: { email: string; password: string } | null = null;
   try {
     const raw = (await cookies()).get('tambiz_flash')?.value;
@@ -44,7 +45,7 @@ export default async function JudgesPage({ params, searchParams }: { params: Pro
               <span className="grow-1" style={{ minWidth: 180 }}>
                 <span className="title">{j.display_name}</span>
                 <span className="sub" style={{ display: 'block', overflowWrap: 'anywhere' }}>
-                  {j.email}
+                  {j.email} · <Link href={`/admin/events/${id}/profiles/${j.id}`}>Profile</Link>
                 </span>
               </span>
               <form action={resetJudgePassword}>
@@ -66,7 +67,32 @@ export default async function JudgesPage({ params, searchParams }: { params: Pro
           {!judges.length ? <li className="sub">No judges yet.</li> : null}
         </ul>
 
-        <div className="section-title">Add a judge</div>
+        <div className="section-title">Add from the department list</div>
+        <p className="sub" style={{ marginTop: 0 }}>
+          Judges are kept year after year. Picking the same person again, rather than making a new account, keeps their record together in Judge profiles.
+        </p>
+        <ul className="list">
+          {department.map((j) => (
+            <li key={j.id} style={{ flexWrap: 'wrap' }}>
+              <span className="grow-1" style={{ minWidth: 180 }}>
+                <span className="title">{j.display_name}</span>
+                <span className="sub" style={{ display: 'block', overflowWrap: 'anywhere' }}>
+                  {j.email} · judged {j.events} event{j.events === 1 ? '' : 's'}
+                </span>
+              </span>
+              <form action={addExistingJudge}>
+                <input type="hidden" name="eventId" value={id} />
+                <input type="hidden" name="accountId" value={j.id} />
+                <button className="btn small secondary" type="submit">
+                  Add to this event
+                </button>
+              </form>
+            </li>
+          ))}
+          {!department.length ? <li className="sub">Everyone on the department list is already judging this event.</li> : null}
+        </ul>
+
+        <div className="section-title">Add a new judge</div>
         <form action={createJudge} className="card form">
           <input type="hidden" name="eventId" value={id} />
           <div className="row2">
@@ -79,7 +105,7 @@ export default async function JudgesPage({ params, searchParams }: { params: Pro
               <input className="input" id="email" name="email" placeholder="lmanalo@feu.edu.ph" autoCapitalize="none" required />
             </div>
           </div>
-          <span className="sub">The app makes a temporary password and shows it once. Judges can change it under Account.</span>
+          <span className="sub">The app makes a temporary password and shows it once. Judges can change it under Account. A new judge joins the department list for future events.</span>
           <button className="btn" type="submit">
             Create judge account
           </button>

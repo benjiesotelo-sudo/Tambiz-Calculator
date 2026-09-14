@@ -4,7 +4,7 @@ import { requireJudge } from '@/lib/auth';
 import { one, query } from '@/lib/db';
 import { eventForJudge, getGroup, groupMembers } from '@/lib/repo';
 import type { Half } from '@/lib/rubric';
-import { critKey, memberKey } from '@/lib/sheet';
+import { absentKey, critKey, memberKey } from '@/lib/sheet';
 
 export const dynamic = 'force-dynamic';
 
@@ -31,6 +31,8 @@ export default async function ScorePage({ params, searchParams }: { params: Prom
     }
     for (const m of mems) initial[memberKey(m.student_id, m.field)] = Number(m.value);
   }
+  // Absence belongs to the student, so it shows even on a sheet this judge has not started.
+  for (const m of members) if (m.absent_at) initial[absentKey(m.id)] = 1;
 
   return (
     <ScoreSheet

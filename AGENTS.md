@@ -11,8 +11,9 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 ## Project
 
 - `index.html` is the original single-file calculator and the authority on scoring. Never edit it; `tests/crosscheck.test.ts` extracts its functions to check `src/lib/scoring.ts`.
-- Any scoring change must keep `npm test` green (golden cases + cross-check). Rules are listed with `index.html` line numbers in `src/lib/scoring.ts`.
-- All database access goes through `src/lib/db.ts`: Neon when `DATABASE_URL` is set, PGlite in `.local-db/` otherwise. Schema changes go in `src/lib/schema.ts` and must stay idempotent (it runs on every cold start).
+- Any scoring change must keep `npm test` green (golden cases + cross-check). Rules are listed with `index.html` line numbers in `src/lib/scoring.ts`, which also records where the coordinator's decisions deliberately differ (blanks never zero, `round2` everywhere, ties by overall); golden tests name the old answer for each difference.
+- All database access goes through `src/lib/db.ts`: Neon when `DATABASE_URL` is set, PGlite in `.local-db/` otherwise; Vercel previews ignore `DATABASE_URL` unless `TAMBIZ_PREVIEW_DATABASE=1`. Schema changes go in `src/lib/schema.ts`, must stay idempotent (it runs on every cold start) and additive, because the live database may get them before the code that uses them.
+- `.env.local` in a worktree can hold the live Neon `DATABASE_URL`, and `next dev`/`next build` load it. Run locally with `DATABASE_URL= DATABASE_URL_POOLED= npx next dev` (an empty value is never overridden) and never against Neon without the captain's say-so.
 - Every page, server action and API route checks the caller's role itself (`requireAdmin` / `requireJudge` in `src/lib/auth.ts`); do not rely on middleware.
 - Scores above a criterion's maximum are refused (client `checkScore`, server `refuseReason` in `src/lib/sheet.ts`), never clamped.
 - Real student data must never be committed; `.gitignore` blocks `.xlsx`, `.csv` and `data/` directories, so do not name source folders `data`.

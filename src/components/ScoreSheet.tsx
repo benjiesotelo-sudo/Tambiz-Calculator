@@ -6,7 +6,8 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { categoryMax, criterionLabel, type Category, type Half, type Rubric } from '@/lib/rubric';
-import { checkScore, critKey, fmtScore, memberKey } from '@/lib/sheet';
+import { fmtPct } from '@/lib/scoring';
+import { absentKey, checkScore, critKey, fmtScore, memberKey } from '@/lib/sheet';
 import { readDraft, writeDraft } from './draft';
 
 interface Member {
@@ -48,6 +49,7 @@ export function ScoreSheet(props: Props) {
     (key: string) => {
       const [kind, a, b] = key.split(':');
       if (kind === 'c') return halfDef.categories.find((c) => c.key === a)?.maxes[+b] ?? 0;
+      if (kind === 'a') return 1;
       return rubric.memberFields.find((f) => f.key === b)?.max ?? 0;
     },
     [halfDef, rubric],
@@ -100,6 +102,7 @@ export function ScoreSheet(props: Props) {
       if (!keys.length && !extra) return true;
       const snapshot = keys.map((k) => [k, rawRef.current[k] ?? ''] as const);
       const changes = snapshot.map(([k, r]) => {
+        if (k.startsWith('a:')) return { key: k, value: r === '1' ? 1 : null };
         const c = checkScore(r, maxOf(k));
         return { key: k, value: c.state === 'ok' ? c.n : null };
       });
@@ -183,7 +186,8 @@ export function ScoreSheet(props: Props) {
   const catStats = (cat: Category) => {
     let filled = 0,
       errors = 0,
-      sum = 0;
+      sum = 0,
+      scoredMax = 0;
     const errs: Issue[] = [],
       blanks: Issue[] = [],
       warns: Issue[] = [];
@@ -191,17 +195,20 @@ export function ScoreSheet(props: Props) {
       const k = critKey(cat.key, i);
       const raw = rawRef.current[k];
       const c = checkScore(raw, m);
-      const label = criterionLabel(cat, i);
+      // Review lists stay short even when the coordinator has entered long criterion wording.
+      const full = criterionLabel(cat, i);
+      const label = cat.criteria?.[i] ? `${i + 1}. ${full.length > 48 ? `${full.slice(0, 46)}…` : full}` : full;
       if (c.state === 'ok') {
         filled++;
         sum += c.n;
+        scoredMax += m;
         if (c.n === 0) warns.push({ t: 'w', key: k, text: `${label} is 0. Intended?` });
       } else if (c.state === 'error') {
         errors++;
         errs.push({ t: 'e', key: k, text: `${label}: ${raw} is over the max of ${m}` });
       } else blanks.push({ t: 'b', key: k, text: `${label} is blank` });
     });
-    return { filled, total: cat.maxes.length, errors, sum, max: categoryMax(cat), issues: [...errs, ...blanks, ...warns] };
+    return { filled, total: cat.maxes.length, errors, sum, scoredMax, max: categoryMax(cat), issues: [...errs, ...blanks, ...warns] };
   };
   const memberStats = () => {
     let filled = 0,
@@ -210,6 +217,11 @@ export function ScoreSheet(props: Props) {
       done = 0;
     const issues: Issue[] = [];
     for (const m of members) {
+      // A member marked absent from the defense needs no scores.
+      if (rawRef.current[absentKey(m.id)] === '1') {
+        done++;
+        continue;
+      }
       let ok = 0;
       for (const f of rubric.memberFields) {
         total++;
@@ -433,6 +445,26 @@ export function ScoreSheet(props: Props) {
         </div>
         {!members.length ? <div className="banner offline">This group has no members yet. The coordinator adds them from the class roll.</div> : null}
         {members.map((m) => {
+          const absent = rawRef.current[absentKey(m.id)] === '1';
+          const absentButton = (
+            <button className="go" disabled={locked} onClick={() => onType(absentKey(m.id), absent ? '' : '1')}>
+              {absent ? 'Not absent' : 'Absent'}
+            </button>
+          );
+          if (absent) {
+            return (
+              <div className="member absent" key={m.id}>
+                <div className="mhead">
+                  <span className="avatar">{m.initials}</span>
+                  <div style={{ minWidth: 0 }}>
+                    <div className="mname">{m.name}</div>
+                    <div className="sub">Absent from the defense. No scores needed; the coordinator gives their grade.</div>
+                  </div>
+                  <div className="mtotal">{absentButton}</div>
+                </div>
+              </div>
+            );
+          }
           let tot = 0,
             any = false;
           rubric.memberFields.forEach((f) => {
@@ -453,6 +485,7 @@ export function ScoreSheet(props: Props) {
                 <div className="mtotal">
                   <b>{any ? fmtScore(tot) : '–'}</b>
                   <span className="sub"> / 100</span>
+                  <div>{absentButton}</div>
                 </div>
               </div>
               <div className="mfields">
@@ -493,7 +526,8 @@ export function ScoreSheet(props: Props) {
           {halfDef.categories.map((st) => {
             const x = catStats(st);
             const state = x.errors ? 'err' : x.filled === x.total ? 'ok' : x.filled === 0 ? 'none' : 'part';
-            const pct = x.filled ? `${fmtScore(Math.round((x.sum / x.max) * 1000) / 10)}%` : '–';
+            // Blanks are left out, never counted as zero (decision 1), with the same two-decimal rounding as results.
+            const pct = x.filled ? fmtPct((x.sum / x.scoredMax) * 100) : '–';
             const issues = x.filled === 0 && !x.errors ? [{ t: 'b' as const, key: critKey(st.key, 0), text: `Not started · ${x.total} blank` }] : x.issues;
             return (
               <li key={st.key} className={`ritem ${state}`}>

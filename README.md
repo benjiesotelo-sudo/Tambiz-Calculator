@@ -13,11 +13,12 @@ The coordinator's click-by-click guide is [`docs/how-to-run-an-event.md`](docs/h
 
 ## What the app does
 
-- **Coordinator** (admin): creates the year's event, imports the class roll and adviser list from Excel, creates groups and chooses their members from the roll, creates judge accounts, watches judging progress, closes judging, reads results and grades, and downloads the Excel workbook.
-- **Judges**: sign in on a phone, pick Defense or Booth, pick a group, and score one category per screen with the maximum printed beside every box. A score above the maximum is refused with a message. Review lists every blank and error with a Go button, and “Mark group complete” stays locked until the sheet is clean. Defense judges also score each member. Scores are kept on the phone the moment they are typed and sent in the background.
-- **Results**: every category percentage with its rank, the defense and booth halves, the overall score and rank, a top-10 leaderboard per category, and each student's member total, final grade and letter grade.
+- **Coordinator** (admin): creates the year's event, types or pastes the criterion wording, imports the class roll and adviser list from Excel, creates groups and chooses their members from the roll, picks judges from the department list or creates accounts, watches judging progress, corrects scores with a reason, closes judging once every group, student and member is settled, reads results, grades and judge profiles, downloads the Excel workbook, and releases results with a mailing sheet for Power Automate.
+- **Judges**: sign in on a phone, pick Defense or Booth, pick a group, and score one category per screen with the criterion wording and maximum beside every box. A score above the maximum, or with more than two decimals, is refused with a message. Review lists every blank and error with a Go button, and “Mark group complete” stays locked until the sheet is clean. Defense judges also score each member, or mark them absent. Scores are kept on the phone the moment they are typed and sent in the background.
+- **Results**: every category percentage with its rank, the defense and booth halves, the overall score and rank, a top-10 leaderboard per category, the adviser ranking, and each student's member total, final grade and letter grade.
+- **Students and advisers**: a private link, opened with a student number or an adviser code. A student sees their own grade and scores and their group's percentages; an adviser sees their own groups and their groups' average overall. Neither ever sees a place number (the awarding reveals the order); a page may only say a group is in the top 10 of a category or overall. After release a group's code, name or adviser can still be corrected, with a warning and a recorded trace; deleting a group or clearing a score is refused.
 
-Scoring is a direct port of `index.html`; see `src/lib/scoring.ts`. Overall = Defense × 0.7 + Booth × 0.3, every category weighs the same within its half, and a final grade is rounded **up** to a whole number before its letter is looked up (84.5 → 85 → B+).
+Scoring began as a port of `index.html` and follows the coordinator's decisions of 14 September 2026; `src/lib/scoring.ts` lists every rule and where it differs. Overall = Defense × 0.7 + Booth × 0.3, every category weighs the same within its half, a blank score is never counted as zero (an incomplete group has no rank), percentages are rounded to two decimals the same way on screen and in Excel, category ties are broken by overall score, and a final grade is rounded **up** to a whole number before its letter is looked up (84.5 → 85 → B+).
 
 ## Run it on your computer
 
@@ -49,8 +50,11 @@ The sample data creates one coordinator and three judges. Their passwords come f
 npm test
 ```
 
-- `tests/golden.test.ts`: the 14 reference answers taken from the original `index.html` (design research, `evidence/golden-rules.js`), plus the letter-grade rounding rule.
-- `tests/crosscheck.test.ts`: runs the original scoring functions extracted from `index.html` on 40 random events and checks the new code gives identical percentages and ranks.
+- `tests/golden.test.ts`: the reference answers from the original `index.html` (design research, `evidence/golden-rules.js`); where a decision changed a rule, the test names the old answer and the decision. Also rounding, decimals and the letter-grade rule.
+- `tests/crosscheck.test.ts`: runs the original scoring functions extracted from `index.html` on 60 random events and checks the new code gives identical percentages and ranks wherever nothing is left blank (the deliberate differences are explained at the top of the file).
+- `tests/finalise.test.ts`, `tests/links.test.ts`, `tests/mailing.test.ts`, `tests/judge-profiles.test.ts`, `tests/rubric.test.ts`, `tests/excel-export.test.ts`, `tests/schema.test.ts`: finalising checks, private links and the adviser ranking, the mailing table, judge profiles, criterion wording and spelling, workbook rounding, and the schema applying twice.
+
+Running the app locally: this folder's `.env.local` may hold the real `DATABASE_URL`, and `next dev` reads it. To be sure you are on the local database, start with `DATABASE_URL= npm run dev` (an empty value is never replaced by `.env.local`).
 
 ## Deploy to Vercel with Neon
 
@@ -68,8 +72,11 @@ npm test
    | `DATABASE_URL` | The Neon connection string | **Yes.** Without it the deployed app runs on a temporary in-memory database that is wiped whenever Vercel restarts it. |
    | `SEED_ADMIN_PASSWORD` | Password for `admin@tambiz.demo` | Recommended. See “Changing the sample account passwords” below. |
    | `SEED_JUDGE_PASSWORD` | Password for the three sample judges (`judge1@`, `judge2@`, `judge3@tambiz.demo`) | Recommended. Same. |
+   | `APP_URL` | The app's address, for example `https://tambiz-calculator-lyart.vercel.app` | Recommended. Students' and advisers' private links are built from it. Without it, the production deployment uses Vercel's production address. |
 
    If you use Vercel's Neon integration instead of pasting the string, it creates `DATABASE_URL` for you. Turn off “create a database branch for every preview deployment”; the free plan allows only 10 branches.
+
+   **Preview deployments never use `DATABASE_URL`.** A pull request's preview runs on its own throwaway sample data (in-memory PGlite), so reviewing a change can never alter live data or apply its schema early. To let previews use the real database anyway, set `TAMBIZ_PREVIEW_DATABASE=1` in the Preview environment.
 5. **Deploy.** Press Deploy, open the address Vercel gives you, and sign in as the coordinator.
 6. **Before real data:** change the coordinator password, remove or reset the sample judges, and create the real event.
 

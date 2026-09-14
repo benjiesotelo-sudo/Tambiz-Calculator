@@ -80,6 +80,16 @@ export default async function EventHome({ params, searchParams }: { params: Prom
         </div>
 
         <div className="section-title">Scoring sheet</div>
+        {(() => {
+          const all = (['defense', 'booth'] as const).flatMap((h) => event.rubric.halves[h].categories.flatMap((cat) => cat.maxes.map((_, i) => cat.criteria?.[i] ?? '')));
+          const worded = all.filter((t) => t.trim()).length;
+          return (
+            <div className={`notice ${worded === all.length ? 'ok' : 'warn'}`}>
+              {worded === all.length ? `All ${all.length} criteria have their wording.` : `${worded} of ${all.length} criteria have wording; judges see “Criterion 1, 2, 3…” for the rest.`}{' '}
+              <Link href={`${base}/sheet`}>{worded === all.length ? 'Edit the wording' : 'Enter the criterion wording'}</Link>
+            </div>
+          );
+        })()}
         <div className="grid">
           {(['defense', 'booth'] as const).map((h) => (
             <div className="card" key={h}>

@@ -3,7 +3,7 @@ import { AppBar } from '@/components/AppBar';
 import { EventHeader } from '@/components/EventNav';
 import { requireAdmin } from '@/lib/auth';
 import { eventReport, getEvent } from '@/lib/repo';
-import { fmt1 } from '@/lib/scoring';
+import { adviserRanking, fmtPct } from '@/lib/scoring';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,6 +17,12 @@ export default async function ResultsPage({ params }: { params: Promise<{ id: st
   const report = await eventReport(event);
   const rows = [...report.results.groups].sort((a, b) => (a.overallRank ?? 1e9) - (b.overallRank ?? 1e9) || a.name.localeCompare(b.name));
   const codeOf = new Map(report.groups.map((g) => [g.id, g.code]));
+  const incomplete = rows.filter((g) => !g.complete && !g.accepted).length;
+  const standings = adviserRanking(report.groups.map((g) => ({ adviserId: g.adviser_id, result: report.resultById.get(g.id)! })));
+  const advisers = report.groups
+    .filter((g, i, all) => g.adviser_id && standings.has(g.adviser_id) && all.findIndex((x) => x.adviser_id === g.adviser_id) === i)
+    .map((g) => ({ id: g.adviser_id!, name: g.adviser_name ?? '', ...standings.get(g.adviser_id!)! }))
+    .sort((a, b) => a.rank - b.rank || a.name.localeCompare(b.name));
 
   return (
     <>
@@ -27,6 +33,11 @@ export default async function ResultsPage({ params }: { params: Promise<{ id: st
           {event.status === 'finalised' ? 'Final results.' : 'Live preview: these change as judges score.'} Overall = Defense × {event.rubric.halves.defense.weight} + Booth ×{' '}
           {event.rubric.halves.booth.weight}. Every category counts equally within its half.
         </p>
+        <div className="notice ok">
+          <b>A blank score is never counted as zero.</b> Anything nobody has scored shows a dash and is left out. A group reads <b>Incomplete</b> until every criterion in both
+          halves has a score, and only complete scores are ranked.
+          {incomplete ? ` ${incomplete} group${incomplete === 1 ? ' is' : 's are'} incomplete right now.` : ''}
+        </div>
         <div className="actions" style={{ marginTop: 0 }}>
           <a className="btn small secondary" href={`/api/admin/events/${id}/export`}>
             Download Excel workbook
@@ -34,6 +45,9 @@ export default async function ResultsPage({ params }: { params: Promise<{ id: st
         </div>
 
         <div className="section-title">Top 10 leaderboard</div>
+        <p className="sub">
+          Ranked on the percentages shown. When two groups show the same percentage, the one with the higher overall score goes first; they share a place only if both are equal.
+        </p>
         <div className="lb-grid">
           {report.results.leaderboards.map((lb) => (
             <div className="lb-card" key={lb.key}>
@@ -43,28 +57,32 @@ export default async function ResultsPage({ params }: { params: Promise<{ id: st
                   <div className="lb-item" key={e.id}>
                     <Rank r={e.rank} />
                     <span className="nm">{e.name}</span>
-                    <span className="pc">{fmt1(e.score)}%</span>
+                    <span className="pc">{fmtPct(e.score)}</span>
                   </div>
                 ))
               ) : (
-                <div className="lb-empty">No scores yet</div>
+                <div className="lb-empty">No complete scores yet</div>
               )}
             </div>
           ))}
         </div>
 
         <div className="section-title">Every group by category</div>
-        <p className="sub">Ranks as in the old Results table: a tie in a category is broken by overall score.</p>
+        <p className="sub">The same ranks as the leaderboard. Groups without an overall rank are listed last.</p>
         {rows.map((g) => (
           <div className="card" key={g.id}>
-            <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+            <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
               <span className="code">{codeOf.get(g.id)}</span>
-              <h3 style={{ margin: 0, flex: 1, minWidth: 0, overflowWrap: 'anywhere' }}>{g.name}</h3>
-              <span className="bignum">{g.overall === null ? '—' : `${fmt1(g.overall)}%`}</span>
+              <h3 style={{ margin: 0, flex: '1 1 140px', minWidth: 0, overflowWrap: 'anywhere' }}>{g.name}</h3>
+              {g.complete || g.accepted ? <span className="bignum">{fmtPct(g.overall)}</span> : <span className="pill part">Incomplete</span>}
               <Rank r={g.overallRank} />
             </div>
             <div className="sub">
-              Defense {g.defense === null ? '—' : `${fmt1(g.defense)}%`} · Booth {g.booth === null ? '—' : `${fmt1(g.booth)}%`}
+              Defense {fmtPct(g.defense)}
+              {g.defense !== null && !g.defenseComplete ? ' (incomplete)' : ''} · Booth {fmtPct(g.booth)}
+              {g.booth !== null && !g.boothComplete ? ' (incomplete)' : ''}
+              {!g.complete && !g.accepted && g.overall !== null ? ` · ${fmtPct(g.overall)} from what is scored so far` : ''}
+              {g.accepted ? ' · Finalised without every score (see Progress)' : ''}
             </div>
             <div className="catgrid">
               {g.categories.map((c) => (
@@ -73,15 +91,39 @@ export default async function ResultsPage({ params }: { params: Promise<{ id: st
                     {c.name}
                   </div>
                   <div className="v">
-                    <span>{c.pct === null ? '—' : `${fmt1(c.pct)}%`}</span>
+                    <span>{fmtPct(c.pct)}</span>
                     <Rank r={c.rank} />
                   </div>
+                  {c.pct !== null && !c.complete ? <div className="n">incomplete</div> : null}
                 </div>
               ))}
             </div>
           </div>
         ))}
         {!rows.length ? <p className="sub">No groups yet.</p> : null}
+
+        <div className="section-title">Adviser ranking</div>
+        <p className="sub" style={{ marginTop: 0 }}>
+          The average of the overall percentages of each adviser’s ranked groups; advisers with the same average share a position. Only you see this table: each adviser sees just
+          their own groups’ average overall, never a position.
+        </p>
+        <ul className="list">
+          {advisers.map((a) => (
+            <li key={a.id}>
+              <Rank r={a.rank} />
+              <span className="grow-1">
+                <span className="title">{a.name}</span>
+                <span className="sub" style={{ display: 'block' }}>
+                  {a.groups} ranked group{a.groups === 1 ? '' : 's'}
+                </span>
+              </span>
+              <span className="bignum" style={{ fontSize: 17 }}>
+                {fmtPct(a.average)}
+              </span>
+            </li>
+          ))}
+          {!advisers.length ? <li className="sub">No adviser has a ranked group yet.</li> : null}
+        </ul>
       </main>
     </>
   );
