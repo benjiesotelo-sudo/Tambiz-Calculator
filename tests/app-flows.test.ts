@@ -41,7 +41,8 @@ import { issueLinks, openLink } from '@/lib/links';
 import { sha256 } from '@/lib/passwords';
 import { judgeEventProfile } from '@/lib/profiles-data';
 import { eventFinaliseChecks, eventReport, getEvent, groupScoreDetail, type EventRow } from '@/lib/repo';
-import { criteriaOf } from '@/lib/rubric';
+import { criteriaOf, type Half } from '@/lib/rubric';
+import { computeResults } from '@/lib/scoring';
 
 type Action = (fd: FormData) => Promise<unknown>;
 
@@ -68,6 +69,45 @@ async function setEvent(status: EventRow['status'], released: boolean) {
 beforeAll(async () => {
   const row = await one<{ id: string }>(`SELECT id FROM event WHERE title = 'Tambiz 2027'`);
   event = (await getEvent(row!.id))!;
+});
+
+describe('only a submitted sheet counts (14 September 2026)', () => {
+  it('sheets in progress feed no result, grade, export or finalise check, but are listed apart for Progress', async () => {
+    const open = await query<{ id: string; group_id: string; half: Half }>(`SELECT id, group_id, half FROM score_sheet WHERE event_id = $1 AND status = 'in_progress'`, [event.id]);
+    expect(open.length).toBeGreaterThan(0);
+    const report = await eventReport(event);
+    expect(report.sheets.every((s) => s.status === 'complete')).toBe(true);
+    expect(new Set(report.openSheets.map((s) => s.id))).toEqual(new Set(open.map((s) => s.id)));
+    expect(open.every((s) => !report.sheetValues.has(s.id))).toBe(true);
+
+    // Every group's results are exactly what its submitted sheets alone give.
+    const scored = report.groups.map((g) => ({
+      id: g.id,
+      name: g.name,
+      accepted: !!g.accept_reason,
+      defense: report.sheets.filter((s) => s.group_id === g.id && s.half === 'defense').map((s) => report.sheetValues.get(s.id)!),
+      booth: report.sheets.filter((s) => s.group_id === g.id && s.half === 'booth').map((s) => report.sheetValues.get(s.id)!),
+    }));
+    expect(report.results).toEqual(computeResults(event.rubric, scored));
+
+    // A half whose only sheet is in progress has no percentage, and its members' in-progress scores give no total.
+    const onlyOpen = open.find((o) => !report.sheets.some((s) => s.group_id === o.group_id && s.half === o.half));
+    expect(onlyOpen).toBeDefined();
+    const result = report.resultById.get(onlyOpen!.group_id)!;
+    expect(onlyOpen!.half === 'defense' ? result.defense : result.booth).toBeNull();
+    if (onlyOpen!.half === 'defense') expect(report.grades.filter((g) => g.group.id === onlyOpen!.group_id).every((g) => g.total === null)).toBe(true);
+
+    // The workbook lists only submitted sheets.
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load((await buildWorkbook(report)) as unknown as ArrayBuffer);
+    const statuses: string[] = [];
+    for (const name of ['Scores', 'Booth Scores']) wb.getWorksheet(name)!.eachRow((row, n) => n > 1 && statuses.push(String(row.getCell(4).value)));
+    expect(new Set(statuses)).toEqual(new Set(['Complete']));
+
+    // Finalising names the sheet in progress and says it does not count.
+    const { warnings } = await eventFinaliseChecks(report);
+    expect(warnings.some((w) => /None of its scores count until they do/.test(w.text))).toBe(true);
+  });
 });
 
 describe('private link tries (decision 8)', () => {
@@ -117,7 +157,7 @@ describe('a score corrected to blank keeps its trace (decision 7)', () => {
     await setEvent('judging', false);
     const v = (await one<{ sheet_id: string; criterion_key: string; value: number; group_id: string }>(
       `SELECT v.sheet_id, v.criterion_key, v.value, s.group_id FROM score_value v JOIN score_sheet s ON s.id = v.sheet_id
-       WHERE s.event_id = $1 AND s.half = 'defense' AND v.corrected_by IS NULL ORDER BY v.sheet_id, v.criterion_key LIMIT 1`,
+       WHERE s.event_id = $1 AND s.half = 'defense' AND s.status = 'complete' AND v.corrected_by IS NULL ORDER BY v.sheet_id, v.criterion_key LIMIT 1`,
       [event.id],
     ))!;
     const key = `c:${v.criterion_key}`;
@@ -169,6 +209,9 @@ describe('judge profiles (item 14)', () => {
     await query(`INSERT INTO tgroup (id, event_id, code, name, name_key) VALUES ('test-group-2026', $1, 'G01', 'Old Group', 'oldgroup')`, [past]);
     await query(`INSERT INTO score_sheet (id, event_id, group_id, half, judge_id) VALUES ('test-sheet-2026', $1, 'test-group-2026', 'defense', $2)`, [past, judgeId]);
     await query(`INSERT INTO score_value (sheet_id, criterion_key, value) VALUES ('test-sheet-2026', $1, 10)`, [criteriaOf(event.rubric, 'defense')[0].key]);
+    // A sheet only started, never submitted, is not part of the judge's record (before: 2026 was listed).
+    expect((await judgeEventProfile(event, judgeId))!.history).toEqual([]);
+    await query(`UPDATE score_sheet SET status = 'complete', completed_at = now() WHERE id = 'test-sheet-2026'`);
     const later = (await judgeEventProfile(event, judgeId))!;
     expect(later.scoredHere).toBe(false);
     expect(later.history.map((h) => h.event.title)).toEqual(['Tambiz 2026']);

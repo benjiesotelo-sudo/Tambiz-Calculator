@@ -109,7 +109,7 @@ export default async function GroupScoresPage({
           <>
             <p className="sub">
               Judges:{' '}
-              {detail.sheets.map((s) => `${s.judge_name} (${s.status === 'complete' ? 'complete' : 'in progress'})`).join(', ')}
+              {detail.sheets.map((s) => `${s.judge_name} (${s.status === 'complete' ? 'submitted' : 'in progress, not counted'})`).join(', ')}
             </p>
             {halfDef.categories.map((cat) => (
               <div className="card" key={cat.key}>

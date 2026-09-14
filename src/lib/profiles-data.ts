@@ -31,7 +31,8 @@ export async function eventProfiles(event: EventRow): Promise<JudgeProfile[]> {
 
 /** One line per event this judge scored in, oldest first. */
 export async function judgeHistory(judgeId: string): Promise<{ event: EventRow; profile: JudgeProfile }[]> {
-  const ids = await query<{ event_id: string }>('SELECT DISTINCT event_id FROM score_sheet WHERE judge_id = $1', [judgeId]);
+  // Only submitted sheets count (scoring.ts rule 5), so an event where this judge only started sheets is not in their record.
+  const ids = await query<{ event_id: string }>(`SELECT DISTINCT event_id FROM score_sheet WHERE judge_id = $1 AND status = 'complete'`, [judgeId]);
   const out: { event: EventRow; profile: JudgeProfile }[] = [];
   for (const { event_id } of ids) {
     const event = await getEvent(event_id);

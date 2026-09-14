@@ -4,7 +4,7 @@
 // Blocking: a group without a completed sheet in each half, or with a criterion nobody scored, unless the coordinator
 // accepted it with a reason; a student on the roll in no group and not left out with a reason; a group member whose
 // member scores are incomplete and who is not marked absent.
-// Not blocking, but shown: a half with only one completed sheet, sheets still in progress, accepted groups, absent
+// Not blocking, but shown: a half with only one completed sheet, sheets still in progress (which count for nothing), accepted groups, absent
 // members and students left out.
 
 import { HALVES, type Half } from './rubric';
@@ -57,7 +57,7 @@ export function finaliseChecks(input: FinaliseInput): FinaliseChecks {
       else if (done === 1) warnings.push({ kind: 'group', id: g.id, text: `${label}: only one completed ${input.halfLabel[half]} sheet.` });
       for (const s of mine) {
         if (s.status !== 'complete' && s.filled > 0) {
-          warnings.push({ kind: 'group', id: g.id, text: `${label}: ${s.judgeName} has not marked ${input.halfLabel[half]} complete. The scores typed so far still count.` });
+          warnings.push({ kind: 'group', id: g.id, text: `${label}: ${s.judgeName} has not submitted their ${input.halfLabel[half]} sheet (marked it complete). None of its scores count until they do.` });
         }
       }
     }

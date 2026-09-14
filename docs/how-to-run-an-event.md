@@ -198,7 +198,7 @@ Give this part to the judges.
 8. A 0 shows an amber "0 points. Intended?" note. It is allowed; it is only a reminder.
 9. Defense judges only: the **Members** step shows one card per student, each with **Presentation /20**, **Communication /40** and **Q&A /40**. Score every member. If a student is **not at the defense**, tap **Absent** on their card instead: their boxes disappear, they need no scores, and every judge sees them as absent. Tap **Not absent** to undo. Never type zeros for an absent student.
 10. Tap **Review**. It lists every category with your percentage, and every blank box and every error. Tap **Go** beside any of them to jump straight to that box.
-11. When nothing is blank or red, **Mark group complete** turns green. Tap it.
+11. When nothing is blank or red, **Mark group complete** turns green. Tap it. **Your scores for this group count only after you tap it.** A group you scored but did not mark complete counts for nothing.
 12. Tap **All groups** and pick the next group.
 
 About saving:
@@ -207,22 +207,25 @@ About saving:
 - The label at the top right says **All saved**, **Sending 2…**, or **Offline · 3 kept on phone**.
 - If the connection drops, keep scoring. Do not close the browser's private tab or clear the browser. The scores send by themselves when the connection is back.
 - If it says **Sign in to send 3**, tap **Sign in again** in the yellow message, sign in, and open the same group again.
-- To change a group you already marked complete, open it and tap **Edit scores**.
+- To change a group you already marked complete, open it and tap **Edit scores**. While you edit, that group's scores from you stop counting; tap **Mark group complete** again when you are done.
 
 ---
 
 ## Part H. Watch the progress
 
 1. On a laptop, open the event and press the **Progress** tab.
-2. The two boxes at the top show, for each half, how many groups have at least one complete sheet.
+2. The two boxes at the top show, for each half, how many groups have at least one submitted sheet.
 3. **By group** lists every group. For each half:
    - **No scores** (red): no judge has scored it yet.
-   - **✓ 2**: two judges marked it complete.
-   - **1 in progress**: a judge has started but not finished. The judge's name and how many criteria they have filled are shown beside it.
-4. **By judge** shows how far each judge has got.
+   - **Nothing submitted** (red): a judge has started, but nobody has marked it complete, so the group has no score in that half yet.
+   - **✓ 2 submitted** (green): two judges marked it complete. Only these scores count.
+   - **1 in progress · not counted** (grey): a judge has started but not tapped **Mark group complete**. The judge's name and how many criteria they have filled are shown beside it. **None of those scores count** until the judge submits.
+4. **By judge** shows how many sheets each judge has submitted and how many are still in progress.
 5. Reload the page to see the latest.
 
-If a group shows **No scores** in a half at the end of the night, find the judge for that half before closing judging. A gold **only 1** means a half has just one completed sheet: it counts, but a second judge makes the result steadier.
+**Only a submitted sheet counts.** A sheet a judge started and never marked complete is left out of every percentage, rank, leaderboard, grade, the Excel workbook and Judge profiles. A group is ranked as soon as one submitted sheet covers every category in each half.
+
+If a group shows **No scores** or **Nothing submitted** in a half at the end of the night, find the judge for that half before closing judging. A gold **only 1** means a half has just one submitted sheet: it counts, but a second judge makes the result steadier.
 
 ### Correcting a judge's score
 
@@ -249,7 +252,7 @@ Judging can close only when nothing is left unsettled. The **Close judging** sec
    - **"G07 Pandesal Plus: no completed Booth sheet"** (or "a criterion nobody has scored"). Ask the judge to finish and tap **Mark group complete**. If the group genuinely cannot be fully judged, for example it never ran a booth, press **Close judging for this group with the scores it has…**, type the reason, and press **Accept with this reason**. Its missing half stays out of its score; it is not counted as zero.
    - **"Carlo Lacson (BA-3A) is on the roll but in no group."** Place them in a group (Part D), or press **Leave this student out with a reason…** (see Part B).
    - **"Andrea Dela Cruz (G01) has incomplete member scores."** Ask the defense judges to score them, correct the scores yourself, or, if the student missed the defense, press **Mark absent from the defense**.
-3. Read the gold **Check** items. They do not block closing: a half with only one completed sheet, and sheets a judge has not marked complete (their scores so far still count).
+3. Read the gold **Check** items. They do not block closing: a half with only one completed sheet, and sheets a judge has not marked complete. **Scores on a sheet that was not marked complete do not count**, so ask that judge to submit it before you close judging, or accept that it is left out.
 4. **Already decided by you** lists accepted groups, absent students and students left out, each with **Undo**.
 5. Tick **I have checked the progress above**.
 6. Press **Close judging**. The status changes to **Judging closed**.
@@ -268,8 +271,9 @@ If you closed too early, press **Reopen judging** on the same page. Judging can 
 
 How scores are worked out:
 
+- **Only a submitted sheet counts.** A judge's scores for a group count once the judge taps **Mark group complete**. A sheet started and never submitted is ignored everywhere: results, ranks, leaderboards, grades, the workbook and Judge profiles.
 - **A blank is never a zero.** A criterion, category or half that nobody scored shows a dash and is left out of the arithmetic. A category percentage uses only the criteria that have a score; a half averages only the categories that have a percentage; a group with no booth scores has its defense half as its overall.
-- **Incomplete groups are not ranked.** A group reads **Incomplete** until every criterion in both halves has at least one judge's score. It gets no rank and no place on the leaderboard, so a half-judged group never looks like a low score.
+- **Incomplete groups are not ranked.** A group reads **Incomplete** until every criterion in both halves has a score on at least one submitted sheet. It gets no rank and no place on the leaderboard, so a half-judged group never looks like a low score.
 - **Two decimal places.** Every percentage shows two decimals, for example 89.85%. The screens and the Excel workbook use the same rounding, so they always show the same number.
 - **Ties.** Groups are ranked on the percentages you see. When two groups show the same category percentage, the one with the higher overall score goes first; they share a place only when both are equal. This rule is the same on the leaderboard and in the table.
 

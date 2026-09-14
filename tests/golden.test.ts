@@ -8,6 +8,7 @@ import {
   categoryPct,
   categoryScore,
   computeResults,
+  countingSheets,
   finalGrade,
   fmt2,
   fmtPct,
@@ -63,6 +64,46 @@ describe('a category tie with a group whose overall is incomplete (decision 4)',
     const items = [{ s: 50, tb: null }, { s: 50, tb: 10 }, { s: 50, tb: null }];
     const rank = rankMap(items, (x) => x.s, (x) => x.tb);
     expect(items.map((_, i) => rank(i))).toEqual([2, 1, 2]);
+  });
+});
+
+describe('rule 5: only a submitted sheet counts (14 September 2026)', () => {
+  type Stored = { status: 'in_progress' | 'complete'; values: SheetValues; members?: { presentation: number | null; communication: number | null; qa: number | null } };
+  const counted = (sheets: Stored[]) => countingSheets(sheets).map((s) => s.values);
+  const submitted: Stored = { status: 'complete', values: share(D, 0.9), members: { presentation: 18, communication: 36, qa: 36 } };
+  // A judge typed low scores into a few boxes, then walked away without marking the group complete.
+  const abandoned: Stored = { status: 'in_progress', values: share(D, 0.2, { paper: blank(9), pd: blank(3) }), members: { presentation: 4, communication: null, qa: null } };
+
+  it('an abandoned half-filled sheet no longer drags the averages down (before: Elevator Pitch 55.00, defense 55.00)', () => {
+    const everything = [submitted, abandoned].map((s) => s.values);
+    expect(fmt2(categoryPct(everything, D[0]))).toBe('55.00');
+    expect(fmt2(halfPct(everything, D))).toBe('72.50');
+    const g: G = { id: 'g', name: 'G', defense: counted([submitted, abandoned]), booth: [share(B, 0.8)] };
+    const res = computeResults(R, [g]).groups[0];
+    expect([fmt2(res.categories[0].pct), fmt2(res.defense), fmt2(res.overall), res.complete, res.overallRank]).toEqual(['90.00', '90.00', '87.00', true, 1]);
+  });
+
+  it('a group is ranked once one submitted sheet covers every category in each half', () => {
+    const g: G = { id: 'g', name: 'G', defense: counted([submitted]), booth: counted([{ status: 'complete', values: share(B, 0.5) }]) };
+    expect(computeResults(R, [g]).groups[0]).toMatchObject({ complete: true, overallRank: 1 });
+  });
+
+  it('a fully typed sheet that was never submitted counts for nothing (before: complete and ranked)', () => {
+    const typedNotSubmitted: Stored = { status: 'in_progress', values: share(D, 0.95) };
+    const g: G = { id: 'g', name: 'G', defense: counted([typedNotSubmitted]), booth: [share(B, 0.8)] };
+    const res = computeResults(R, [g]).groups[0];
+    expect([res.defense, res.categories[0].pct, res.complete, res.overallRank]).toEqual([null, null, false, null]);
+    expect(fmtPct(res.categories[0].pct)).toBe('—');
+  });
+
+  it('member scores on an unsubmitted sheet are ignored too (before: presentation averaged 11)', () => {
+    const sets = countingSheets([submitted, abandoned]).map((s) => s.members!);
+    expect(memberScore(sets)).toEqual({ total: 90, complete: true });
+  });
+
+  it('a typed zero on a submitted sheet still counts', () => {
+    const zero: Stored = { status: 'complete', values: share(D, 1, { ep: [0, 20, 20, 20, 20] }) };
+    expect(categoryScore(counted([zero]), D[0])).toEqual({ pct: 80, complete: true });
   });
 });
 
