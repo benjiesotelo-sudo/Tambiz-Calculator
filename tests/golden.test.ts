@@ -20,6 +20,7 @@ import {
   overallPct,
   rankMap,
   round2,
+  topTenPlacings,
   type SheetValues,
 } from '@/lib/scoring';
 import { checkScore, refuseReason } from '@/lib/sheet';
@@ -133,6 +134,29 @@ describe('golden case B: a category tie is broken by overall everywhere, leaderb
     const res = computeResults(R, groups);
     expect(res.groups.map((g) => g.categories[0].rank)).toEqual([2, 1]);
     expect(res.leaderboards[0].entries.map((e) => `${e.name}=${e.rank}`)).toEqual(['Alpha=1', 'Beta=2']);
+  });
+});
+
+describe('a tie at 10th place: the leaderboard lists every tied group (14 September 2026)', () => {
+  // Nine groups placed 1st to 9th, two identical groups sharing 10th, and one group 12th.
+  const shares = [0.99, 0.98, 0.97, 0.96, 0.95, 0.94, 0.93, 0.92, 0.91, 0.9, 0.9, 0.8];
+  const groups: G[] = shares.map((s, i) => ({ id: `g${i + 1}`, name: `Group ${String(i + 1).padStart(2, '0')}`, defense: [share(D, s)], booth: [share(B, s)] }));
+
+  it('both groups tied at 10th are on every leaderboard, and the 12th is not (before: cut at ten names, one tied group dropped)', () => {
+    const res = computeResults(R, groups);
+    for (const lb of res.leaderboards) {
+      expect(lb.entries.map((e) => e.id)).toEqual(groups.slice(0, 11).map((g) => g.id));
+      expect(lb.entries.slice(9).map((e) => e.rank)).toEqual([10, 10]);
+    }
+    expect(leaderboard(groups, ep, ov).map((e) => e.id)).toEqual(groups.slice(0, 11).map((g) => g.id));
+  });
+
+  it('a group’s own page says top 10 exactly when it is on that leaderboard', () => {
+    const res = computeResults(R, groups);
+    for (const g of res.groups) {
+      const onBoards = res.leaderboards.filter((lb) => lb.entries.some((e) => e.id === g.id)).map((lb) => lb.name);
+      expect(topTenPlacings(g)).toEqual(onBoards);
+    }
   });
 });
 

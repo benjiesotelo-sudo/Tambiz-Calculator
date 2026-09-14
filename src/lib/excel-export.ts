@@ -5,7 +5,7 @@
 import ExcelJS from 'exceljs';
 import { fullName, rollName, type EventReport, type GradeRow } from './repo';
 import { criteriaOf, type Half } from './rubric';
-import { fmt2, round2 } from './scoring';
+import { fmt2, round2, TOP_PLACES } from './scoring';
 
 const GREEN = 'FF1A6B3C';
 const DARK = 'FF0D4F2B';
@@ -110,13 +110,14 @@ export async function buildWorkbook(report: EventReport): Promise<Buffer> {
     ws.addRow(['A blank score is never counted as zero. A part nobody scored is left empty and left out; incomplete groups have no rank.']);
   }
 
-  // Leaderboard: Position 1-10 down, one column per category.
+  // Leaderboard: Position 1-10 down, one column per category, with a further row for each group still tied at 10th.
   {
     const ws = wb.addWorksheet('Leaderboard');
     ws.columns = [{ header: '', width: 12 }, ...results.leaderboards.map((lb) => ({ header: lb.name, width: 30 }))];
     header(ws, ws.getRow(1), DARK, GOLD);
-    for (let pos = 0; pos < 10; pos++) {
-      ws.addRow([`Position ${pos + 1}`, ...results.leaderboards.map((lb) => (lb.entries[pos] ? `${lb.entries[pos].rank}. ${lb.entries[pos].name}: ${fmt2(lb.entries[pos].score)}%` : ''))]);
+    const rows = Math.max(TOP_PLACES, ...results.leaderboards.map((lb) => lb.entries.length));
+    for (let pos = 0; pos < rows; pos++) {
+      ws.addRow([pos < TOP_PLACES ? `Position ${pos + 1}` : 'Tied', ...results.leaderboards.map((lb) => (lb.entries[pos] ? `${lb.entries[pos].rank}. ${lb.entries[pos].name}: ${fmt2(lb.entries[pos].score)}%` : ''))]);
     }
   }
 

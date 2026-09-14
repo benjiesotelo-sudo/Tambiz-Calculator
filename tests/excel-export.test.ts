@@ -32,6 +32,21 @@ async function open(r: EventReport) {
   return wb;
 }
 
+describe('the Leaderboard sheet', () => {
+  it('has a row for every group tied at 10th place', async () => {
+    const entries = Array.from({ length: 12 }, (_, i) => ({ id: `g${i}`, name: `Group ${i + 1}`, score: 90 - Math.min(i, 9), rank: Math.min(i + 1, 10) }));
+    const base = report(90);
+    const wb = await open({ ...base, results: { ...base.results, leaderboards: [{ key: 'overall', name: 'Overall', half: 'overall' as const, entries }] } } as EventReport);
+    const ws = wb.getWorksheet('Leaderboard')!;
+    const listed: string[] = [];
+    ws.eachRow((row, n) => {
+      if (n > 1) listed.push(`${row.getCell(1).text} | ${row.getCell(2).text}`);
+    });
+    expect(listed).toHaveLength(12);
+    expect(listed.slice(9)).toEqual(['Position 10 | 10. Group 10: 81.00%', 'Tied | 10. Group 11: 81.00%', 'Tied | 10. Group 12: 81.00%']);
+  });
+});
+
 describe('the workbook rounds exactly like the screens', () => {
   it('89.85 is 89.85 in both (the first app showed 89.8 on screen and 89.9 in Excel)', async () => {
     const wb = await open(report(89.85));

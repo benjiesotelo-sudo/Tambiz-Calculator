@@ -274,10 +274,10 @@ How scores are worked out:
 - **Ties.** Groups are ranked on the percentages you see. When two groups show the same category percentage, the one with the higher overall score goes first; they share a place only when both are equal. This rule is the same on the leaderboard and in the table.
 
 1. Press the **Results** tab.
-2. **Top 10 leaderboard** shows one card per category plus **Overall**. Groups that still share a place are listed alphabetically.
+2. **Top 10 leaderboard** shows one card per category plus **Overall**. Groups that still share a place are listed alphabetically. Every group tied at 10th place is listed, so in a rare year a card shows eleven or more names; that is correct, and it matches what each group's own results page says about being in the top 10.
 3. **Every group by category** shows each group's overall percentage and rank at the top right (or **Incomplete**), its Defense and Booth halves, and every category percentage with its rank.
 4. Press the **Grades** tab. Students are grouped by section. Each card shows:
-   - **Member total**: for Presentation /20, Communication /40 and Q&A /40, the average across the defense judges who scored it, added up (out of 100). A field one judge left blank is not counted as zero. Until every field has at least one judge's score the total shows a dash (—) and reads **(incomplete)**, here and in the workbook; a partial total is never scaled up to 100.
+   - **Member total**: for Presentation /20, Communication /40 and Q&A /40, the average across the defense judges who scored it, added up (out of 100). A field one judge left blank is not counted as zero. Until every field has at least one judge's score the total shows a dash (—) and reads **(incomplete)** here; in the workbook the cell is left empty, with the note beside it saying why. A partial total is never scaled up to 100.
    - **Group overall**: the group's overall percentage.
    - **Final grade**: (member total + group overall) ÷ 2, using the two-decimal numbers shown.
    - **Rounded up**: the final grade rounded up to a whole number (84.5 becomes 85).
@@ -294,7 +294,7 @@ How scores are worked out:
    - **Scores**: every defense judge's scores, one row per judge per group.
    - **Booth Scores**: the same for booth.
    - **Results**: every category percentage and rank, the halves, and the overall, sorted by overall rank.
-   - **Leaderboard**: positions 1 to 10 for each category and overall.
+   - **Leaderboard**: positions 1 to 10 for each category and overall, with a **Tied** row for each further group sharing 10th place.
    - **Individual Grades**: every member's three scores from each judge, their total, the group overall, final grade and letter.
    - **For Encoding**: the official grade sheet. FEU header lines, then Member Name, STUDENT NAME (per Class Roll), Student ID, Section, Total Score, Group Overall %, Final Grade (rounded up) and Letter Grade, sorted by section.
 4. Copy the **For Encoding** rows into the official encoding system as usual.

@@ -23,8 +23,14 @@ function back(path: string, msg: { ok?: string; error?: string }): never {
 
 const isUnique = (e: unknown) => (e as { code?: string })?.code === '23505';
 
+const logStatement = (eventId: string | null, accountId: string, action: string, detail: object): Statement => ({
+  text: 'INSERT INTO change_log (id, event_id, account_id, action, detail) VALUES ($1, $2, $3, $4, $5::jsonb)',
+  params: [newId(), eventId, accountId, action, JSON.stringify(detail)],
+});
+
 async function log(eventId: string | null, accountId: string, action: string, detail: object) {
-  await query('INSERT INTO change_log (id, event_id, account_id, action, detail) VALUES ($1, $2, $3, $4, $5::jsonb)', [newId(), eventId, accountId, action, JSON.stringify(detail)]);
+  const { text, params } = logStatement(eventId, accountId, action, detail);
+  await query(text, params);
 }
 
 async function eventOr404(eventId: string) {
@@ -273,7 +279,6 @@ export async function saveGroup(fd: FormData) {
   const adviserId = await adviserIdFor(event.id, fd);
   try {
     if (before) {
-      await query('UPDATE tgroup SET code = $3, name = $4, name_key = $5, section = $6, adviser_id = $7 WHERE id = $1 AND event_id = $2', [groupId, event.id, code, name, key, section, adviserId]);
       const adviser = adviserId ? await one<{ name: string }>('SELECT name FROM adviser WHERE id = $1', [adviserId]) : null;
       const changes = [
         before.code !== code ? `Code ${before.code} → ${code}` : '',
@@ -282,7 +287,10 @@ export async function saveGroup(fd: FormData) {
         (before.adviser_id ?? null) !== adviserId ? `Adviser ${adviserWord(before.adviser_name)} → ${adviserWord(adviser?.name)}` : '',
       ].filter(Boolean);
       const released = !!event.released_at;
-      await log(event.id, acc.id, 'group.update', { groupId, code, name, section, adviserId, from: { code: before.code, name: before.name, section: before.section, adviserId: before.adviser_id }, changes, released });
+      await transaction([
+        { text: 'UPDATE tgroup SET code = $3, name = $4, name_key = $5, section = $6, adviser_id = $7 WHERE id = $1 AND event_id = $2', params: [groupId, event.id, code, name, key, section, adviserId] },
+        logStatement(event.id, acc.id, 'group.update', { groupId, code, name, section, adviserId, from: { code: before.code, name: before.name, section: before.section, adviserId: before.adviser_id }, changes, released }),
+      ]);
       if (!released || !changes.length) back(path, { ok: 'Group saved.' });
       const warnings = [
         before.code !== code || before.name !== name ? 'Results were already released, so the members’ and adviser’s result pages now show the new code and name.' : '',
@@ -456,10 +464,7 @@ export async function importAdvisers(fd: FormData) {
         if (g.adviser_id !== id) {
           const change = `Adviser ${adviserWord(g.adviser_id ? nameById.get(g.adviser_id) : null)} → ${adviserWord(nameById.get(id))}`;
           reassigned.push(`${g.code} (${change.slice('Adviser '.length)})`);
-          statements.push({
-            text: 'INSERT INTO change_log (id, event_id, account_id, action, detail) VALUES ($1, $2, $3, $4, $5::jsonb)',
-            params: [newId(), event.id, acc.id, 'group.update', JSON.stringify({ groupId: g.id, adviserId: id, from: { adviserId: g.adviser_id }, changes: [change], released, file: name })],
-          });
+          statements.push(logStatement(event.id, acc.id, 'group.update', { groupId: g.id, adviserId: id, from: { adviserId: g.adviser_id }, changes: [change], released, file: name }));
           g.adviser_id = id;
         }
       } else problems.push(`Row ${r.rowNumber}: no group ${code || r.values.group_name} in this event.`);

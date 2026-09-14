@@ -163,7 +163,7 @@ export interface LeaderboardEntry {
 const byName = (a: string, b: string) => a.localeCompare(b, undefined, { sensitivity: 'base', numeric: true });
 
 /**
- * Top-10 leaderboard. Scores are rounded, ranked with the same rule and tie-breaker as the results table, and groups
+ * Top-10 leaderboard: every group ranked 10th or better, so all groups tied at 10th are listed. Scores are rounded, ranked with the same rule and tie-breaker as the results table, and groups
  * that still share a rank are listed by name. index.html (1153-1175) ignored the overall score here.
  */
 export function leaderboard<T extends { id: string; name: string }>(
@@ -177,8 +177,8 @@ export function leaderboard<T extends { id: string; name: string }>(
   return items
     .map((t, i) => ({ id: t.id, name: t.name, score: rounded(scoreFn(t)), rank: rank(i) }))
     .filter((x): x is LeaderboardEntry => x.score !== null && x.rank !== null)
-    .sort((a, b) => a.rank - b.rank || byName(a.name, b.name))
-    .slice(0, limit);
+    .filter((x) => x.rank <= limit)
+    .sort((a, b) => a.rank - b.rank || byName(a.name, b.name));
 }
 
 // ── members and grades ──────────────────────────────────────────────
@@ -341,16 +341,15 @@ export function computeResults(rubric: Rubric, groups: ScoredGroup[]): EventResu
   const ovRank = rankMap(base, rankableOverall);
   base.forEach((g, gi) => (g.overallRank = ovRank(gi)));
 
-  // The leaderboard shows the same ranks as the table, top 10 by rank, ties listed by name.
+  // The leaderboard shows the same ranks as the table: every group ranked 10th or better, so a tie at 10th lists them all, ties by name.
   const board = (key: string, name: string, half: Half | 'overall', rankOf: (g: GroupResult) => number | null, scoreOf: (g: GroupResult) => number | null) => ({
     key,
     name,
     half,
     entries: base
       .map((g) => ({ id: g.id, name: g.name, score: scoreOf(g), rank: rankOf(g) }))
-      .filter((e): e is LeaderboardEntry => e.rank !== null && e.score !== null)
-      .sort((a, b) => a.rank - b.rank || byName(a.name, b.name))
-      .slice(0, TOP_PLACES),
+      .filter((e): e is LeaderboardEntry => e.rank !== null && e.score !== null && e.rank <= TOP_PLACES)
+      .sort((a, b) => a.rank - b.rank || byName(a.name, b.name)),
   });
   const leaderboards: EventResults['leaderboards'] = [];
   let ci = 0;
