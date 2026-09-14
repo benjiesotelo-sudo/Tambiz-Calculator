@@ -72,7 +72,6 @@ Running the app locally: this folder's `.env.local` may hold the real `DATABASE_
    | `DATABASE_URL` | The Neon connection string | **Yes.** Without it the deployed app runs on a temporary in-memory database that is wiped whenever Vercel restarts it. |
    | `SEED_ADMIN_PASSWORD` | Password for `admin@tambiz.demo` | Recommended. See “Changing the sample account passwords” below. |
    | `SEED_JUDGE_PASSWORD` | Password for the three sample judges (`judge1@`, `judge2@`, `judge3@tambiz.demo`) | Recommended. Same. |
-
    | `APP_URL` | The app's address, for example `https://tambiz-calculator-lyart.vercel.app` | Recommended. Students' and advisers' private links are built from it. Without it, the production deployment uses Vercel's production address. |
 
    If you use Vercel's Neon integration instead of pasting the string, it creates `DATABASE_URL` for you. Turn off “create a database branch for every preview deployment”; the free plan allows only 10 branches.

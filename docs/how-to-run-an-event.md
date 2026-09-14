@@ -383,10 +383,10 @@ Be aware of these gaps.
 - **Full offline mode.** Scores typed while offline are kept on the phone and sent later, but a phone that has never opened the app cannot load it offline, and reloading the page with no connection shows the browser's offline page.
 - **Deleting scores.** There is no button to delete a whole judge's sheet (for example after a rehearsal); you can only remove scores one at a time with **Correct**. A group with scores cannot be deleted.
 - **Frozen results.** Closing judging locks the scores, but results are recalculated each time you open them; there is no stored snapshot or file history.
-- **Change history screen.** Corrections are listed on each group's scores page, but other changes (imports, groups, status) are recorded in the database with no screen to read them.
+- **Change history screen.** Score corrections are listed on each group's scores page and changes to a group's details on the group's page, but other changes (imports, members, status) are recorded in the database with no screen to read them.
 - **First sign-in password change.** Judges are not forced to change the temporary password; they can do it under **Account**.
 - **More on links.** Wrong tries are counted per link only, not also per network. A link's 30 days cannot be extended on its own; reissue it instead. A mailing sheet cannot be downloaded again: if it is lost, reissue the links.
-- **Corrections after release.** Once results are released nothing can be corrected in the app; there is no "issue corrected results" step.
+- **Corrections after release.** Once results are released, only a group's code, name or adviser can be corrected (Part L); scores cannot, and there is no "issue corrected results" step.
 
 ## If something goes wrong
 
