@@ -1,10 +1,12 @@
+import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { AppBar, Notice } from '@/components/AppBar';
 import { EventHeader } from '@/components/EventNav';
 import { requireAdmin } from '@/lib/auth';
 import { linkState, LINK_DAYS, MAX_TRIES } from '@/lib/link-rules';
 import { appBaseUrl, linkStatus, releaseRecipients } from '@/lib/links';
-import { getEvent } from '@/lib/repo';
+import { releaseRefusal } from '@/lib/finalise';
+import { eventFinaliseChecks, eventReport, getEvent } from '@/lib/repo';
 import { unlockLink } from '../../../actions';
 
 export const dynamic = 'force-dynamic';
@@ -25,6 +27,7 @@ export default async function ReleasePage({ params, searchParams }: { params: Pr
   const students = recipients.filter((r) => r.type === 'student').length;
   const advisers = recipients.length - students;
   const post = `/api/admin/events/${id}/mailing`;
+  const refusal = event.status === 'finalised' && !event.released_at ? releaseRefusal(await eventFinaliseChecks(await eventReport(event))) : null;
 
   return (
     <>
@@ -69,6 +72,20 @@ export default async function ReleasePage({ params, searchParams }: { params: Pr
 
         {event.status !== 'finalised' ? (
           <div className="notice warn">Close judging on the Progress tab first. Results can be released only after judging is closed.</div>
+        ) : refusal ? (
+          <div className="card">
+            <div className="notice err" style={{ marginTop: 0 }}>
+              {refusal}
+            </div>
+            <p style={{ marginBottom: 0 }}>
+              Something was changed after judging closed, for example an accepted group was undone or a score was cleared. Settle each item, then come back here to release.
+            </p>
+            <div className="actions">
+              <Link className="btn secondary" href={`/admin/events/${id}/progress#close`}>
+                Go to Close judging
+              </Link>
+            </div>
+          </div>
         ) : !event.released_at ? (
           <form method="post" action={post} className="card form">
             <input type="hidden" name="mode" value="release" />

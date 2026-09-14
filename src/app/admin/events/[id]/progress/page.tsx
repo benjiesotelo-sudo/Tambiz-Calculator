@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation';
 import { AppBar, Notice } from '@/components/AppBar';
 import { EventHeader } from '@/components/EventNav';
 import { requireAdmin } from '@/lib/auth';
-import type { Check } from '@/lib/finalise';
+import { itemsNeedYou, type Check } from '@/lib/finalise';
 import { eventFinaliseChecks, eventJudges, eventReport, getEvent } from '@/lib/repo';
 import { criteriaOf, type Half } from '@/lib/rubric';
 import { acceptGroup, clearAcceptance, excludeStudent, includeStudent, setEventStatus, setMemberAbsent } from '../../../actions';
@@ -84,6 +84,19 @@ export default async function ProgressPage({ params, searchParams }: { params: P
       </div>
     );
   };
+
+  const blockerList = checks.blockers.length ? (
+    <ul className="list">
+      {checks.blockers.map((b) => (
+        <li key={`${b.kind}:${b.id}:${b.text}`} style={{ display: 'block' }}>
+          <div className="title" style={{ marginBottom: 6 }}>
+            <span className="pill err">Needs you</span> {b.text}
+          </div>
+          {blockerActions(b)}
+        </li>
+      ))}
+    </ul>
+  ) : null;
 
   const undo = (d: Check) => {
     if (d.kind === 'group')
@@ -206,13 +219,21 @@ export default async function ProgressPage({ params, searchParams }: { params: P
                 Results were released on {new Date(event.released_at).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', dateStyle: 'long' })}, so judging cannot be reopened.
               </p>
             ) : (
-              <form action={setEventStatus}>
-                <input type="hidden" name="eventId" value={id} />
-                <input type="hidden" name="status" value="judging" />
-                <button className="btn secondary" type="submit">
-                  Reopen judging
-                </button>
-              </form>
+              <>
+                {checks.blockers.length ? (
+                  <div className="notice err">
+                    Something changed after judging closed: {itemsNeedYou(checks.blockers.length)} you before results can be released.
+                  </div>
+                ) : null}
+                {blockerList}
+                <form action={setEventStatus}>
+                  <input type="hidden" name="eventId" value={id} />
+                  <input type="hidden" name="status" value="judging" />
+                  <button className="btn secondary" type="submit">
+                    Reopen judging
+                  </button>
+                </form>
+              </>
             )}
           </div>
         ) : (
@@ -222,24 +243,11 @@ export default async function ProgressPage({ params, searchParams }: { params: P
               anything that cannot be, record a reason below.
             </p>
             {checks.blockers.length ? (
-              <div className="notice err">
-                {checks.blockers.length} item{checks.blockers.length === 1 ? ' needs' : 's need'} you before judging can close.
-              </div>
+              <div className="notice err">{itemsNeedYou(checks.blockers.length)} you before judging can close.</div>
             ) : (
               <div className="notice ok">Nothing is in the way of closing judging.</div>
             )}
-            {checks.blockers.length ? (
-              <ul className="list">
-                {checks.blockers.map((b) => (
-                  <li key={`${b.kind}:${b.id}:${b.text}`} style={{ display: 'block' }}>
-                    <div className="title" style={{ marginBottom: 6 }}>
-                      <span className="pill err">Needs you</span> {b.text}
-                    </div>
-                    {blockerActions(b)}
-                  </li>
-                ))}
-              </ul>
-            ) : null}
+            {blockerList}
           </>
         )}
         {checks.warnings.length ? (

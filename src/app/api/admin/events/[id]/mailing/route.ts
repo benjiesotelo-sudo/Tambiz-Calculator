@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server';
 import { currentAccount } from '@/lib/auth';
 import { newId, one, query } from '@/lib/db';
+import { releaseRefusal } from '@/lib/finalise';
 import { issueLinks, linkStatus, linkUrl, releaseRecipients, type Recipient } from '@/lib/links';
 import { buildMailingSheet } from '@/lib/mailing';
-import { getEvent } from '@/lib/repo';
+import { eventFinaliseChecks, eventReport, getEvent } from '@/lib/repo';
 
 export const dynamic = 'force-dynamic';
 
@@ -42,6 +43,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (mode === 'release') {
     if (event.released_at) return back({ error: 'Results are already released. Use the reissue buttons below.' });
     if (fd.get('confirm') !== 'yes') return back({ error: 'Tick the box to confirm before releasing results.' });
+    const refusal = releaseRefusal(await eventFinaliseChecks(await eventReport(event)));
+    if (refusal) return back({ error: refusal });
     const claimed = await one<{ id: string }>(`UPDATE event SET released_at = now() WHERE id = $1 AND released_at IS NULL AND status = 'finalised' RETURNING id`, [event.id]);
     if (!claimed) {
       return back({

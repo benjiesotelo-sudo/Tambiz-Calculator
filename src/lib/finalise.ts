@@ -31,6 +31,16 @@ export interface FinaliseChecks {
   decided: Check[];
 }
 
+/** "1 item needs" / "3 items need". */
+export const itemsNeedYou = (n: number) => `${n} item${n === 1 ? ' needs' : 's need'}`;
+
+/** Why results cannot be released while the finalise checks have blockers (something undone after judging closed), or null. */
+export function releaseRefusal(checks: FinaliseChecks): string | null {
+  const n = checks.blockers.length;
+  if (!n) return null;
+  return `Results cannot be released yet: ${itemsNeedYou(n)} you first. They are listed under Close judging on the Progress tab.`;
+}
+
 export function finaliseChecks(input: FinaliseInput): FinaliseChecks {
   const blockers: Check[] = [];
   const warnings: Check[] = [];

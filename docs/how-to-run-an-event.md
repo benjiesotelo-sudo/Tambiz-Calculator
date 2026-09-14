@@ -324,7 +324,7 @@ How a link works:
 
 Before you start: judging is closed (Part I), every adviser has a code (Part C), and you have checked the grades (Part J). **After release, scores can no longer be corrected and judging cannot be reopened.**
 
-1. Press the **Release** tab.
+1. Press the **Release** tab. If something was changed after judging closed so that an item **Needs you** again (for example you pressed **Undo** on an accepted group, cleared a group's only score, or removed a student from a group), the tab says how many items need you instead of showing the release button. They are listed under **Close judging** on the **Progress** tab; settle them as in Part I, then come back.
 2. Read **Check before sending**. It lists students with no email, advisers with no email or code, and any email that contains the person's student number or code. Fix what you can on the Class roll and Advisers tabs.
 3. Tick **Results are final and ready for students and advisers**.
 4. Press **Release results and download the mailing sheet**. An Excel file downloads.

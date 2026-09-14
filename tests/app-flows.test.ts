@@ -32,7 +32,7 @@ vi.mock('@/lib/auth', () => {
   return { currentAccount: async () => admin, requireAccount: async () => admin, requireAdmin: async () => admin, requireJudge: async () => admin };
 });
 
-import { addMembers, correctScore, excludeStudent, includeStudent, removeMember } from '@/app/admin/actions';
+import { acceptGroup, addMembers, correctScore, excludeStudent, includeStudent, removeMember, setMemberAbsent } from '@/app/admin/actions';
 import { POST as mailing } from '@/app/api/admin/events/[id]/mailing/route';
 import { one, query } from '@/lib/db';
 import { buildWorkbook } from '@/lib/excel-export';
@@ -40,7 +40,7 @@ import { MAX_TRIES } from '@/lib/link-rules';
 import { issueLinks, openLink } from '@/lib/links';
 import { sha256 } from '@/lib/passwords';
 import { judgeEventProfile } from '@/lib/profiles-data';
-import { eventReport, getEvent, groupScoreDetail, type EventRow } from '@/lib/repo';
+import { eventFinaliseChecks, eventReport, getEvent, groupScoreDetail, type EventRow } from '@/lib/repo';
 import { criteriaOf } from '@/lib/rubric';
 
 type Action = (fd: FormData) => Promise<unknown>;
@@ -203,15 +203,53 @@ describe('after release the roster stays as released', () => {
 });
 
 describe('releasing results (decisions 8 and 11)', () => {
+  const release = () => {
+    const fd = new FormData();
+    fd.set('mode', 'release');
+    fd.set('confirm', 'yes');
+    return mailing(new Request(`http://localhost/api/admin/events/${event.id}/mailing`, { method: 'POST', body: fd }), { params: Promise.resolve({ id: event.id }) });
+  };
+  const blockers = async () => (await eventFinaliseChecks(await eventReport(event))).blockers;
+  /** Settles every item the Progress page lists as Needs you, the way the coordinator would. */
+  async function settle() {
+    const report = await eventReport(event);
+    for (const b of await blockers()) {
+      const done =
+        b.kind === 'group'
+          ? await act(acceptGroup, { eventId: event.id, groupId: b.id, reason: 'Settled for the test' })
+          : b.kind === 'student'
+            ? await act(excludeStudent, { eventId: event.id, studentId: b.id, reason: 'Settled for the test' })
+            : await act(setMemberAbsent, { eventId: event.id, groupId: report.grades.find((g) => g.student.id === b.id)!.group.id, studentId: b.id, absent: 'yes' });
+      expect(done.error).toBeNull();
+    }
+    expect(await blockers()).toEqual([]);
+  }
+
+  it('is refused while something undone after judging closed needs the coordinator, and goes ahead once it is settled', async () => {
+    await setEvent('finalised', false);
+    await settle();
+    await query('DELETE FROM access_link WHERE event_id = $1', [event.id]);
+    const member = (await one<{ group_id: string; student_id: string }>('SELECT group_id, student_id FROM group_member WHERE event_id = $1 ORDER BY student_id LIMIT 1', [event.id]))!;
+    expect((await act(removeMember, { eventId: event.id, groupId: member.group_id, studentId: member.student_id })).error).toBeNull();
+    expect(await blockers()).toHaveLength(1);
+
+    const refused = await release();
+    expect(refused.status).toBe(303);
+    const back = new URL(refused.headers.get('location')!);
+    expect(back.pathname).toBe(`/admin/events/${event.id}/release`);
+    expect(back.searchParams.get('error')).toBe('Results cannot be released yet: 1 item needs you first. They are listed under Close judging on the Progress tab.');
+    expect(await one('SELECT released_at FROM event WHERE id = $1', [event.id])).toEqual({ released_at: null });
+    expect(await one('SELECT count(*)::int AS n FROM access_link WHERE event_id = $1', [event.id])).toEqual({ n: 0 });
+
+    await settle();
+    expect((await release()).status).toBe(200);
+    expect((await getEvent(event.id))!.released_at).not.toBeNull();
+  });
+
   it('pressing release twice makes one set of links, and every link in the downloaded mailing sheet works', async () => {
     await setEvent('finalised', false);
+    await settle();
     await query('DELETE FROM access_link WHERE event_id = $1', [event.id]);
-    const release = () => {
-      const fd = new FormData();
-      fd.set('mode', 'release');
-      fd.set('confirm', 'yes');
-      return mailing(new Request(`http://localhost/api/admin/events/${event.id}/mailing`, { method: 'POST', body: fd }), { params: Promise.resolve({ id: event.id }) });
-    };
     const answers = await Promise.all([release(), release()]);
     const sheets = answers.filter((r) => r.status === 200);
     const refused = answers.filter((r) => r.status === 303);
