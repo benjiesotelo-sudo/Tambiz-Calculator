@@ -105,7 +105,7 @@ export default async function ResultsPage({ params }: { params: Promise<{ id: st
         <div className="section-title">Adviser ranking</div>
         <p className="sub" style={{ marginTop: 0 }}>
           The average of the overall percentages of each adviser’s ranked groups; advisers with the same average share a position. Only you see this table: each adviser sees just
-          their own position.
+          their own groups’ average overall, never a position.
         </p>
         <ul className="list">
           {advisers.map((a) => (
