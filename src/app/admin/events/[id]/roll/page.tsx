@@ -71,6 +71,12 @@ export default async function RollPage({ params, searchParams }: { params: Promi
           <button className="btn" type="submit">
             Import
           </button>
+          <div className="actions" style={{ marginTop: 0 }}>
+            <a className="btn small secondary" href="/api/admin/templates/roll">
+              Download template
+            </a>
+            <span className="sub">An Excel file with exactly the columns the import reads, and one example row.</span>
+          </div>
         </form>
 
         <p className="lead" style={{ marginTop: 14 }}>

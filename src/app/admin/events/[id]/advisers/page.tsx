@@ -52,6 +52,12 @@ export default async function AdvisersPage({ params, searchParams }: { params: P
           <button className="btn" type="submit">
             Import
           </button>
+          <div className="actions" style={{ marginTop: 0 }}>
+            <a className="btn small secondary" href="/api/admin/templates/advisers">
+              Download template
+            </a>
+            <span className="sub">An Excel file with exactly the columns the import reads, and one example row.</span>
+          </div>
         </form>
 
         <div className="section-title">Advisers</div>

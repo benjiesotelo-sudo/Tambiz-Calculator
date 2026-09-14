@@ -79,7 +79,7 @@ The event page's **Scoring sheet** section says how many of the 39 criteria have
 6. If a red message says the file "does not fit the class roll", it names the missing column. Open the file in Excel, check that column's heading is spelled as shown (for example `Student No.` or `Section`), save, and repeat from step 2.
 7. Check the **On the roll** number matches the number of students you expect.
 
-The file must have these columns: **Student No.**, **Student Email**, **Surname**, **First Name**, **Section**. Any other columns are ignored. The headings do not have to be in the first row.
+The file must have these columns: **Student No.**, **Student Email**, **Surname**, **First Name**, **Section**. Any other columns are ignored. The headings do not have to be in the first row. If your file is in another shape, press **Download template** under **Import**: it gives an Excel file with exactly the columns the import reads and one invented example row. Type over the example row (or delete it), fill in your students, save, and import it.
 
 If students are added or dropped later, import the new file again. Importing the same file twice **updates** students; it never adds them twice.
 
@@ -106,7 +106,7 @@ Choose **one** of these.
 **With an adviser file**
 
 1. Press the **Advisers** tab.
-2. Press **Choose File** and pick the adviser `.xlsx` file. It needs an **Adviser** column. An **Email** column is optional. A **Group Code** or **Group Name** column sets each group's adviser in one go (do this after Part D if you use it).
+2. Press **Choose File** and pick the adviser `.xlsx` file. (No file yet? Press **Download template** for an Excel file with the right columns and one invented example row to type over.) It needs an **Adviser** column. An **Email** column is optional. A **Group Code** or **Group Name** column sets each group's adviser in one go (do this after Part D if you use it).
 3. Press **Import**.
 4. Read the green message.
 
