@@ -6,7 +6,7 @@ import { requireAdmin } from '@/lib/auth';
 import { newId, one, query, transaction, type Statement } from '@/lib/db';
 import { ADVISER_COLUMNS, ImportError, parseWorkbook, ROLL_COLUMNS } from '@/lib/excel-import';
 import { generatePassword, hashPassword } from '@/lib/passwords';
-import { eventFinaliseChecks, eventReport, getEvent, listEvents } from '@/lib/repo';
+import { eventFinaliseChecks, eventReport, getEvent, listEvents, removedScores } from '@/lib/repo';
 import { criterionLabel, findCriterion, HALVES, rubricForNewEvent, withCriterionWording } from '@/lib/rubric';
 import { nameKey } from '@/lib/seed';
 import { emailGivesAway, makeAdviserCode, MAX_TRIES, normaliseCheck } from '@/lib/link-rules';
@@ -105,6 +105,7 @@ export async function excludeStudent(fd: FormData) {
   const acc = await requireAdmin();
   const event = await eventOr404(s(fd, 'eventId'));
   const path = returnTo(fd, event.id, `/admin/events/${event.id}/roll`);
+  if (event.released_at) back(path, { error: 'Results have been released; nothing can change now.' });
   const reason = reasonOf(fd);
   if (reason.length < 3) back(path, { error: 'Type a short reason, for example “Dropped the course”.' });
   const st = await one<{ first_name: string; surname: string }>(
@@ -121,6 +122,7 @@ export async function includeStudent(fd: FormData) {
   const acc = await requireAdmin();
   const event = await eventOr404(s(fd, 'eventId'));
   const path = returnTo(fd, event.id, `/admin/events/${event.id}/roll`);
+  if (event.released_at) back(path, { error: 'Results have been released; nothing can change now.' });
   await query('UPDATE student SET excluded_reason = NULL, excluded_at = NULL WHERE id = $1 AND event_id = $2', [s(fd, 'studentId'), event.id]);
   await log(event.id, acc.id, 'student.include', { studentId: s(fd, 'studentId') });
   back(path, { ok: 'Undone. Place this student in a group before judging closes.' });
@@ -189,7 +191,7 @@ export async function correctScore(fd: FormData) {
   const from = current ? Number(current.value) : null;
   if (from === to) back(path, { error: `${label} is already ${to === null ? 'blank' : fmtScore(to)}.` });
   // The judge's own value is kept from before the first correction; later corrections leave it alone.
-  const judgeValue = current ? (current.corrected_by ? current.judge_value : from) : null;
+  const judgeValue = current ? (current.corrected_by ? current.judge_value : from) : ((await removedScores(event.id, [sheet.id])).get(sheet.id)?.get(key)?.judgeValue ?? null);
 
   if (to === null) {
     await query(`DELETE FROM ${table.name} WHERE ${table.where}`, table.ids);
@@ -290,6 +292,7 @@ export async function addMembers(fd: FormData) {
   const event = await eventOr404(s(fd, 'eventId'));
   const groupId = s(fd, 'groupId');
   const path = `/admin/events/${event.id}/groups/${groupId}`;
+  if (event.released_at) back(path, { error: 'Results have been released; nothing can change now.' });
   const ids = fd.getAll('studentId').map(String).filter(Boolean);
   if (!ids.length) back(path, { error: 'Tick at least one student to add.' });
   const taken = await query<{ first_name: string; surname: string; code: string }>(
@@ -313,6 +316,7 @@ export async function removeMember(fd: FormData) {
   const event = await eventOr404(s(fd, 'eventId'));
   const groupId = s(fd, 'groupId');
   const studentId = s(fd, 'studentId');
+  if (event.released_at) back(`/admin/events/${event.id}/groups/${groupId}`, { error: 'Results have been released; nothing can change now.' });
   await query('DELETE FROM group_member WHERE event_id = $1 AND group_id = $2 AND student_id = $3', [event.id, groupId, studentId]);
   await log(event.id, acc.id, 'member.remove', { groupId, studentId });
   back(`/admin/events/${event.id}/groups/${groupId}`, { ok: 'Member removed from the group. Their scores from this group no longer count.' });

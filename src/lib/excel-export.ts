@@ -64,7 +64,7 @@ export async function buildWorkbook(report: EventReport): Promise<Buffer> {
         const vals = report.sheetValues.get(s.id)!;
         const corrected = (report.corrections.get(s.id) ?? [])
           .filter((c) => critName.has(c.key))
-          .map((c) => `${critName.get(c.key)}: judge gave ${c.judgeValue ?? 'no score'}, now ${c.value} (${c.reason})`)
+          .map((c) => `${critName.get(c.key)}: judge gave ${c.judgeValue ?? 'no score'}, now ${c.value ?? 'blank'} (${c.reason})`)
           .join('; ');
         ws.addRow([g.code, g.name, s.judge_name, s.status === 'complete' ? 'Complete' : 'In progress', ...crits.map((c) => vals[c.category.key]?.[c.index] ?? null), corrected]);
       }

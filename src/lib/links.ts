@@ -131,23 +131,43 @@ async function checkValueFor(link: LinkRow): Promise<string | null> {
 
 export type OpenResult = { ok: true } | { ok: false; state: LinkState | 'missing' } | { ok: false; state: 'wrong'; triesLeft: number };
 
-/** Checks what the holder typed. Right: a 30-minute session for this link only. Wrong: one of five tries used. */
+const STILL_OPEN = 'revoked_at IS NULL AND locked_at IS NULL AND (expires_at IS NULL OR expires_at > now())';
+
+/** The link's state as stored now. Every try used up counts as locked, even before the last wrong try has locked it. */
+async function stateNow(linkId: string): Promise<LinkState | 'missing'> {
+  const row = await one<LinkRow>('SELECT * FROM access_link WHERE id = $1', [linkId]);
+  if (!row) return 'missing';
+  const state = linkState(row);
+  return state === 'ok' ? 'locked' : state;
+}
+
+/**
+ * Checks what the holder typed. Each try is counted before the comparison, so guesses sent at the same moment still
+ * get five tries between them. Right: a 30-minute session for this link only, if the link is still open. Wrong: the try stays used.
+ */
 export async function openLink(code: string, typed: string): Promise<OpenResult> {
   const link = await findLink(code);
   if (!link) return { ok: false, state: 'missing' };
   const state = linkState(link);
   if (state !== 'ok') return { ok: false, state };
+  const tried = await one<{ failed_attempts: number }>(
+    `UPDATE access_link SET failed_attempts = failed_attempts + 1 WHERE id = $1 AND ${STILL_OPEN} AND failed_attempts < $2 RETURNING failed_attempts`,
+    [link.id, MAX_TRIES],
+  );
+  if (!tried) return { ok: false, state: await stateNow(link.id) };
   const expected = await checkValueFor(link);
   if (expected && checkMatches(typed, expected)) {
     const token = randomBytes(32).toString('base64url');
-    await transaction([
-      { text: 'DELETE FROM link_session WHERE expires_at < now()' },
-      { text: `INSERT INTO link_session (token_hash, link_id, expires_at) VALUES ($1, $2, now() + interval '${SESSION_MINUTES} minutes')`, params: [sha256(token), link.id] },
-      {
-        text: 'UPDATE access_link SET failed_attempts = 0, first_opened_at = coalesce(first_opened_at, now()), last_opened_at = now(), open_count = open_count + 1 WHERE id = $1',
-        params: [link.id],
-      },
-    ]);
+    const opened = await one<{ link_id: string }>(
+      `WITH opened AS (
+         UPDATE access_link SET failed_attempts = 0, first_opened_at = coalesce(first_opened_at, now()), last_opened_at = now(), open_count = open_count + 1
+         WHERE id = $1 AND ${STILL_OPEN} RETURNING id
+       )
+       INSERT INTO link_session (token_hash, link_id, expires_at) SELECT $2, id, now() + interval '${SESSION_MINUTES} minutes' FROM opened RETURNING link_id`,
+      [link.id, sha256(token)],
+    );
+    if (!opened) return { ok: false, state: await stateNow(link.id) };
+    await query('DELETE FROM link_session WHERE expires_at < now()');
     (await cookies()).set(COOKIE, token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
@@ -157,13 +177,9 @@ export async function openLink(code: string, typed: string): Promise<OpenResult>
     });
     return { ok: true };
   }
-  const r = await one<{ failed_attempts: number; locked: boolean }>(
-    `UPDATE access_link SET failed_attempts = failed_attempts + 1, locked_at = CASE WHEN failed_attempts + 1 >= $2 THEN now() ELSE NULL END
-     WHERE id = $1 AND locked_at IS NULL RETURNING failed_attempts, locked_at IS NOT NULL AS locked`,
-    [link.id, MAX_TRIES],
-  );
-  if (!r || r.locked) return { ok: false, state: 'locked' };
-  return { ok: false, state: 'wrong', triesLeft: MAX_TRIES - r.failed_attempts };
+  if (tried.failed_attempts < MAX_TRIES) return { ok: false, state: 'wrong', triesLeft: MAX_TRIES - tried.failed_attempts };
+  await query('UPDATE access_link SET locked_at = now() WHERE id = $1 AND locked_at IS NULL AND failed_attempts >= $2', [link.id, MAX_TRIES]);
+  return { ok: false, state: 'locked' };
 }
 
 export async function closeLinkSession(code: string) {

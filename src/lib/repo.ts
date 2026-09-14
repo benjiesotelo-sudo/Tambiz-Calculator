@@ -1,5 +1,6 @@
 // Reads shared by pages, actions and the export. All SQL outside db.ts, auth.ts and seed.ts lives here or in actions.
 
+import { removedByCoordinator, type CorrectionLogEntry, type RemovedScore } from './corrections';
 import { one, query } from './db';
 import { finaliseChecks } from './finalise';
 import { criteriaOf, DEFAULT_RUBRIC, HALVES, type Half, type MemberFieldKey, type Rubric } from './rubric';
@@ -136,9 +137,23 @@ export interface SheetRow {
   status: 'in_progress' | 'complete';
 }
 
+/** Scores the coordinator removed and nobody has entered since, from the change log (corrections.ts). Optionally for some sheets only. */
+export async function removedScores(eventId: string, sheetIds?: string[]) {
+  const rows = await query<{ action: string; created_at: Date; who: string | null; detail: CorrectionLogEntry['detail'] }>(
+    `SELECT c.action, c.created_at, a.display_name AS who, c.detail FROM change_log c LEFT JOIN account a ON a.id = c.account_id
+     WHERE c.event_id = $1 AND c.action IN ('score.correct', 'scores') AND ($2::text[] IS NULL OR c.detail->>'sheet' = ANY($2::text[]))
+       AND c.detail->>'sheet' IN (SELECT r.detail->>'sheet' FROM change_log r WHERE r.event_id = $1 AND r.action = 'score.correct' AND r.detail->>'to' IS NULL)
+     ORDER BY c.created_at, c.id`,
+    [eventId, sheetIds ?? null],
+  );
+  return removedByCoordinator(rows.map((r) => ({ action: r.action, createdAt: r.created_at, who: r.who, detail: r.detail })));
+}
+
+export type Correction = { key: string; value: number | null; judgeValue: number | null; reason: string };
+
 /** Every sheet, value and member score of an event, shaped for the scoring functions. */
 export async function loadEventScores(event: EventRow) {
-  const [sheets, values, members] = await Promise.all([
+  const [sheets, values, members, removed] = await Promise.all([
     query<SheetRow>(
       `SELECT s.id, s.group_id, s.half, s.judge_id, s.status, a.display_name AS judge_name FROM score_sheet s JOIN account a ON a.id = s.judge_id WHERE s.event_id = $1 ORDER BY a.display_name`,
       [event.id],
@@ -153,17 +168,23 @@ export async function loadEventScores(event: EventRow) {
        FROM member_score v JOIN score_sheet s ON s.id = v.sheet_id WHERE s.event_id = $1`,
       [event.id],
     ),
+    removedScores(event.id),
   ]);
-  /** Coordinator corrections per sheet, keyed like the phone (c:… or m:…). */
-  const corrections = new Map<string, { key: string; value: number; judgeValue: number | null; reason: string }[]>();
+  /** Coordinator corrections per sheet, keyed like the phone (c:… or m:…); a removed score has value null. */
+  const corrections = new Map<string, Correction[]>();
+  const addCorrection = (sheetId: string, c: Correction) => corrections.set(sheetId, [...(corrections.get(sheetId) ?? []), c]);
   const noteCorrection = (sheetId: string, key: string, v: { value: number; corrected: boolean; judge_value: number | null; correction_reason: string | null }) => {
     if (!v.corrected) return;
-    const list = corrections.get(sheetId) ?? [];
-    list.push({ key, value: Number(v.value), judgeValue: v.judge_value === null ? null : Number(v.judge_value), reason: v.correction_reason ?? '' });
-    corrections.set(sheetId, list);
+    addCorrection(sheetId, { key, value: Number(v.value), judgeValue: v.judge_value === null ? null : Number(v.judge_value), reason: v.correction_reason ?? '' });
   };
   values.forEach((v) => noteCorrection(v.sheet_id, `c:${v.criterion_key}`, v));
   members.forEach((m) => noteCorrection(m.sheet_id, `m:${m.student_id}:${m.field}`, m));
+  const stored = new Set([...values.map((v) => `${v.sheet_id}|c:${v.criterion_key}`), ...members.map((m) => `${m.sheet_id}|m:${m.student_id}:${m.field}`)]);
+  for (const [sheetId, byKey] of removed) {
+    for (const [key, r] of byKey) {
+      if (!stored.has(`${sheetId}|${key}`)) addCorrection(sheetId, { key, value: null, judgeValue: r.judgeValue, reason: r.reason });
+    }
+  }
 
   const sheetValues = new Map<string, SheetValues>();
   for (const sh of sheets) {
@@ -217,7 +238,7 @@ export interface EventReport {
   sheets: SheetRow[];
   sheetValues: Map<string, SheetValues>;
   filled: Map<string, number>;
-  corrections: Map<string, { key: string; value: number; judgeValue: number | null; reason: string }[]>;
+  corrections: Map<string, Correction[]>;
   /** Students on the roll deliberately left out of every group, with the coordinator's reason. */
   excluded: StudentRow[];
 }
@@ -328,7 +349,7 @@ export async function groupScoreDetail(event: EventRow, groupId: string, half: H
   );
   const ids = sheets.map((s) => s.id);
   type Raw = { sheet_id: string; key: string; value: number; corrected_by_name: string | null; corrected_at: Date | null; correction_reason: string | null; judge_value: number | null };
-  const [values, members, history] = await Promise.all([
+  const [values, members, history, removedLog] = await Promise.all([
     query<Raw>(
       `SELECT v.sheet_id, 'c:' || v.criterion_key AS key, v.value, a.display_name AS corrected_by_name, v.corrected_at, v.correction_reason, v.judge_value
        FROM score_value v LEFT JOIN account a ON a.id = v.corrected_by WHERE v.sheet_id = ANY($1::text[])`,
@@ -344,6 +365,7 @@ export async function groupScoreDetail(event: EventRow, groupId: string, half: H
        WHERE c.event_id = $1 AND c.action = 'score.correct' AND c.detail->>'group' = $2 AND c.detail->>'half' = $3 ORDER BY c.created_at DESC`,
       [event.id, groupId, half],
     ),
+    removedScores(event.id, ids),
   ]);
   const scores = new Map<string, Map<string, StoredScore>>(ids.map((id) => [id, new Map()]));
   for (const r of [...values, ...members]) {
@@ -355,7 +377,11 @@ export async function groupScoreDetail(event: EventRow, groupId: string, half: H
       judgeValue: r.judge_value === null ? null : Number(r.judge_value),
     });
   }
-  return { sheets, scores, history };
+  /** Scores the coordinator removed (corrected to blank), for boxes that are still blank. */
+  const removed = new Map<string, Map<string, RemovedScore>>(
+    ids.map((id) => [id, new Map([...(removedLog.get(id) ?? [])].filter(([key]) => !scores.get(id)?.has(key)))]),
+  );
+  return { sheets, scores, history, removed };
 }
 
 export const criteriaCount = (rubric: Rubric, half: Half) => criteriaOf(rubric, half).length;

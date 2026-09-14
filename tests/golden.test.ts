@@ -41,6 +41,30 @@ const bPct = (g: G) => halfPct(g.booth, B);
 const ov = (g: G) => overallPct(dPct(g), bPct(g), R);
 const ep = (g: G) => categoryPct(g.defense, D[0]);
 
+describe('a category tie with a group whose overall is incomplete (decision 4)', () => {
+  // Both groups have Elevator Pitch at exactly 85.00%. P's booth is missing one score, so P's overall is not ranked.
+  const P: G = { id: 'p', name: 'P', defense: [share(D, 0.85)], booth: [share(B, 0.9, { bbpb: B[0].maxes.map((m, i) => (i === 0 ? null : m * 0.9)) })] };
+  const Q: G = { id: 'q', name: 'Q', defense: [share(D, 0.85)], booth: [share(B, 0.6)] };
+  const P2: G = { ...P, id: 'p2', name: 'P2' };
+  const epRank = (groups: G[]) => Object.fromEntries(computeResults(R, groups).groups.map((g) => [g.id, g.categories[0].rank]));
+
+  it('the group with a known overall ranks first, whatever the list order (before: the first group listed took rank 1)', () => {
+    expect(epRank([P, Q])).toEqual({ p: 2, q: 1 });
+    expect(epRank([Q, P])).toEqual({ p: 2, q: 1 });
+    expect(computeResults(R, [P, Q]).leaderboards[0].entries.map((e) => [e.name, e.rank])).toEqual([['Q', 1], ['P', 2]]);
+  });
+
+  it('two groups tied with no known overall share the rank', () => {
+    expect(epRank([P, Q, P2])).toEqual({ p: 2, q: 1, p2: 2 });
+  });
+
+  it('rankMap puts a null tie-breaker after a known one', () => {
+    const items = [{ s: 50, tb: null }, { s: 50, tb: 10 }, { s: 50, tb: null }];
+    const rank = rankMap(items, (x) => x.s, (x) => x.tb);
+    expect(items.map((_, i) => rank(i))).toEqual([2, 1, 2]);
+  });
+});
+
 describe('golden case A: blank judges skipped; unscored categories and halves stay out (decision 1)', () => {
   const A: G = {
     id: 'a', name: 'A', booth: [],

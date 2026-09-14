@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { currentAccount } from '@/lib/auth';
-import { newId, query } from '@/lib/db';
+import { newId, one, query } from '@/lib/db';
 import { issueLinks, linkStatus, linkUrl, releaseRecipients, type Recipient } from '@/lib/links';
 import { buildMailingSheet } from '@/lib/mailing';
 import { getEvent } from '@/lib/repo';
@@ -42,7 +42,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (mode === 'release') {
     if (event.released_at) return back({ error: 'Results are already released. Use the reissue buttons below.' });
     if (fd.get('confirm') !== 'yes') return back({ error: 'Tick the box to confirm before releasing results.' });
-    await query('UPDATE event SET released_at = now() WHERE id = $1 AND released_at IS NULL', [event.id]);
+    const claimed = await one<{ id: string }>(`UPDATE event SET released_at = now() WHERE id = $1 AND released_at IS NULL AND status = 'finalised' RETURNING id`, [event.id]);
+    if (!claimed) {
+      return back({
+        error: 'Results were already released a moment ago, perhaps by pressing the button twice, so no second set of links was made. Use the mailing sheet from that release. If it did not download, use “Reissue every link” below.',
+      });
+    }
     chosen = recipients;
   } else {
     if (!event.released_at) return back({ error: 'Release results first.' });

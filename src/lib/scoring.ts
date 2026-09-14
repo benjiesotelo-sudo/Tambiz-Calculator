@@ -122,6 +122,8 @@ export function overallPct(defense: number | null, booth: number | null, rubric:
 /**
  * Tied scores share a rank and the next rank is skipped (1, 1, 3), as in index.html:727-746. With a tie-breaker,
  * ties are broken by it and share a rank only when both values match. A null score gets no rank.
+ * A null tie-breaker (for example a group whose overall is incomplete) comes after every known one, and two null
+ * tie-breakers share the rank, so the order never depends on the order of the list.
  * Callers pass rounded values (round2), so ranks follow what people see.
  */
 export function rankMap<T>(items: T[], scoreFn: (t: T) => number | null, tiebreakerFn?: (t: T) => number | null) {
@@ -130,8 +132,10 @@ export function rankMap<T>(items: T[], scoreFn: (t: T) => number | null, tiebrea
     .filter((x): x is { i: number; s: number; tb: number | null } => x.s !== null)
     .sort((a, b) => {
       if (b.s !== a.s) return b.s - a.s;
-      if (tiebreakerFn && b.tb !== null && a.tb !== null && b.tb !== a.tb) return b.tb - a.tb;
-      return 0;
+      if (!tiebreakerFn || a.tb === b.tb) return 0;
+      if (a.tb === null) return 1;
+      if (b.tb === null) return -1;
+      return b.tb - a.tb;
     });
   const ranks = new Map<number, number>();
   scored.forEach((item, pos) => {

@@ -5,7 +5,7 @@ import { statusLabel } from '@/components/EventNav';
 import { requireAdmin } from '@/lib/auth';
 import { halfSummary } from '@/lib/judge-profiles';
 import { ordinal } from '@/lib/link-rules';
-import { capital, judgeHistory, signedPoints } from '@/lib/profiles-data';
+import { judgeEventProfile, signedPoints } from '@/lib/profiles-data';
 import { getEvent } from '@/lib/repo';
 import type { Half } from '@/lib/rubric';
 import { fmt2 } from '@/lib/scoring';
@@ -21,10 +21,9 @@ export default async function JudgeProfilePage({ params, searchParams }: { param
   const sp = await searchParams;
   const event = await getEvent(id);
   if (!event) notFound();
-  const history = await judgeHistory(judgeId);
-  const here = history.find((h) => h.event.id === id);
-  if (!here) notFound();
-  const p = here.profile;
+  const found = await judgeEventProfile(event, judgeId);
+  if (!found) notFound();
+  const { profile: p, history, scoredHere } = found;
   const half: Half = sp.half === 'booth' || (sp.half !== 'defense' && !p.halves.defense.groupsScored && p.halves.booth.groupsScored) ? 'booth' : 'defense';
   const h = p.halves[half];
   const base = `/admin/events/${id}/profiles/${judgeId}`;
@@ -41,6 +40,12 @@ export default async function JudgeProfilePage({ params, searchParams }: { param
           {event.title} · {statusLabel(event)} · {event.rubric.halves[half].label}
         </div>
         <h1 className="page-title">{p.judgeName}</h1>
+        {!scoredHere ? (
+          <div className="notice warn">
+            {p.judgeName} has not scored any group in {event.title} yet, so there is nothing to compare yet. Their record from other events is below.
+          </div>
+        ) : (
+        <>
         <p className="lead">
           Marks at <b>{signedPoints(h.marksAt)}</b> · separates groups: <b>{h.spread?.level ?? '—'}</b> · agrees with co-judges: <b>{h.agreement?.level ?? '—'}</b>.{' '}
           {halfSummary(h)}
@@ -105,11 +110,14 @@ export default async function JudgeProfilePage({ params, searchParams }: { param
             </ul>
           </>
         ) : null}
+        </>
+        )}
 
         <div className="section-title">Across events</div>
         <p className="sub" style={{ marginTop: 0 }}>
           Kept against the person, not the login, year after year: one line per event this judge scored in.
         </p>
+        {!history.length ? <p className="sub">No scores in any event yet.</p> : null}
         <div className="grid">
           {history.map(({ event: e, profile: x }) => (
             <Link key={e.id} className={`tile${e.id === id ? ' on' : ''}`} href={`/admin/events/${e.id}/profiles/${judgeId}`}>

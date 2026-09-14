@@ -43,6 +43,19 @@ export async function judgeHistory(judgeId: string): Promise<{ event: EventRow; 
   return out.sort((a, b) => a.event.year - b.event.year || new Date(a.event.created_at).getTime() - new Date(b.event.created_at).getTime());
 }
 
+/**
+ * One judge's profile for an event, with their record across events. A judge assigned to the event who has not scored
+ * yet gets an empty profile; null when the judge is neither assigned to the event nor scored in it.
+ */
+export async function judgeEventProfile(event: EventRow, judgeId: string): Promise<{ profile: JudgeProfile; scoredHere: boolean; history: { event: EventRow; profile: JudgeProfile }[] } | null> {
+  const [history, judges] = await Promise.all([judgeHistory(judgeId), eventJudges(event.id)]);
+  const here = history.find((h) => h.event.id === event.id);
+  if (here) return { profile: here.profile, scoredHere: true, history };
+  const assigned = judges.find((j) => j.id === judgeId);
+  if (!assigned) return null;
+  return { profile: judgeProfile(judgeId, assigned.display_name, [], event.rubric), scoredHere: false, history };
+}
+
 /** "+1.10 pts", "−4.20 pts", "0.00 pts". */
 export function signedPoints(n: number | null): string {
   if (n === null) return '—';

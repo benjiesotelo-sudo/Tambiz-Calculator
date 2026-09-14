@@ -33,13 +33,21 @@ export default async function GroupScoresPage({
 
   const cell = (sheetId: string, judgeName: string, key: string, label: string, max: number) => {
     const stored: StoredScore | undefined = detail.scores.get(sheetId)?.get(key);
+    const removed = stored ? undefined : detail.removed.get(sheetId)?.get(key);
+    const show = (v: number | null) => (v === null ? 'no score' : fmtScore(v));
     return (
       <div className="corr" key={`${sheetId}:${key}`}>
         <span className="corr-judge">{judgeName}</span>
         <span className="corr-val">{stored ? fmtScore(stored.value) : '–'}</span>
         {stored?.correctedByName ? (
           <span className="corr-note">
-            Corrected by the coordinator. The judge gave {stored.judgeValue === null ? 'no score' : fmtScore(stored.judgeValue)}. Reason: {stored.reason}
+            Corrected by the coordinator. The judge gave {show(stored.judgeValue)}. Reason: {stored.reason}
+          </span>
+        ) : null}
+        {removed ? (
+          <span className="corr-note">
+            Corrected by the coordinator to blank. The judge gave {show(removed.judgeValue)}
+            {removed.previous !== removed.judgeValue ? `; it was ${show(removed.previous)} before removal` : ''}. Reason: {removed.reason}
           </span>
         ) : null}
         {locked ? null : (
