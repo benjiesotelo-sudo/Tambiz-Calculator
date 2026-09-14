@@ -5,6 +5,7 @@ import {
   completionMatches,
   filterRows,
   filterValues,
+  leaveCompletion,
   matchOption,
   parseClipboard,
   plainCompletion,
@@ -116,6 +117,27 @@ describe('completing a typed choice in the cell, as Excel does', () => {
     // Backspace over the highlighted part leaves the typed text, and deleting further does not complete again.
     expect(typeCompletion('reyes', unplaced, false)).toEqual(kept);
     expect(shown(typeCompletion('reye', unplaced, false))).toBe('reye[]');
+  });
+
+  it('typing “reyes” and clicking away or switching to Excel adds no student; “reyes” stays typed and unsaved', () => {
+    const c = typeCompletion('reyes', unplaced, true);
+    expect(leaveCompletion(studentNo, c, true, unplaced)).toEqual({ keep: plainCompletion('reyes') });
+    expect(leaveCompletion(studentNo, c, false, unplaced)).toEqual({ keep: plainCompletion('reyes'), reason: expect.stringContaining('“reyes” matches more than one') });
+    const chosenWithDown = stepCompletion(c, completionMatches('reyes', unplaced), 1);
+    expect(leaveCompletion(studentNo, chosenWithDown, false, unplaced)).toMatchObject({ keep: plainCompletion('reyes') });
+  });
+
+  it('clicking away saves what was typed only when it means one student, and never while in another window', () => {
+    const santos = typeCompletion('santos', unplaced, true);
+    expect(shown(santos)).toBe('santos[ → 2021-00103 · SANTOS, Carla · BSA-1B]');
+    const left = leaveCompletion(studentNo, santos, false, unplaced);
+    expect(left).toEqual({ save: plainCompletion('santos') });
+    expect('save' in left && resolveCompletion(studentNo, left.save)).toEqual({ value: 's3', label: '2021-00103' });
+    const exact = typeCompletion('2021-00104', unplaced, true);
+    expect(leaveCompletion(studentNo, exact, false, unplaced)).toEqual({ save: plainCompletion('2021-00104') });
+    expect(leaveCompletion(studentNo, exact, true, unplaced)).toEqual({ keep: plainCompletion('2021-00104') });
+    const score: GridColumn = { key: 's', label: 'Score', editable: true, type: 'number', max: 20 };
+    expect(leaveCompletion(score, plainCompletion('18'), false)).toEqual({ save: plainCompletion('18') });
   });
 
   it('typing a whole student number completes to nothing more and saves that student', () => {

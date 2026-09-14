@@ -268,6 +268,22 @@ export function resolveCompletion(column: GridColumn, c: Completion, options: Gr
   return c.option ? { value: c.option.value, label: c.option.label } : resolveCell(column, c.typed, options, rowMax);
 }
 
+export type Leaving = { save: Completion } | { keep: Completion; reason?: string };
+
+/**
+ * What leaving a cell without Enter or Tab does. Only Enter and Tab accept a completion, so the cell keeps just what
+ * was typed. That is saved when it can mean one thing only (an exact or single match, a new value where the column
+ * takes one, or a blank). Otherwise, and always while the person is away in another window or tab, the cell stays
+ * open with the typed text unsaved.
+ */
+export function leaveCompletion(column: GridColumn, c: Completion, away: boolean, options: GridOption[] = column.options ?? [], rowMax?: number): Leaving {
+  const typed = plainCompletion(c.typed);
+  if (away) return { keep: typed };
+  if (column.type !== 'choice') return { save: typed };
+  const resolved = resolveCell(column, c.typed, options, rowMax);
+  return 'error' in resolved ? { keep: typed, reason: resolved.error } : { save: typed };
+}
+
 // ── column widths ───────────────────────────────────────────────────
 
 const DEFAULT_WIDTH = 'minmax(6rem, 1fr)';

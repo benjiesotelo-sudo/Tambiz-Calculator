@@ -15,6 +15,7 @@ import {
   filterRows,
   filterValues,
   isNewRow,
+  leaveCompletion,
   NEW_ROW,
   parseClipboard,
   plainCompletion,
@@ -480,13 +481,13 @@ export function DataGrid(props: DataGridProps) {
   );
 
   const endEdit = useCallback(
-    (how: 'commit' | 'cancel', move?: { dr: number; dc: number; wrap?: boolean; col?: string }, picked?: GridOption) => {
+    (how: 'commit' | 'cancel', move?: { dr: number; dc: number; wrap?: boolean; col?: string }, entry?: Completion) => {
       // Leaving the cell also blurs its box, which ends the edit again before React has redrawn; only the first counts.
       const e = editingRef.current;
       if (!e) return;
       editingRef.current = null;
       setEditing(null);
-      const key = how === 'commit' ? (commit(e.key, e.col, picked ? completeWith(e.typed, [picked], 0) : e) ?? e.key) : e.key;
+      const key = how === 'commit' ? (commit(e.key, e.col, entry ?? e) ?? e.key) : e.key;
       focusGrid();
       const col = move?.col ?? e.col;
       if (key !== e.key && !keys.includes(key)) {
@@ -500,6 +501,28 @@ export function DataGrid(props: DataGridProps) {
       if (move) moveBy({ key, col }, move.dr, move.dc, { wrap: move.wrap });
     },
     [commit, moveBy, moveTo, keys, colIndex, columns],
+  );
+
+  /** Leaves the cell other than by Enter or Tab. Returns false when the cell stays open, with what was typed kept unsaved. */
+  const leaveEdit = useCallback(
+    (move?: { dr: number; dc: number }): boolean => {
+      const e = editingRef.current;
+      if (!e) return true;
+      const column = columns[colIndex.get(e.col)!];
+      const row = e.key === BLANK ? null : (localRef.current.find((l) => l.key === e.key)?.row ?? null);
+      const away = document.visibilityState === 'hidden' || !document.hasFocus();
+      const leaving = leaveCompletion(column, e, away, optionsFor(column, e.key), row?.max);
+      if ('save' in leaving) {
+        endEdit('commit', move, leaving.save);
+        return true;
+      }
+      const kept = { ...e, ...leaving.keep };
+      editingRef.current = kept;
+      setEditing(kept);
+      if (leaving.reason) setHint(leaving.reason);
+      return false;
+    },
+    [columns, colIndex, optionsFor, endEdit],
   );
 
   // When the blank row becomes a new row, the next blank row is below it; keep the cursor on the new row.
@@ -799,7 +822,7 @@ export function DataGrid(props: DataGridProps) {
         if (editing.mode === 'enter') {
           e.preventDefault();
           tabStart.current = null;
-          endEdit('commit', { dr: 0, dc: e.key === 'ArrowRight' ? 1 : -1 });
+          leaveEdit({ dr: 0, dc: e.key === 'ArrowRight' ? 1 : -1 });
         }
         return;
     }
@@ -849,7 +872,7 @@ export function DataGrid(props: DataGridProps) {
     if (editing && editing.key === key && editing.col === col) return;
     if ((e.target as HTMLElement).closest('a')) return;
     e.preventDefault();
-    if (editing) endEdit('commit');
+    if (editing && !leaveEdit()) return;
     tabStart.current = null;
     moveTo(key, col, e.shiftKey && !!active);
     focusGrid();
@@ -863,10 +886,12 @@ export function DataGrid(props: DataGridProps) {
   };
   api.current.editorKey = onEditorKey;
   api.current.editorBlur = () => {
-    if (editing) endEdit('commit');
+    if (editing) leaveEdit();
   };
   api.current.editorPaste = onEditorPaste;
-  api.current.pick = (o) => endEdit('commit', undefined, o);
+  api.current.pick = (o) => {
+    if (editing) endEdit('commit', undefined, completeWith(editing.typed, [o], 0));
+  };
   api.current.options = (c, key) => optionsFor(c, key);
 
   // ── drawing ───────────────────────────────────────────────────
@@ -1257,6 +1282,31 @@ const GridRowView = memo(function GridRowView(p: {
 
 function CellEditor({ column, editing, rowKey, api }: { column: GridColumn; editing: Editing; rowKey: string; api: Api }) {
   const ref = useRef<HTMLInputElement>(null);
+  const listRef = useRef<HTMLUListElement>(null);
+  // Like text spilling across cells in Excel, the box widens over its neighbours to show all it holds, and it and the
+  // list under it stay inside the table so nothing is cut off and the page never scrolls sideways.
+  useLayoutEffect(() => {
+    const el = ref.current;
+    const cell = el?.parentElement;
+    const grid = el?.closest<HTMLElement>('.dg-grid');
+    if (!el || !cell || !grid) return;
+    const room = grid.getBoundingClientRect();
+    const box = cell.getBoundingClientRect();
+    const inner = room.width - 2;
+    el.style.width = '';
+    el.style.left = '';
+    const width = Math.min(Math.max(box.width, el.scrollWidth + 4), inner);
+    el.style.width = `${width}px`;
+    const over = box.left + width - (room.right - 1);
+    if (over > 0) el.style.left = `${-Math.min(over, box.left - room.left - 1)}px`;
+    el.scrollLeft = 0;
+    const list = listRef.current;
+    if (!list) return;
+    list.style.left = '';
+    list.style.maxWidth = `${Math.min(inner, 440)}px`;
+    const past = list.getBoundingClientRect().right - (room.right - 1);
+    if (past > 0) list.style.left = `${-Math.min(past, box.left - room.left - 1)}px`;
+  }, [editing.text, editing.index]);
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
@@ -1297,7 +1347,7 @@ function CellEditor({ column, editing, rowKey, api }: { column: GridColumn; edit
         onMouseDown={(e) => e.stopPropagation()}
       />
       {shown.length || newHint ? (
-        <ul className="dg-suggest" role="listbox" aria-label={`${column.label} choices`}>
+        <ul ref={listRef} className="dg-suggest" role="listbox" aria-label={`${column.label} choices`}>
           {shown.map((o, i) => (
             <li
               key={o.value}
