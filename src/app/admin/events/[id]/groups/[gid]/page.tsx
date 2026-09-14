@@ -1,19 +1,17 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { AppBar, Notice } from '@/components/AppBar';
+import { DataGrid } from '@/components/DataGrid';
 import { requireAdmin } from '@/lib/auth';
-import { getEvent, getGroup, groupDetailChanges, groupMembers, listAdvisers, listStudents, rollName } from '@/lib/repo';
-import { addMembers, deleteGroup, removeMember, saveGroup, setMemberAbsent } from '../../../../actions';
+import type { GridColumn } from '@/lib/grid';
+import { getEvent, getGroup, groupDetailChanges, groupMembers, listStudents, rollName } from '@/lib/repo';
+import { memberGridRow, PRESENCE } from '@/lib/tables';
+import { deleteGroup } from '../../../../actions';
+import { removeMembersTable, saveMembersTable } from '../../../../table-actions';
 
 export const dynamic = 'force-dynamic';
 
-export default async function GroupPage({
-  params,
-  searchParams,
-}: {
-  params: Promise<{ id: string; gid: string }>;
-  searchParams: Promise<{ ok?: string; error?: string; q?: string; all?: string }>;
-}) {
+export default async function GroupPage({ params, searchParams }: { params: Promise<{ id: string; gid: string }>; searchParams: Promise<{ ok?: string; error?: string }> }) {
   const acc = await requireAdmin();
   const { id, gid } = await params;
   const sp = await searchParams;
@@ -21,21 +19,36 @@ export default async function GroupPage({
   if (!event) notFound();
   const group = await getGroup(id, gid);
   if (!group) notFound();
-  const [members, advisers, students, changes] = await Promise.all([groupMembers(gid), listAdvisers(id), listStudents(id), groupDetailChanges(id, gid)]);
+  const [members, students, changes] = await Promise.all([groupMembers(gid), listStudents(id), groupDetailChanges(id, gid)]);
   const released = !!event.released_at;
-
-  // Students not in any group; same section first unless "all sections" is chosen. A search looks at everyone unplaced.
-  const q = (sp.q ?? '').trim().toLowerCase();
-  const unplaced = students.filter((s) => !s.group_id);
-  const candidates = unplaced.filter((s) =>
-    q ? `${s.surname} ${s.first_name} ${s.student_number} ${s.section}`.toLowerCase().includes(q) : sp.all || !group.section ? true : s.section === group.section,
-  );
   const base = `/admin/events/${id}/groups/${gid}`;
+
+  // Students in no group, this group's section first, offered while typing in the blank row.
+  const unplaced = students.filter((s) => !s.group_id).sort((a, b) => Number(b.section === group.section) - Number(a.section === group.section));
+  const sameSection = unplaced.filter((s) => s.section === group.section).length;
+  const columns: GridColumn[] = [
+    {
+      key: 'student',
+      label: 'Student No.',
+      type: 'choice',
+      editable: true,
+      addOnly: true,
+      required: true,
+      allowNew: true,
+      uniqueOptions: true,
+      options: unplaced.map((s) => ({ value: s.id, label: s.student_number, hint: `${rollName(s)} · ${s.section}` })),
+      width: '9.5rem',
+    },
+    { key: 'name', label: 'Name (per class roll)', width: 'minmax(11rem, 2fr)' },
+    { key: 'section', label: 'Section', width: '6.5rem' },
+    { key: 'email', label: 'Email', width: 'minmax(10rem, 1.6fr)' },
+    { key: 'absent', label: 'At the defense', type: 'choice', editable: true, options: PRESENCE, filter: true, width: '8.5rem' },
+  ];
 
   return (
     <>
       <AppBar subtitle="Coordinator" account={acc} home="/admin" />
-      <main className="page">
+      <main className="page wide">
         <div className="crumbs">
           <Link href={`/admin/events/${id}/groups`}>‹ Groups</Link>
         </div>
@@ -44,11 +57,10 @@ export default async function GroupPage({
         </div>
         <h1 className="page-title">{group.name}</h1>
         <p className="lead">
-          {group.section || 'No section'} · {group.adviser_name ?? 'No adviser'}
+          {group.section || 'No section'} · {group.adviser_name ?? 'No adviser'} · change these on the <Link href={`/admin/events/${id}/groups`}>Groups</Link> table.
         </p>
         <Notice ok={sp.ok} error={sp.error} />
 
-        <div className="section-title">Scores</div>
         <div className="actions" style={{ marginTop: 0 }}>
           <Link className="btn small secondary" href={`${base}/scores?half=defense`}>
             Defense scores and corrections
@@ -58,137 +70,33 @@ export default async function GroupPage({
           </Link>
         </div>
 
-        <div className="section-title">Members ({members.length})</div>
-        <ul className="list">
-          {members.map((m) => (
-            <li key={m.id} style={{ flexWrap: 'wrap' }}>
-              <span className="grow-1" style={{ minWidth: 180 }}>
-                <span className="title">{rollName(m)}</span>
-                <span className="sub" style={{ display: 'block' }}>
-                  {m.student_number} · {m.section}
-                  {m.absent_at ? ' · Absent from the defense: no grade from the app; you enter it' : ''}
-                </span>
-              </span>
-              {m.absent_at ? <span className="pill part">Absent</span> : null}
-              <form action={setMemberAbsent}>
-                <input type="hidden" name="eventId" value={id} />
-                <input type="hidden" name="groupId" value={gid} />
-                <input type="hidden" name="studentId" value={m.id} />
-                <input type="hidden" name="absent" value={m.absent_at ? 'no' : 'yes'} />
-                <input type="hidden" name="return" value={base} />
-                <button className="btn small secondary" type="submit" disabled={!!event.released_at}>
-                  {m.absent_at ? 'Not absent' : 'Mark absent'}
-                </button>
-              </form>
-              <form action={removeMember}>
-                <input type="hidden" name="eventId" value={id} />
-                <input type="hidden" name="groupId" value={gid} />
-                <input type="hidden" name="studentId" value={m.id} />
-                <button className="btn small danger" type="submit">
-                  Remove
-                </button>
-              </form>
-            </li>
-          ))}
-          {!members.length ? <li className="sub">No members yet. Tick students below and press Add.</li> : null}
-        </ul>
-
-        <div className="section-title">Add members from the class roll</div>
-        <form method="get" className="actions" style={{ marginTop: 0 }}>
-          <input className="input" name="q" defaultValue={sp.q ?? ''} placeholder="Search name or student number" style={{ flex: '1 1 200px', width: 'auto' }} />
-          <button className="btn secondary" type="submit">
-            Search
-          </button>
-          {group.section && !sp.all && !q ? (
-            <Link className="btn secondary" href={`${base}?all=1`}>
-              All sections
-            </Link>
-          ) : null}
-        </form>
-        <p className="sub">
-          Showing {candidates.length} student{candidates.length === 1 ? '' : 's'} not yet in any group
-          {q ? ` matching “${sp.q}”` : sp.all || !group.section ? '' : ` in ${group.section}`}. A student can belong to only one group.
-        </p>
+        <div className="section-title">Members</div>
         {students.length === 0 ? (
           <div className="notice warn">
             The class roll is empty. <Link href={`/admin/events/${id}/roll`}>Import the class roll</Link> first; members are chosen from it, never typed.
           </div>
         ) : (
-          <form action={addMembers}>
-            <input type="hidden" name="eventId" value={id} />
-            <input type="hidden" name="groupId" value={gid} />
-            <ul className="list">
-              {candidates.slice(0, 80).map((s) => (
-                <li key={s.id}>
-                  <label style={{ display: 'flex', gap: 10, alignItems: 'center', flex: 1, minWidth: 0, cursor: 'pointer' }}>
-                    <input type="checkbox" name="studentId" value={s.id} style={{ width: 22, height: 22, flex: '0 0 auto' }} />
-                    <span className="grow-1">
-                      <span className="title">{rollName(s)}</span>
-                      <span className="sub" style={{ display: 'block' }}>
-                        {s.student_number} · {s.section}
-                      </span>
-                    </span>
-                  </label>
-                </li>
-              ))}
-              {!candidates.length ? <li className="sub">Nobody to add here.</li> : null}
-            </ul>
-            {candidates.length ? (
-              <div className="actions">
-                <button className="btn" type="submit">
-                  Add ticked students
-                </button>
-              </div>
-            ) : null}
-          </form>
+          <p className="sub" style={{ marginTop: 0 }}>
+            To add a member, type their student number or part of their name in the last row and pick them; paste a column of student numbers to add several at once.{' '}
+            {unplaced.length} student{unplaced.length === 1 ? ' is' : 's are'} in no group yet
+            {group.section ? `, ${sameSection} of them in ${group.section}` : ''}. A student can belong to only one group. Mark a student <b>Absent</b> if they missed the
+            defense: the app then gives them no grade, and you enter it yourself.
+          </p>
         )}
+        <DataGrid
+          label={`Members of ${group.name}`}
+          columns={columns}
+          rows={members.map((m) => memberGridRow(event, m))}
+          save={saveMembersTable.bind(null, id, gid)}
+          remove={released ? undefined : removeMembersTable.bind(null, id, gid)}
+          removeLabel="Remove from group"
+          canAdd={!released && students.length > 0}
+          addHint="Type a student number or name"
+          rowName="name"
+          searchPlaceholder="Search members"
+          emptyText="No members yet."
+        />
 
-        <div className="section-title">Group details</div>
-        {released ? (
-          <div className="notice warn">
-            Results have been released. You can still correct the code, name or adviser, and each change is recorded below with your name and the time. A new code or name
-            shows on the members’ and adviser’s result pages. A new adviser changes both advisers’ result pages and the adviser ranking, and the mailing sheet already sent no
-            longer matches.
-          </div>
-        ) : null}
-        <form action={saveGroup} className="card form">
-          <input type="hidden" name="eventId" value={id} />
-          <input type="hidden" name="groupId" value={gid} />
-          <div className="row2">
-            <div className="field">
-              <label htmlFor="code">Code</label>
-              <input className="input" id="code" name="code" defaultValue={group.code} required />
-            </div>
-            <div className="field">
-              <label htmlFor="section">Section</label>
-              <input className="input" id="section" name="section" defaultValue={group.section} readOnly={released} />
-            </div>
-          </div>
-          <div className="field">
-            <label htmlFor="name">Business name</label>
-            <input className="input" id="name" name="name" defaultValue={group.name} required />
-          </div>
-          <div className="row2">
-            <div className="field">
-              <label htmlFor="adviserId">Adviser</label>
-              <select className="input" id="adviserId" name="adviserId" defaultValue={group.adviser_id ?? ''}>
-                <option value="">No adviser</option>
-                {advisers.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="field">
-              <label htmlFor="adviserName">…or type a new adviser</label>
-              <input className="input" id="adviserName" name="adviserName" />
-            </div>
-          </div>
-          <button className="btn" type="submit">
-            Save group
-          </button>
-        </form>
         <form action={deleteGroup} className="actions">
           <input type="hidden" name="eventId" value={id} />
           <input type="hidden" name="groupId" value={gid} />

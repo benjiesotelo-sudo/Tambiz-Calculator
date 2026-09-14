@@ -3,7 +3,9 @@
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { requireAdmin } from '@/lib/auth';
+import { logStatement } from '@/lib/change-log';
 import { newId, one, query, transaction, type Statement } from '@/lib/db';
+import { adviserChangeWarning, adviserWord, editGroup, removeGroup } from '@/lib/group-edit';
 import { ADVISER_COLUMNS, ImportError, parseWorkbook, ROLL_COLUMNS } from '@/lib/excel-import';
 import { generatePassword, hashPassword } from '@/lib/passwords';
 import { eventFinaliseChecks, eventReport, getEvent, getGroup, listEvents, removedScores } from '@/lib/repo';
@@ -21,12 +23,6 @@ function back(path: string, msg: { ok?: string; error?: string }): never {
   redirect(`${path}${path.includes('?') ? '&' : '?'}${u.toString()}`);
 }
 
-const isUnique = (e: unknown) => (e as { code?: string })?.code === '23505';
-
-const logStatement = (eventId: string | null, accountId: string, action: string, detail: object): Statement => ({
-  text: 'INSERT INTO change_log (id, event_id, account_id, action, detail) VALUES ($1, $2, $3, $4, $5::jsonb)',
-  params: [newId(), eventId, accountId, action, JSON.stringify(detail)],
-});
 
 async function log(eventId: string | null, accountId: string, action: string, detail: object) {
   const { text, params } = logStatement(eventId, accountId, action, detail);
@@ -234,91 +230,26 @@ export async function saveCriteria(fd: FormData) {
 }
 
 // ── groups and members ────────────────────────────────────────
-
-async function adviserIdFor(eventId: string, fd: FormData): Promise<string | null> {
-  const chosen = s(fd, 'adviserId');
-  const typed = s(fd, 'adviserName');
-  if (typed) {
-    const key = nameKey(typed);
-    const existing = await one<{ id: string }>('SELECT id FROM adviser WHERE event_id = $1 AND name_key = $2', [eventId, key]);
-    if (existing) return existing.id;
-    const id = newId();
-    await query('INSERT INTO adviser (id, event_id, name, name_key) VALUES ($1, $2, $3, $4)', [id, eventId, typed, key]);
-    return id;
-  }
-  return chosen || null;
-}
-
-const adviserWord = (name: string | null | undefined) => name || 'no adviser';
-
-/** The consequence of a released group's adviser changing, said at the moment it happens. */
-const adviserChangeWarning = (who: string) =>
-  `Results were already released, so ${who} result pages and the adviser ranking change, and the mailing sheet already sent no longer matches. An adviser who had no link yet can be given one on the Release tab with “Download links for the people with none yet”.`;
+// The Groups table saves through table-actions.ts; these forms share its rules (lib/group-edit.ts).
 
 export async function saveGroup(fd: FormData) {
   const acc = await requireAdmin();
   const event = await eventOr404(s(fd, 'eventId'));
   const groupId = s(fd, 'groupId');
-  const code = s(fd, 'code').toUpperCase();
-  const name = s(fd, 'name');
-  const section = s(fd, 'section').toUpperCase();
   const path = groupId ? `/admin/events/${event.id}/groups/${groupId}` : `/admin/events/${event.id}/groups`;
   const before = groupId ? await getGroup(event.id, groupId) : null;
   if (groupId && !before) back(`/admin/events/${event.id}/groups`, { error: 'Group not found.' });
-  // After release only a group's code, name and adviser can be corrected; each change is recorded and its consequence shown.
-  if (event.released_at && !before) back(path, { error: 'Results have been released, so no new group can be added.' });
-  if (event.released_at && before && before.section !== section) back(path, { error: 'Results have been released, so the section cannot change now. The code, name and adviser can still be corrected.' });
-  if (!code || !name) back(path, { error: 'A group needs a code and a name.' });
-  const key = nameKey(name);
-  if (!key) back(path, { error: 'The group name needs at least one letter or number.' });
-  const clash = await one<{ code: string; name: string; id: string }>(
-    'SELECT id, code, name FROM tgroup WHERE event_id = $1 AND (code = $2 OR name_key = $3) AND id <> $4',
-    [event.id, code, key, groupId || ''],
-  );
-  if (clash) back(path, { error: clash.code === code ? `Code ${code} is already used by ${clash.name}.` : `“${name}” is the same name as ${clash.code} ${clash.name} (spacing and punctuation are ignored).` });
-  const adviserId = await adviserIdFor(event.id, fd);
-  try {
-    if (before) {
-      const adviser = adviserId ? await one<{ name: string }>('SELECT name FROM adviser WHERE id = $1', [adviserId]) : null;
-      const changes = [
-        before.code !== code ? `Code ${before.code} → ${code}` : '',
-        before.name !== name ? `Name ${before.name} → ${name}` : '',
-        before.section !== section ? `Section ${before.section || 'none'} → ${section || 'none'}` : '',
-        (before.adviser_id ?? null) !== adviserId ? `Adviser ${adviserWord(before.adviser_name)} → ${adviserWord(adviser?.name)}` : '',
-      ].filter(Boolean);
-      const released = !!event.released_at;
-      await transaction([
-        { text: 'UPDATE tgroup SET code = $3, name = $4, name_key = $5, section = $6, adviser_id = $7 WHERE id = $1 AND event_id = $2', params: [groupId, event.id, code, name, key, section, adviserId] },
-        logStatement(event.id, acc.id, 'group.update', { groupId, code, name, section, adviserId, from: { code: before.code, name: before.name, section: before.section, adviserId: before.adviser_id }, changes, released }),
-      ]);
-      if (!released || !changes.length) back(path, { ok: 'Group saved.' });
-      const warnings = [
-        before.code !== code || before.name !== name ? 'Results were already released, so the members’ and adviser’s result pages now show the new code and name.' : '',
-        (before.adviser_id ?? null) !== adviserId
-          ? adviserChangeWarning(`${adviserWord(before.adviser_name)}’s and ${adviserWord(adviser?.name)}’s`)
-          : '',
-      ].filter(Boolean);
-      back(path, { ok: `Group saved: ${changes.join('; ')}. ${warnings.join(' ')} The change is recorded with your name and the time.` });
-    }
-    const id = newId();
-    await query('INSERT INTO tgroup (id, event_id, code, name, name_key, section, adviser_id) VALUES ($1, $2, $3, $4, $5, $6, $7)', [id, event.id, code, name, key, section, adviserId]);
-    await log(event.id, acc.id, 'group.create', { id, code, name, section });
-    back(`/admin/events/${event.id}/groups/${id}`, { ok: `Created ${code} ${name}. Now add its members.` });
-  } catch (e) {
-    if (isUnique(e)) back(path, { error: 'Another group already has that code or name.' });
-    throw e;
-  }
+  const res = await editGroup(event, acc.id, before, { code: s(fd, 'code'), name: s(fd, 'name'), section: s(fd, 'section'), adviser: s(fd, 'adviserName') || s(fd, 'adviserId') });
+  if (!res.ok) back(path, { error: res.error });
+  back(res.created ? `/admin/events/${event.id}/groups/${res.group.id}` : path, { ok: res.message });
 }
 
 export async function deleteGroup(fd: FormData) {
   const acc = await requireAdmin();
   const event = await eventOr404(s(fd, 'eventId'));
   const groupId = s(fd, 'groupId');
-  if (event.released_at) back(`/admin/events/${event.id}/groups/${groupId}`, { error: 'Results have been released, so a group cannot be deleted. Its code, name and adviser can still be corrected.' });
-  const sheets = await one<{ n: number }>('SELECT count(*)::int AS n FROM score_sheet WHERE group_id = $1', [groupId]);
-  if (sheets && sheets.n > 0) back(`/admin/events/${event.id}/groups/${groupId}`, { error: 'This group already has scores, so it cannot be deleted.' });
-  await query('DELETE FROM tgroup WHERE id = $1 AND event_id = $2', [groupId, event.id]);
-  await log(event.id, acc.id, 'group.delete', { groupId });
+  const refused = await removeGroup(event, acc.id, groupId);
+  if (refused) back(`/admin/events/${event.id}/groups/${groupId}`, { error: refused });
   back(`/admin/events/${event.id}/groups`, { ok: 'Group deleted.' });
 }
 

@@ -1,9 +1,12 @@
 import { notFound } from 'next/navigation';
 import { AppBar } from '@/components/AppBar';
+import { DataGrid } from '@/components/DataGrid';
 import { EventHeader } from '@/components/EventNav';
 import { requireAdmin } from '@/lib/auth';
+import type { GridColumn } from '@/lib/grid';
 import { eventReport, getEvent } from '@/lib/repo';
 import { adviserRanking, fmtPct } from '@/lib/scoring';
+import { resultGridRow } from '@/lib/tables';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,40 +18,47 @@ export default async function ResultsPage({ params }: { params: Promise<{ id: st
   const event = await getEvent(id);
   if (!event) notFound();
   const report = await eventReport(event);
-  const rows = [...report.results.groups].sort((a, b) => (a.overallRank ?? 1e9) - (b.overallRank ?? 1e9) || a.name.localeCompare(b.name));
-  const codeOf = new Map(report.groups.map((g) => [g.id, g.code]));
-  const incomplete = rows.filter((g) => !g.complete && !g.accepted).length;
+  const incomplete = report.results.groups.filter((g) => !g.complete && !g.accepted).length;
   const standings = adviserRanking(report.groups.map((g) => ({ adviserId: g.adviser_id, result: report.resultById.get(g.id)! })));
   const advisers = report.groups
     .filter((g, i, all) => g.adviser_id && standings.has(g.adviser_id) && all.findIndex((x) => x.adviser_id === g.adviser_id) === i)
     .map((g) => ({ id: g.adviser_id!, name: g.adviser_name ?? '', ...standings.get(g.adviser_id!)! }))
     .sort((a, b) => a.rank - b.rank || a.name.localeCompare(b.name));
 
+  // One row per group, every group, in overall order; groups without an overall rank last.
+  const rows = report.groups
+    .map((g) => ({ g, r: report.resultById.get(g.id)! }))
+    .sort((a, b) => (a.r.overallRank ?? 1e9) - (b.r.overallRank ?? 1e9) || a.g.code.localeCompare(b.g.code, undefined, { numeric: true }))
+    .map(({ g, r }) => resultGridRow(event, g, r));
+  const categories = report.results.groups[0]?.categories ?? [];
+  const columns: GridColumn[] = [
+    { key: 'group', label: 'Group', width: 'minmax(9rem, 1.6fr)' },
+    { key: 'section', label: 'Sec', filter: true, width: '4.6rem' },
+    { key: 'adviser', label: 'Adviser', filter: true, width: 'minmax(6.5rem, 1fr)' },
+    ...categories.map((c): GridColumn => ({ key: `c:${c.key}`, label: c.name, type: 'number', align: 'right', width: 'minmax(6.2rem, .8fr)' })),
+    { key: 'overall', label: 'Overall', type: 'number', align: 'right', width: '5.4rem' },
+    { key: 'rank', label: 'Rank', type: 'number', align: 'right', width: '3.8rem' },
+    { key: 'judged', label: 'Judged', filter: true, width: '6.6rem' },
+  ];
+
   return (
     <>
       <AppBar subtitle="Coordinator" account={acc} home="/admin" />
-      <main className="page">
+      <main className="page wide">
         <EventHeader event={event} tab="results" title="Results" />
         <p className="lead">
-          {event.status === 'finalised' ? 'Final results.' : 'Live preview: these change as judges score.'} Overall = Defense × {event.rubric.halves.defense.weight} + Booth ×{' '}
-          {event.rubric.halves.booth.weight}. Every category counts equally within its half.
-        </p>
-        <div className="notice ok">
-          <b>A blank score is never counted as zero.</b> Anything nobody has scored shows a dash and is left out. A group reads <b>Incomplete</b> until every criterion in both
-          halves has a score, and only complete scores are ranked.
+          {event.status === 'finalised' ? 'Final results.' : 'Live preview: these change as judges submit.'} Overall = Defense × {event.rubric.halves.defense.weight} + Booth ×{' '}
+          {event.rubric.halves.booth.weight}. Only submitted sheets count, a blank is never a zero, and a group is ranked once every criterion in both halves has a score.
           {incomplete ? ` ${incomplete} group${incomplete === 1 ? ' is' : 's are'} incomplete right now.` : ''}
-        </div>
+        </p>
         <div className="actions" style={{ marginTop: 0 }}>
           <a className="btn small secondary" href={`/api/admin/events/${id}/export`}>
             Download Excel workbook
           </a>
         </div>
 
-        <div className="section-title">Top 10 leaderboard</div>
-        <p className="sub">
-          Ranked on the percentages shown. When two groups show the same percentage, the one with the higher overall score goes first; they share a place only if both are equal.
-        </p>
-        <div className="lb-grid">
+        <div className="section-title">Top 10 for the awarding</div>
+        <div className="lb-grid compact">
           {report.results.leaderboards.map((lb) => (
             <div className="lb-card" key={lb.key}>
               <div className={`lb-head ${lb.half === 'booth' ? 'booth' : lb.half === 'overall' ? 'overall' : ''}`}>{lb.name}</div>
@@ -66,41 +76,17 @@ export default async function ResultsPage({ params }: { params: Promise<{ id: st
             </div>
           ))}
         </div>
+        <p className="sub">
+          Ranked on the two-decimal percentages shown. When two groups show the same category percentage, the higher overall goes first; they share a place only if both are
+          equal. Every group tied at 10th is listed.
+        </p>
 
-        <div className="section-title">Every group by category</div>
-        <p className="sub">The same ranks as the leaderboard. Groups without an overall rank are listed last.</p>
-        {rows.map((g) => (
-          <div className="card" key={g.id}>
-            <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-              <span className="code">{codeOf.get(g.id)}</span>
-              <h3 style={{ margin: 0, flex: '1 1 140px', minWidth: 0, overflowWrap: 'anywhere' }}>{g.name}</h3>
-              {g.complete || g.accepted ? <span className="bignum">{fmtPct(g.overall)}</span> : <span className="pill part">Incomplete</span>}
-              <Rank r={g.overallRank} />
-            </div>
-            <div className="sub">
-              Defense {fmtPct(g.defense)}
-              {g.defense !== null && !g.defenseComplete ? ' (incomplete)' : ''} · Booth {fmtPct(g.booth)}
-              {g.booth !== null && !g.boothComplete ? ' (incomplete)' : ''}
-              {!g.complete && !g.accepted && g.overall !== null ? ` · ${fmtPct(g.overall)} from what is scored so far` : ''}
-              {g.accepted ? ' · Finalised without every score (see Progress)' : ''}
-            </div>
-            <div className="catgrid">
-              {g.categories.map((c) => (
-                <div key={c.key} className={`catcell ${c.half}`}>
-                  <div className="n" title={c.name}>
-                    {c.name}
-                  </div>
-                  <div className="v">
-                    <span>{fmtPct(c.pct)}</span>
-                    <Rank r={c.rank} />
-                  </div>
-                  {c.pct !== null && !c.complete ? <div className="n">incomplete</div> : null}
-                </div>
-              ))}
-            </div>
-          </div>
-        ))}
-        {!rows.length ? <p className="sub">No groups yet.</p> : null}
+        <div className="section-title">Every group</div>
+        <p className="sub" style={{ marginTop: 0 }}>
+          Each category shows the percentage and, after the dot, its rank. Click a heading (or use Sort on a phone) to sort by any column; search or filter by section, adviser or
+          whether the group is fully judged.
+        </p>
+        <DataGrid label="Results" columns={columns} rows={rows} rowName="group" searchPlaceholder="Search groups, sections and advisers" emptyText="No groups yet." />
 
         <div className="section-title">Adviser ranking</div>
         <p className="sub" style={{ marginTop: 0 }}>

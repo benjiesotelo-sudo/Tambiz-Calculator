@@ -33,6 +33,7 @@ vi.mock('@/lib/auth', () => {
 });
 
 import { acceptGroup, addMembers, correctScore, deleteGroup, excludeStudent, importAdvisers, includeStudent, removeMember, saveGroup, setMemberAbsent } from '@/app/admin/actions';
+import { removeGroupsTable, removeMembersTable, saveGroupsTable, saveMembersTable } from '@/app/admin/table-actions';
 import { POST as mailing } from '@/app/api/admin/events/[id]/mailing/route';
 import { one, query } from '@/lib/db';
 import { buildWorkbook } from '@/lib/excel-export';
@@ -107,6 +108,68 @@ describe('only a submitted sheet counts (14 September 2026)', () => {
     // Finalising names the sheet in progress and says it does not count.
     const { warnings } = await eventFinaliseChecks(report);
     expect(warnings.some((w) => /None of its scores count until they do/.test(w.text))).toBe(true);
+  });
+});
+
+describe('the Groups and Members tables save cell by cell (14 September 2026)', () => {
+  it('a typed new row becomes a group with the next code; a clash is refused on its cell; the row comes back as saved', async () => {
+    await setEvent('setup', false);
+    const res = await saveGroupsTable(event.id, [
+      { rowId: 'new:a', key: 'name', value: 'Table Venture' },
+      { rowId: 'new:a', key: 'section', value: 'ba-3a' },
+    ]);
+    const saved = res.rows[0];
+    expect(saved.error).toBeUndefined();
+    expect(saved.row!.cells).toMatchObject({ name: 'Table Venture', section: 'BA-3A', members: '0' });
+    expect(saved.row!.cells.code).toMatch(/^G\d\d$/);
+    const id = saved.row!.id;
+
+    const clash = await saveGroupsTable(event.id, [{ rowId: id, key: 'name', value: 'Kape  Kultura!' }]);
+    expect(clash.rows[0].errors?.name).toMatch(/same name as G01 Kape Kultura/);
+    expect(await one('SELECT name FROM tgroup WHERE id = $1', [id])).toEqual({ name: 'Table Venture' });
+
+    // Only the changed row is sent back, not the whole table.
+    const adviser = (await one<{ id: string; name: string }>('SELECT id, name FROM adviser WHERE event_id = $1 ORDER BY name LIMIT 1', [event.id]))!;
+    const moved = await saveGroupsTable(event.id, [{ rowId: id, key: 'adviser', value: adviser.id }]);
+    expect(moved.rows).toHaveLength(1);
+    expect(moved.rows[0].row!.cells.adviser).toBe(adviser.name);
+
+    expect((await removeGroupsTable(event.id, [id])).rows).toEqual([{ rowId: id, removed: true }]);
+  });
+
+  it('members are added by student number, never twice, and removals are refused after release while corrections stay open', async () => {
+    await setEvent('setup', false);
+    const group = (await one<{ id: string }>(`SELECT id FROM tgroup WHERE event_id = $1 AND code = 'G01'`, [event.id]))!;
+    const free = (await one<{ id: string; student_number: string }>(
+      'SELECT id, student_number FROM student s WHERE event_id = $1 AND NOT EXISTS (SELECT 1 FROM group_member m WHERE m.student_id = s.id) ORDER BY student_number LIMIT 1',
+      [event.id],
+    ))!;
+    const taken = (await one<{ student_number: string; code: string }>(
+      `SELECT s.student_number, g.code FROM group_member m JOIN student s ON s.id = m.student_id JOIN tgroup g ON g.id = m.group_id WHERE m.event_id = $1 AND g.id <> $2 LIMIT 1`,
+      [event.id, group.id],
+    ))!;
+
+    const added = await saveMembersTable(event.id, group.id, [
+      { rowId: 'new:1', key: 'student', value: ` ${free.student_number} ` },
+      { rowId: 'new:2', key: 'student', value: taken.student_number },
+    ]);
+    expect(added.rows[0].row).toMatchObject({ id: free.id, cells: { student: free.student_number, absent: 'Present' } });
+    expect(added.rows[1].errors?.student).toMatch(new RegExp(`is in ${taken.code} already`));
+
+    const absent = await saveMembersTable(event.id, group.id, [{ rowId: free.id, key: 'absent', value: 'absent' }]);
+    expect(absent.rows[0].row!.cells.absent).toBe('Absent');
+
+    await setEvent('finalised', true);
+    expect((await removeMembersTable(event.id, group.id, [free.id])).rows[0].error).toMatch(/released/);
+    const rename = await saveGroupsTable(event.id, [{ rowId: group.id, key: 'section', value: 'BA-9Z' }]);
+    expect(rename.rows[0].errors?.section).toMatch(/section cannot change/);
+    const g = (await one<{ name: string }>('SELECT name FROM tgroup WHERE id = $1', [group.id]))!;
+    const corrected = await saveGroupsTable(event.id, [{ rowId: group.id, key: 'name', value: `${g.name} Corp` }]);
+    expect(corrected.notice).toMatch(/result pages now show the new code and name/);
+    await saveGroupsTable(event.id, [{ rowId: group.id, key: 'name', value: g.name }]);
+
+    await setEvent('setup', false);
+    expect((await removeMembersTable(event.id, group.id, [free.id])).rows).toEqual([{ rowId: free.id, removed: true }]);
   });
 });
 

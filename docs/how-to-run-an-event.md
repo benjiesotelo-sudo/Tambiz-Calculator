@@ -16,6 +16,22 @@ You do not need to remember anything from last year.
 - **Event**: one year's Tambiz. Everything else belongs to an event.
 - **Half**: Defense (70% of a group's overall score) or Booth (30%).
 - **Sheet**: one judge's scores for one group in one half.
+- **Submitted**: a sheet the judge finished with **Mark group complete**. Only submitted sheets count.
+
+**How the tables work**
+
+Groups, a group's members, Class roll, Advisers, Judges, a group's scores, Grades and Results are all the same table, and it works like Excel. Learn it once:
+
+- Click a cell, or move to it with the arrow keys, and type. **Enter** goes down, **Tab** goes right (Shift+Tab left). **Esc** throws away what you typed in that cell.
+- **F2** or a double-click puts the cursor inside the cell's text, to change part of it.
+- **To add a row, type in the empty last row.** It saves once its required cells are filled; until then the label says what it still needs.
+- **To paste from Excel:** copy the cells in Excel, click the cell where the top-left one should go, and press **Ctrl+V** (⌘V on a Mac). A yellow bar says how many cells will change and how many rows will be added, and the new values are highlighted in the table. Press **Enter** to apply or **Esc** to cancel. Rows past the end become new rows.
+- **Shift** with the arrow keys selects several cells. **Ctrl+C** copies them to paste into Excel; **Delete** empties them; one value pasted over a selection fills all of it.
+- A cell with a list (an adviser, a student, Present or Absent) shows suggestions as you type. **Up** and **Down** choose, **Enter** takes it.
+- **Ctrl+Delete** removes the selected row, after you press **Enter** to confirm. **Ctrl+Enter** opens the row's own page, for example a group's.
+- **Ctrl+F** goes to the table's **Search** box, which finds any word in any column. The lists beside it filter by a column, for example Section or Adviser. Click a column heading to sort by it, again to reverse, a third time to go back.
+- **There is no Save button.** Every change saves by itself. The label at the top right of the table says **All changes saved**, **Saving…**, or in red how many cells were not saved. A red cell was refused: select it and the reason shows under the table. Fix it by typing again.
+- On a phone each row shows as a card, with **Sort** beside the filters. Tap a value to change it.
 
 ---
 
@@ -112,28 +128,32 @@ An adviser without an email or without a code gets no link.
 
 ## Part D. Create the groups and add their members
 
-Do this once for every group.
+**The groups.** The **Groups** tab is one table: Code, Business name, Section, Adviser and Members.
 
 1. Press the **Groups** tab.
-2. Scroll to **Add a group**.
-3. Check the **Code** (the app suggests the next one, such as `G09`).
-4. Type the **Section**, for example `BA-3A`.
-5. Type the **Business name**, for example `Kape Kultura`.
-6. Choose the **Adviser** from the list. (If the adviser is not in the list, type their name in **…or type a new adviser** instead.)
-7. Press **Add group**. The group's own page opens.
-8. Under **Add members from the class roll**, you see the students of that section who are not yet in any group.
-9. Tick each member of this group.
-10. Press **Add ticked students**. They appear under **Members**.
-11. If a member is in another section, type part of their name or student number in the search box, press **Search**, tick them, and press **Add ticked students**.
-12. Press **‹ Groups** to go back, and repeat from step 2 for the next group.
+2. Click the empty last row under **Business name** (it says *Add a group here*) and type the business name, for example `Kape Kultura`. Press **Tab**.
+3. Type the **Section**, for example `BA-3A`. Press **Tab**.
+4. Type the first letters of the adviser's name and press **Enter** to take the suggestion. An adviser not on the list is added as a new adviser when you press Enter.
+5. The row saves by itself. Leave **Code** empty and the app gives the next one, such as `G09`; or type your own code.
+6. Carry on in the next empty row.
+
+**Many groups at once:** in Excel, put the columns in the table's order (Code, Business name, Section, Adviser), copy the rows, click the first empty **Code** cell and press **Ctrl+V**. Check the yellow bar and press **Enter**. Leave the Code column out and paste into **Business name** instead to have codes given for you.
+
+To change a group, type over its cell. Every change to a group's code, name, section or adviser is listed at the bottom of the group's page under **Changes to this group's details**, with who made it and when. To delete a group that no judge has scored, select its row and press **Ctrl+Delete**, then **Enter**.
+
+**The members.** Do this for every group.
+
+1. On the **Groups** table, click the business name (or select the row and press **Ctrl+Enter**). The group's page opens.
+2. In the empty last row of **Members**, type a student number or part of a name. The suggestions are students who are in no group yet, this group's section first. Press **Enter** to take one. The student's name, section and email fill in from the class roll.
+3. Carry on in the next empty row. To add several at once, copy a column of student numbers from Excel, click the empty **Student No.** cell and press **Ctrl+V**, then **Enter**.
+4. To remove a member, select their row and press **Ctrl+Delete**, then **Enter**.
+5. Press **‹ Groups** to go back.
 
 Rules the app enforces for you:
 
-- A student can belong to only one group. If you tick someone already in another group, the app says which group and adds nobody.
+- A student can belong to only one group. If you type someone already in another group, their cell turns red and says which group; nobody is added.
 - Two groups cannot share a code, or a name that differs only in spaces or punctuation ("PAYONG PALAY" and "PayongPalay" count as the same).
-- Members are always chosen from the roll. They are never typed.
-
-To fix a mistake: open the group, press **Remove** beside a member, or change the details under **Group details** and press **Save group**. Every change to a group's code, name, section or adviser is listed at the bottom of the group's page under **Changes to this group's details**, with who made it and when.
+- Members are always chosen from the roll. A student number that is not on the roll is refused.
 
 **Final check**
 
@@ -261,7 +281,7 @@ What this does: judges can no longer change any score. Results and grades stop m
 
 A blank score is never counted as zero. Anything nobody scored is left out, and a group that is not fully judged reads **Incomplete** and has no rank. A judge who means zero types `0`, and that counts.
 
-**A student absent from the defense** gets no grade from the app. On the **Grades** tab they show **Absent**, and in the workbook their Final Grade and Letter Grade are blank with the note "Absent from the defense: grade to be entered by the coordinator". Enter their grade yourself in the official encoding system. You can also mark a student absent, or not absent, from the group's page.
+**A student absent from the defense** gets no grade from the app. On the **Grades** tab they show **Absent**, and in the workbook their Final Grade and Letter Grade are blank with the note "Absent from the defense: grade to be entered by the coordinator". Enter their grade yourself in the official encoding system. You can also mark a student absent, or present again, on the group's page: type `Absent` or `Present` in their **At the defense** cell.
 
 If you closed too early, press **Reopen judging** on the same page. Judging can be reopened until results are released.
 
@@ -278,8 +298,12 @@ How scores are worked out:
 - **Ties.** Groups are ranked on the percentages you see. When two groups show the same category percentage, the one with the higher overall score goes first; they share a place only when both are equal. This rule is the same on the leaderboard and in the table.
 
 1. Press the **Results** tab.
-2. **Top 10 leaderboard** shows one card per category plus **Overall**. Groups that still share a place are listed alphabetically. Every group tied at 10th place is listed, so in a rare year a card shows eleven or more names; that is correct, and it matches what each group's own results page says about being in the top 10.
-3. **Every group by category** shows each group's overall percentage and rank at the top right (or **Incomplete**), its Defense and Booth halves, and every category percentage with its rank.
+2. **Top 10 for the awarding** shows one small card per category plus **Overall**: what is read out at the awarding. Groups that still share a place are listed alphabetically. Every group tied at 10th place is listed, so in a rare year a card shows eleven or more names; that is correct, and it matches what each group's own results page says about being in the top 10.
+3. **Every group** is a table of all the groups, one row each: the group, its section and adviser, each category's percentage with its rank after the dot (for example `91.00 · 1`), the **Overall**, its **Rank**, and whether the group is **Complete** or **Incomplete**. It starts in overall order.
+   - Click a column heading to sort by it, for example **Paper** to see the paper ranking.
+   - Type in **Search** to find a group, or use the **Sec**, **Adviser** and **Judged** lists to show only some groups.
+   - A category that is not fully scored shows its percentage with *incomplete* and no rank; nothing scored shows a dash.
+   - Click a group's name to open its page.
 4. Press the **Grades** tab. Students are grouped by section. Each card shows:
    - **Member total**: for Presentation /20, Communication /40 and Q&A /40, the average across the defense judges who scored it, added up (out of 100). A field one judge left blank is not counted as zero. Until every field has at least one judge's score the total shows a dash (—) and reads **(incomplete)** here; in the workbook the cell is left empty, with the note beside it saying why. A partial total is never scaled up to 100.
    - **Group overall**: the group's overall percentage.
@@ -329,7 +353,7 @@ How a link works:
 
 Before you start: judging is closed (Part I), every adviser has a code (Part C), and you have checked the grades (Part J). **After release, scores can no longer be corrected or cleared, judging cannot be reopened, and a group cannot be deleted.**
 
-After release you can still correct a mistake in a group's **code**, **name** or **adviser**, on the group's page or with the adviser import. The app says what the change affects the moment you make it: a new code or name shows on the members' and adviser's pages; a new adviser changes both advisers' pages and the adviser ranking, and the mailing sheet already sent no longer matches (give an adviser who had no link one with **Download links for the people with none yet**). Every change is recorded with your name and the time on the group's page, so nothing changes out of sight.
+After release you can still correct a mistake in a group's **code**, **name** or **adviser**, by typing over it on the **Groups** table or with the adviser import. The app says what the change affects the moment you make it: a new code or name shows on the members' and adviser's pages; a new adviser changes both advisers' pages and the adviser ranking, and the mailing sheet already sent no longer matches (give an adviser who had no link one with **Download links for the people with none yet**). Every change is recorded with your name and the time on the group's page, so nothing changes out of sight.
 
 1. Press the **Release** tab. If something was changed after judging closed so that an item **Needs you** again (for example you pressed **Undo** on an accepted group, cleared a group's only score, or removed a student from a group), the tab says how many items need you instead of showing the release button. They are listed under **Close judging** on the **Progress** tab; settle them as in Part I, then come back.
 2. Read **Check before sending**. It lists students with no email, advisers with no email or code, and any email that contains the person's student number or code. Fix what you can on the Class roll and Advisers tabs.

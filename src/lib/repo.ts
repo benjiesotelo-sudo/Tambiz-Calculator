@@ -79,7 +79,8 @@ export async function listGroups(eventId: string) {
 
 export async function getGroup(eventId: string, groupId: string) {
   return one<GroupRow>(
-    `SELECT g.*, a.name AS adviser_name, 0 AS member_count FROM tgroup g LEFT JOIN adviser a ON a.id = g.adviser_id WHERE g.event_id = $1 AND g.id = $2`,
+    `SELECT g.*, a.name AS adviser_name, (SELECT count(*)::int FROM group_member m WHERE m.group_id = g.id) AS member_count
+     FROM tgroup g LEFT JOIN adviser a ON a.id = g.adviser_id WHERE g.event_id = $1 AND g.id = $2`,
     [eventId, groupId],
   );
 }
