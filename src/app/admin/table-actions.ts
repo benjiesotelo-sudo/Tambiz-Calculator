@@ -520,9 +520,8 @@ export async function saveScoresTable(eventId: string, groupId: string, half: Ha
   const show = (v: number | null) => (v === null ? 'blank' : fmtScore(v));
   // Each change is one box: the row is the box (c:… or m:…), the column is the judge's sheet.
   for (const ch of changes) {
-    const res = await applyCorrection(event, acc.id, ch.key, ch.rowId, ch.value, reason);
-    const wrongPlace = res.group !== undefined && (res.group !== group.id || res.half !== half);
-    if (!res.ok || wrongPlace) errors.set(ch.rowId, { ...(errors.get(ch.rowId) ?? {}), [ch.key]: wrongPlace ? 'That score belongs to another group.' : res.ok ? '' : res.error });
+    const res = await applyCorrection(event, acc.id, ch.key, ch.rowId, ch.value, reason, { group: group.id, half });
+    if (!res.ok) errors.set(ch.rowId, { ...(errors.get(ch.rowId) ?? {}), [ch.key]: res.error });
     else done.push(`${res.label} for ${res.judge}: ${show(res.from)} → ${show(res.to)}`);
   }
   const [detail, members] = await Promise.all([groupScoreDetail(event, group.id, half), half === 'defense' ? groupMembers(group.id) : Promise.resolve([])]);

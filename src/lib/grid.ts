@@ -199,6 +199,95 @@ export function resolveCell(column: GridColumn, text: string, options: GridOptio
   return { value: t, label: t };
 }
 
+// ── completing a typed choice, as Excel's AutoComplete does ─────────
+
+/** A choice cell while typing: what was typed, and the match completed after it, if any. */
+export interface Completion {
+  /** What was typed. */
+  typed: string;
+  /** The option completed in the cell, or null when the cell holds only what was typed. */
+  option: GridOption | null;
+  /** The option's place among the matches for what was typed; -1 when nothing is completed. */
+  index: number;
+  /** What the cell shows, and so exactly what Enter or Tab saves. */
+  text: string;
+  /** The completed part of the text, shown highlighted, runs from start to end; they are equal when nothing is completed. */
+  start: number;
+  end: number;
+}
+
+/** Options typed text can complete to, best first: the exact label, labels starting with it, then labels or hints containing it. */
+export function completionMatches(typed: string, options: GridOption[]): GridOption[] {
+  const t = norm(typed);
+  if (!t) return options;
+  const exact: GridOption[] = [];
+  const starts: GridOption[] = [];
+  const contains: GridOption[] = [];
+  for (const o of options) {
+    const label = norm(o.label);
+    if (label === t) exact.push(o);
+    else if (label.startsWith(t)) starts.push(o);
+    else if (norm(`${o.label} ${o.hint ?? ''}`).includes(t)) contains.push(o);
+  }
+  return [...exact, ...starts, ...contains];
+}
+
+/** The cell holding only what was typed. */
+export function plainCompletion(typed: string): Completion {
+  return { typed, option: null, index: -1, text: typed, start: typed.length, end: typed.length };
+}
+
+/**
+ * The cell with the match at `index` completed after what was typed. A label starting with the typed text is shown
+ * whole; any other match, for example a surname found in a student's name, follows an arrow with its hint.
+ */
+export function completeWith(typed: string, matches: GridOption[], index: number): Completion {
+  const option = matches[index];
+  if (!option) return plainCompletion(typed);
+  const text = option.label.toLowerCase().startsWith(typed.toLowerCase())
+    ? option.label
+    : `${typed}${/\s$/.test(typed) ? '' : ' '}→ ${option.label}${option.hint ? ` · ${option.hint}` : ''}`;
+  return { typed, option, index, text, start: typed.length, end: text.length };
+}
+
+/** What typing leaves in a choice cell: typing at the end completes the best match; deleting, or typing mid-text, never does. */
+export function typeCompletion(typed: string, options: GridOption[], completes: boolean): Completion {
+  return completes && typed.trim() ? completeWith(typed, completionMatches(typed, options), 0) : plainCompletion(typed);
+}
+
+/** Down (step 1) or Up (step -1): the next or previous match, completed the same way. */
+export function stepCompletion(c: Completion, matches: GridOption[], step: 1 | -1): Completion {
+  const n = matches.length;
+  if (!n) return c;
+  const index = c.index < 0 ? (step > 0 ? 0 : n - 1) : (c.index + step + n) % n;
+  return completeWith(c.typed, matches, index);
+}
+
+/** What finishing a cell saves: the completed option exactly as shown, or else what was typed, checked as a paste is. */
+export function resolveCompletion(column: GridColumn, c: Completion, options: GridOption[] = column.options ?? [], rowMax?: number): Resolved {
+  return c.option ? { value: c.option.value, label: c.option.label } : resolveCell(column, c.typed, options, rowMax);
+}
+
+// ── column widths ───────────────────────────────────────────────────
+
+const DEFAULT_WIDTH = 'minmax(6rem, 1fr)';
+
+/**
+ * The CSS grid tracks for the columns. Each column keeps its minimum width while the table has room; in a narrower
+ * table every minimum shrinks by the same share, so the columns always fit and none is cut off.
+ */
+export function columnTracks(columns: GridColumn[]): string {
+  const tracks = columns.map((c) => {
+    const width = (c.width ?? DEFAULT_WIDTH).trim();
+    const fixed = /^([\d.]+)rem$/.exec(width);
+    if (fixed) return { min: Number(fixed[1]), max: width, width };
+    const range = /^minmax\(\s*([\d.]+)rem\s*,\s*([^,()]+?)\s*\)$/.exec(width);
+    return range ? { min: Number(range[1]), max: range[2], width } : { min: 0, max: width, width };
+  });
+  const total = tracks.reduce((n, t) => n + t.min, 0);
+  return tracks.map((t) => (t.min ? `minmax(min(${t.min}rem, ${Math.floor((t.min / total) * 100000) / 1000}%), ${t.max})` : t.width)).join(' ');
+}
+
 // ── search, filter, sort ────────────────────────────────────────────
 
 /** The label a filter uses for an empty cell. */

@@ -12,13 +12,23 @@ export type CorrectionResult =
   | { ok: true; group: string; half: Half; label: string; judge: string; from: number | null; to: number | null }
   | { ok: false; error: string; group?: string; half?: Half };
 
-export async function applyCorrection(event: EventRow, accountId: string, sheetId: string, key: string, raw: string, reasonText: string): Promise<CorrectionResult> {
+export async function applyCorrection(
+  event: EventRow,
+  accountId: string,
+  sheetId: string,
+  key: string,
+  raw: string,
+  reasonText: string,
+  /** The group and half the correction was made on; a sheet from anywhere else is refused before anything is written. */
+  expected?: { group: string; half: Half },
+): Promise<CorrectionResult> {
   const sheet = await one<{ id: string; group_id: string; half: Half; judge_name: string }>(
     `SELECT s.id, s.group_id, s.half, a.display_name AS judge_name FROM score_sheet s JOIN account a ON a.id = s.judge_id WHERE s.id = $1 AND s.event_id = $2`,
     [sheetId, event.id],
   );
   if (!sheet) return { ok: false, error: 'Score sheet not found.' };
   const where = { group: sheet.group_id, half: sheet.half };
+  if (expected && (expected.group !== sheet.group_id || expected.half !== sheet.half)) return { ok: false, ...where, error: 'That score belongs to another group.' };
   if (event.released_at) return { ok: false, ...where, error: 'Results have been released, so scores can no longer be corrected.' };
   const reason = reasonText.replace(/\s+/g, ' ').trim().slice(0, 200);
   if (reason.length < 3) return { ok: false, ...where, error: 'Type a short reason for the correction, for example “Judge confirmed 18, typed 13”.' };

@@ -5,21 +5,27 @@
 // Changes save by themselves in the background, with one indicator for the whole table. Logic that needs no browser
 // lives in lib/grid.ts; the saving is the page's server action.
 
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   canEditCell,
+  columnTracks,
+  completeWith,
+  completionMatches,
   filterRows,
   filterValues,
   isNewRow,
   NEW_ROW,
   parseClipboard,
+  plainCompletion,
   planPaste,
-  resolveCell,
+  resolveCompletion,
   sortRows,
-  suggestOptions,
+  stepCompletion,
   toClipboard,
+  typeCompletion,
   type CellChange,
+  type Completion,
   type GridColumn,
   type GridOption,
   type GridResult,
@@ -35,13 +41,12 @@ interface LocalRow {
   row: GridRow;
 }
 
-interface Editing {
+/** A cell being typed in; its text, and for a choice the match completed in it, come from Completion. */
+interface Editing extends Completion {
   key: string;
   col: string;
-  text: string;
   /** 'enter': started by typing, so the arrow keys finish the cell and move (as in Excel). 'edit': F2 or double-click, so they move the cursor. */
   mode: 'enter' | 'edit';
-  pick: number;
 }
 
 export interface RowAction {
@@ -103,9 +108,13 @@ export function DataGrid(props: DataGridProps) {
   const [note, setNote] = useState('');
   const [hint, setHint] = useState<string | null>(null);
 
-  // Latest values for callbacks that must keep one identity.
+  // Latest values for callbacks that must keep one identity. The rows change only through updateLocal, which keeps
+  // localRef current at once, so a save sent before React redraws still sees every row and every saved id.
   const localRef = useRef(local);
-  localRef.current = local;
+  const updateLocal = useCallback((change: (old: LocalRow[]) => LocalRow[]) => {
+    localRef.current = change(localRef.current);
+    setLocal(localRef.current);
+  }, []);
   const noteText = useRef(note);
   noteText.current = note;
   const editingRef = useRef(editing);
@@ -116,8 +125,8 @@ export function DataGrid(props: DataGridProps) {
   useEffect(() => {
     if (firstRows.current === props.rows) return;
     firstRows.current = props.rows;
-    setLocal((old) => [...props.rows.map((row) => ({ key: row.id, row })), ...old.filter((l) => isNewRow(l.row.id))]);
-  }, [props.rows]);
+    updateLocal((old) => [...props.rows.map((row) => ({ key: row.id, row })), ...old.filter((l) => isNewRow(l.row.id))]);
+  }, [props.rows, updateLocal]);
 
   const colIndex = useMemo(() => new Map(columns.map((c, i) => [c.key, i])), [columns]);
   const byKey = useMemo(() => new Map(local.map((l) => [l.key, l])), [local]);
@@ -180,7 +189,7 @@ export function DataGrid(props: DataGridProps) {
   const applyResult = useCallback(
     (res: GridResult, sent: { key: string; rowId: string; cols: string[] }[]) => {
       const keyOfRowId = new Map(sent.map((s) => [s.rowId, s.key]));
-      setLocal((old) => {
+      updateLocal((old) => {
         let next = old;
         for (const s of res.rows) {
           const key = keyOfRowId.get(s.rowId) ?? old.find((l) => l.row.id === s.rowId)?.key;
@@ -229,7 +238,7 @@ export function DataGrid(props: DataGridProps) {
       if (res.secret) setSecret(res.secret);
       if (res.refresh) router.refresh();
     },
-    [router],
+    [router, updateLocal],
   );
 
   const flush = useCallback(async () => {
@@ -349,7 +358,7 @@ export function DataGrid(props: DataGridProps) {
         target = `${NEW_ROW}${Date.now().toString(36)}-${++counter.current}`;
         const cells = Object.fromEntries(real.map((v) => [v.col, v.label]));
         const newKey = target;
-        setLocal((old) => [...old, { key: newKey, row: { id: newKey, cells } }]);
+        updateLocal((old) => [...old, { key: newKey, row: { id: newKey, cells } }]);
         setAdded((old) => [...old, newKey]);
         newValues.current.set(newKey, Object.fromEntries(real.map((v) => [v.col, v.value])));
         pendingNew.current.add(newKey);
@@ -358,7 +367,7 @@ export function DataGrid(props: DataGridProps) {
       }
       const l = localRef.current.find((x) => x.key === key);
       if (!l) return null;
-      setLocal((old) => old.map((x) => (x.key === key ? { key, row: { ...x.row, cells: { ...x.row.cells, ...Object.fromEntries(values.map((v) => [v.col, v.label])) } } } : x)));
+      updateLocal((old) => old.map((x) => (x.key === key ? { key, row: { ...x.row, cells: { ...x.row.cells, ...Object.fromEntries(values.map((v) => [v.col, v.label])) } } } : x)));
       if (isNewRow(l.row.id) && !sendingNew.current.has(key)) {
         const vals = { ...(newValues.current.get(key) ?? {}) };
         for (const v of values) vals[v.col] = v.value;
@@ -372,21 +381,21 @@ export function DataGrid(props: DataGridProps) {
       scheduleFlush();
       return key;
     },
-    [save, scheduleFlush, props.note],
+    [save, scheduleFlush, props.note, updateLocal],
   );
 
   /** Finishes typing in a cell: checks it, shows it and queues it to save. */
   const commit = useCallback(
-    (key: string, col: string, text: string): string | null => {
+    (key: string, col: string, entry: Completion): string | null => {
       const column = columns[colIndex.get(col)!];
       const row = key === BLANK ? null : (localRef.current.find((l) => l.key === key)?.row ?? null);
-      const resolved = resolveCell(column, text, optionsFor(column, key), row?.max);
+      const resolved = resolveCompletion(column, entry, optionsFor(column, key), row?.max);
       if ('error' in resolved) {
         if (key === BLANK) {
           setHint(resolved.error);
           return null;
         }
-        setLocal((old) => old.map((x) => (x.key === key ? { key, row: { ...x.row, cells: { ...x.row.cells, [col]: text.trim() } } } : x)));
+        updateLocal((old) => old.map((x) => (x.key === key ? { key, row: { ...x.row, cells: { ...x.row.cells, [col]: entry.typed.trim() } } } : x)));
         setCellError(key, col, resolved.error);
         return key;
       }
@@ -395,7 +404,7 @@ export function DataGrid(props: DataGridProps) {
       setCellError(key, col, null);
       return writeCells(key, [{ col, label: resolved.label, value: resolved.value }]);
     },
-    [columns, colIndex, errors, optionsFor, setCellError, writeCells],
+    [columns, colIndex, errors, optionsFor, setCellError, writeCells, updateLocal],
   );
 
   // ── moving ────────────────────────────────────────────────────
@@ -464,9 +473,10 @@ export function DataGrid(props: DataGridProps) {
         return;
       }
       setHint(null);
-      setEditing({ key, col, text: text ?? row?.cells[col] ?? '', mode, pick: text === null ? -1 : 0 });
+      const entry = column.type === 'choice' && text ? typeCompletion(text, optionsFor(column, key), true) : plainCompletion(text ?? row?.cells[col] ?? '');
+      setEditing({ key, col, mode, ...entry });
     },
-    [columns, colIndex, save, props.note],
+    [columns, colIndex, save, props.note, optionsFor],
   );
 
   const endEdit = useCallback(
@@ -476,7 +486,7 @@ export function DataGrid(props: DataGridProps) {
       if (!e) return;
       editingRef.current = null;
       setEditing(null);
-      const key = how === 'commit' ? (commit(e.key, e.col, picked ? picked.label : e.text) ?? e.key) : e.key;
+      const key = how === 'commit' ? (commit(e.key, e.col, picked ? completeWith(e.typed, [picked], 0) : e) ?? e.key) : e.key;
       focusGrid();
       const col = move?.col ?? e.col;
       if (key !== e.key && !keys.includes(key)) {
@@ -503,7 +513,7 @@ export function DataGrid(props: DataGridProps) {
     if (!l) return;
     const name = (props.rowName && l.row.cells[props.rowName]) || 'this row';
     if (isNewRow(l.row.id)) {
-      setLocal((old) => old.filter((x) => x.key !== l.key));
+      updateLocal((old) => old.filter((x) => x.key !== l.key));
       pendingNew.current.delete(l.key);
       newValues.current.delete(l.key);
       countWaiting();
@@ -522,7 +532,7 @@ export function DataGrid(props: DataGridProps) {
         }
       },
     });
-  }, [remove, active, byKey, props.rowName, props.removeLabel, applyResult, countWaiting]);
+  }, [remove, active, byKey, props.rowName, props.removeLabel, applyResult, countWaiting, updateLocal]);
 
   const runAction = useCallback(
     (a: RowAction) => {
@@ -749,35 +759,33 @@ export function DataGrid(props: DataGridProps) {
     }
   };
 
-  const onEditorKey = (e: React.KeyboardEvent<HTMLInputElement>, suggestions: GridOption[]) => {
+  const onEditorKey = (e: React.KeyboardEvent<HTMLInputElement>, matches: GridOption[]) => {
     if (!editing) return;
     e.stopPropagation();
-    const pick = editing.pick >= 0 && editing.pick < suggestions.length ? suggestions[editing.pick] : undefined;
-    const choosing = suggestions.length > 0;
     switch (e.key) {
       case 'Enter': {
         e.preventDefault();
         const col = tabStart.current ?? editing.col;
         tabStart.current = null;
-        endEdit('commit', { dr: e.shiftKey ? -1 : 1, dc: 0, col }, pick);
+        endEdit('commit', { dr: e.shiftKey ? -1 : 1, dc: 0, col });
         return;
       }
       case 'Tab':
         e.preventDefault();
         if (tabStart.current === null) tabStart.current = editing.col;
-        endEdit('commit', { dr: 0, dc: e.shiftKey ? -1 : 1, wrap: true }, pick);
+        endEdit('commit', { dr: 0, dc: e.shiftKey ? -1 : 1, wrap: true });
         return;
       case 'Escape':
         e.preventDefault();
-        endEdit('cancel');
+        // The first Esc takes the completion away, keeping what was typed; the next leaves the cell as it was.
+        if (editing.option) setEditing({ ...editing, ...plainCompletion(editing.typed) });
+        else endEdit('cancel');
         return;
       case 'ArrowDown':
       case 'ArrowUp':
-        if (choosing) {
+        if (matches.length) {
           e.preventDefault();
-          const n = suggestions.length;
-          const next = e.key === 'ArrowDown' ? (editing.pick + 1) % n : (editing.pick - 1 + n) % n;
-          setEditing({ ...editing, pick: next });
+          setEditing({ ...editing, ...stepCompletion(editing, matches, e.key === 'ArrowDown' ? 1 : -1) });
           return;
         }
         if (editing.mode === 'enter') {
@@ -829,7 +837,7 @@ export function DataGrid(props: DataGridProps) {
   const api = useRef({
     down: (_key: string, _col: string, _e: React.MouseEvent) => {},
     double: (_key: string, _col: string) => {},
-    setText: (_t: string) => {},
+    setText: (_t: string, _completes: boolean) => {},
     editorKey: (_e: React.KeyboardEvent<HTMLInputElement>, _s: GridOption[]) => {},
     editorBlur: () => {},
     editorPaste: (_e: React.ClipboardEvent<HTMLInputElement>) => {},
@@ -848,7 +856,11 @@ export function DataGrid(props: DataGridProps) {
     if (touch.current) startEdit(key, col, null, 'edit');
   };
   api.current.double = (key, col) => startEdit(key, col, null, 'edit');
-  api.current.setText = (text) => editing && setEditing({ ...editing, text, pick: text ? 0 : -1 });
+  api.current.setText = (text, completes) => {
+    if (!editing) return;
+    const column = columns[colIndex.get(editing.col) ?? 0];
+    setEditing({ ...editing, ...(column.type === 'choice' ? typeCompletion(text, optionsFor(column, editing.key), completes) : plainCompletion(text)) });
+  };
   api.current.editorKey = onEditorKey;
   api.current.editorBlur = () => {
     if (editing) endEdit('commit');
@@ -858,7 +870,7 @@ export function DataGrid(props: DataGridProps) {
   api.current.options = (c, key) => optionsFor(c, key);
 
   // ── drawing ───────────────────────────────────────────────────
-  const template = columns.map((c) => c.width ?? 'minmax(6rem, 1fr)').join(' ');
+  const template = useMemo(() => columnTracks(columns), [columns]);
   const firstEditable = (columns.find((c) => c.editable && c.required) ?? columns.find((c) => c.editable))?.key;
   const errorCount = [...errors.values()].reduce((n, m) => n + Object.keys(m).length, 0) + Object.keys(rowErrors).length;
   const newWaiting = [...pendingNew.current].filter((k) => missingFor(k).length);
@@ -1164,7 +1176,7 @@ function selectionCols(sel: [number, number, number, number] | null, r: number, 
 type Api = React.RefObject<{
   down: (key: string, col: string, e: React.MouseEvent) => void;
   double: (key: string, col: string) => void;
-  setText: (t: string) => void;
+  setText: (t: string, completes: boolean) => void;
   editorKey: (e: React.KeyboardEvent<HTMLInputElement>, s: GridOption[]) => void;
   editorBlur: () => void;
   editorPaste: (e: React.ClipboardEvent<HTMLInputElement>) => void;
@@ -1249,14 +1261,20 @@ function CellEditor({ column, editing, rowKey, api }: { column: GridColumn; edit
     const el = ref.current;
     if (!el) return;
     el.focus({ preventScroll: true });
-    const end = el.value.length;
-    el.setSelectionRange(end, end);
+    el.setSelectionRange(editing.start, editing.end);
     // Only when the editor opens.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  const suggestions = column.type === 'choice' ? suggestOptions(editing.text, api.current.options(column, rowKey)) : [];
-  const typed = editing.text.trim();
-  const newHint = column.newHint && typed && !suggestions.length ? column.newHint.replace('{text}', typed) : null;
+  // A completed match is shown selected, so typing on replaces it, as in Excel.
+  useLayoutEffect(() => {
+    if (editing.start !== editing.end) ref.current?.setSelectionRange(editing.start, editing.end);
+  }, [editing.text, editing.start, editing.end]);
+  const matches = column.type === 'choice' ? completionMatches(editing.typed, api.current.options(column, rowKey)) : [];
+  // The list under the cell shows eight matches, moving along with Down and Up.
+  const from = Math.max(0, editing.index - 7);
+  const shown = matches.slice(from, from + 8);
+  const typed = editing.typed.trim();
+  const newHint = column.newHint && typed && !matches.length ? column.newHint.replace('{text}', typed) : null;
   return (
     <>
       <input
@@ -1267,19 +1285,24 @@ function CellEditor({ column, editing, rowKey, api }: { column: GridColumn; edit
         autoComplete="off"
         spellCheck={false}
         inputMode={column.type === 'number' ? 'decimal' : undefined}
-        onChange={(e) => api.current.setText(e.target.value)}
-        onKeyDown={(e) => api.current.editorKey(e, suggestions)}
+        onChange={(e) => {
+          const el = e.target;
+          const kind = (e.nativeEvent as InputEvent).inputType;
+          const inserted = kind ? kind.startsWith('insert') : el.value.length > editing.typed.length;
+          api.current.setText(el.value, inserted && el.selectionEnd === el.value.length);
+        }}
+        onKeyDown={(e) => api.current.editorKey(e, matches)}
         onBlur={() => api.current.editorBlur()}
         onPaste={(e) => api.current.editorPaste(e)}
         onMouseDown={(e) => e.stopPropagation()}
       />
-      {suggestions.length || newHint ? (
+      {shown.length || newHint ? (
         <ul className="dg-suggest" role="listbox" aria-label={`${column.label} choices`}>
-          {suggestions.map((o, i) => (
+          {shown.map((o, i) => (
             <li
               key={o.value}
               role="option"
-              aria-selected={i === editing.pick}
+              aria-selected={from + i === editing.index}
               onMouseDown={(e) => {
                 e.preventDefault();
                 e.stopPropagation();

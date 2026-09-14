@@ -43,6 +43,7 @@ import {
   saveJudgesTable,
   saveMembersTable,
   saveRollTable,
+  saveScoresTable,
 } from '@/app/admin/table-actions';
 import { POST as mailing } from '@/app/api/admin/events/[id]/mailing/route';
 import { one, query } from '@/lib/db';
@@ -346,6 +347,32 @@ describe('a score corrected to blank keeps its trace (decision 7)', () => {
     expect((await correct('0', 'Judge confirmed a zero')).ok).toMatch(/blank → 0\.$/);
     expect((await eventReport(event)).corrections.get(v.sheet_id)).toContainEqual({ key, value: 0, judgeValue: judgeGave, reason: 'Judge confirmed a zero' });
     expect((await groupScoreDetail(event, v.group_id, 'defense')).removed.get(v.sheet_id)?.has(key) ?? false).toBe(false);
+  });
+});
+
+describe('the scores table corrects only its own group and half (14 September 2026)', () => {
+  it('a score from another group or half is refused before anything is written or recorded', async () => {
+    await setEvent('judging', false);
+    const v = (await one<{ sheet_id: string; criterion_key: string; value: number; group_id: string }>(
+      `SELECT v.sheet_id, v.criterion_key, v.value, s.group_id FROM score_value v JOIN score_sheet s ON s.id = v.sheet_id
+       WHERE s.event_id = $1 AND s.half = 'defense' AND s.status = 'complete' AND v.corrected_by IS NULL ORDER BY v.sheet_id DESC, v.criterion_key LIMIT 1`,
+      [event.id],
+    ))!;
+    const other = (await one<{ id: string }>('SELECT id FROM tgroup WHERE event_id = $1 AND id <> $2 ORDER BY code LIMIT 1', [event.id, v.group_id]))!;
+    const key = `c:${v.criterion_key}`;
+    const state = async () => ({
+      value: Number((await one<{ value: number }>('SELECT value FROM score_value WHERE sheet_id = $1 AND criterion_key = $2', [v.sheet_id, v.criterion_key]))!.value),
+      logged: Number((await one<{ n: string }>(`SELECT count(*) AS n FROM change_log WHERE action = 'score.correct' AND detail->>'sheet' = $1`, [v.sheet_id]))!.n),
+    });
+    const before = await state();
+    const to = Number(v.value) === 0 ? '1' : '0';
+
+    const elsewhere = await saveScoresTable(event.id, other.id, 'defense', [{ rowId: key, key: v.sheet_id, value: to }], 'Hand-built request');
+    expect(elsewhere.rows[0].errors).toEqual({ [v.sheet_id]: 'That score belongs to another group.' });
+    expect(elsewhere.notice).toBeUndefined();
+    const otherHalf = await saveScoresTable(event.id, v.group_id, 'booth', [{ rowId: key, key: v.sheet_id, value: to }], 'Hand-built request');
+    expect(otherHalf.notice).toBeUndefined();
+    expect(await state()).toEqual(before);
   });
 });
 
