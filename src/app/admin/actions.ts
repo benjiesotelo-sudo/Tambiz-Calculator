@@ -8,11 +8,12 @@ import { newId, one, query, transaction, type Statement } from '@/lib/db';
 import { adviserChangeWarning, adviserWord, editGroup, removeGroup } from '@/lib/group-edit';
 import { ADVISER_COLUMNS, ImportError, parseWorkbook, ROLL_COLUMNS } from '@/lib/excel-import';
 import { generatePassword, hashPassword } from '@/lib/passwords';
-import { eventFinaliseChecks, eventReport, getEvent, getGroup, listEvents, removedScores } from '@/lib/repo';
-import { criterionLabel, findCriterion, HALVES, rubricForNewEvent, withCriterionWording } from '@/lib/rubric';
+import { eventFinaliseChecks, eventReport, getEvent, getGroup, listEvents } from '@/lib/repo';
+import { HALVES, rubricForNewEvent, withCriterionWording } from '@/lib/rubric';
 import { nameKey } from '@/lib/seed';
 import { emailGivesAway, makeAdviserCode, MAX_TRIES, normaliseCheck } from '@/lib/link-rules';
-import { checkScore, fmtScore } from '@/lib/sheet';
+import { applyCorrection } from '@/lib/score-correct';
+import { fmtScore } from '@/lib/sheet';
 
 const s = (fd: FormData, k: string) => String(fd.get(k) ?? '').trim();
 
@@ -152,69 +153,11 @@ export async function setMemberAbsent(fd: FormData) {
 export async function correctScore(fd: FormData) {
   const acc = await requireAdmin();
   const event = await eventOr404(s(fd, 'eventId'));
-  const sheet = await one<{ id: string; group_id: string; half: 'defense' | 'booth'; judge_name: string }>(
-    `SELECT s.id, s.group_id, s.half, a.display_name AS judge_name FROM score_sheet s JOIN account a ON a.id = s.judge_id WHERE s.id = $1 AND s.event_id = $2`,
-    [s(fd, 'sheetId'), event.id],
-  );
-  if (!sheet) back(`/admin/events/${event.id}/progress`, { error: 'Score sheet not found.' });
-  const path = `/admin/events/${event.id}/groups/${sheet.group_id}/scores?half=${sheet.half}`;
-  if (event.released_at) back(path, { error: 'Results have been released, so scores can no longer be corrected.' });
-  const reason = reasonOf(fd);
-  if (reason.length < 3) back(path, { error: 'Type a short reason for the correction, for example “Judge confirmed 18, typed 13”.' });
-
-  const key = s(fd, 'key');
-  const [kind, a, b] = key.split(':');
-  let max: number | null = null;
-  let label = '';
-  if (kind === 'c') {
-    const crit = findCriterion(event.rubric, sheet.half, `${a}:${b}`);
-    if (crit) {
-      max = crit.max;
-      label = `${crit.category.name} ${crit.index + 1} (${criterionLabel(crit.category, crit.index)})`;
-    }
-  } else if (kind === 'm' && sheet.half === 'defense') {
-    const field = event.rubric.memberFields.find((f) => f.key === b);
-    const member = await one<{ first_name: string; surname: string }>(
-      'SELECT s.first_name, s.surname FROM group_member m JOIN student s ON s.id = m.student_id WHERE m.group_id = $1 AND m.student_id = $2',
-      [sheet.group_id, a],
-    );
-    if (field && member) {
-      max = field.max;
-      label = `${member.first_name} ${member.surname}, ${field.name}`;
-    }
-  }
-  if (max === null) back(path, { error: 'Unknown score box.' });
-  const check = checkScore(s(fd, 'value'), max);
-  if (check.state === 'error') back(path, { error: `${label}: ${check.msg}` });
-  const to = check.state === 'ok' ? check.n : null;
-
-  const table = kind === 'c' ? { name: 'score_value', where: 'sheet_id = $1 AND criterion_key = $2', ids: [sheet.id, `${a}:${b}`] } : { name: 'member_score', where: 'sheet_id = $1 AND student_id = $2 AND field = $3', ids: [sheet.id, a, b] };
-  const current = await one<{ value: number; corrected_by: string | null; judge_value: number | null }>(`SELECT value, corrected_by, judge_value FROM ${table.name} WHERE ${table.where}`, table.ids);
-  const from = current ? Number(current.value) : null;
-  if (from === to) back(path, { error: `${label} is already ${to === null ? 'blank' : fmtScore(to)}.` });
-  // The judge's own value is kept from before the first correction; later corrections leave it alone.
-  const judgeValue = current ? (current.corrected_by ? current.judge_value : from) : ((await removedScores(event.id, [sheet.id])).get(sheet.id)?.get(key)?.judgeValue ?? null);
-
-  if (to === null) {
-    await query(`DELETE FROM ${table.name} WHERE ${table.where}`, table.ids);
-  } else if (kind === 'c') {
-    await query(
-      `INSERT INTO score_value (sheet_id, criterion_key, value, corrected_by, corrected_at, correction_reason, judge_value) VALUES ($1, $2, $3, $4, now(), $5, $6)
-       ON CONFLICT (sheet_id, criterion_key) DO UPDATE SET value = EXCLUDED.value, updated_at = now(), corrected_by = EXCLUDED.corrected_by,
-         corrected_at = now(), correction_reason = EXCLUDED.correction_reason, judge_value = EXCLUDED.judge_value`,
-      [sheet.id, `${a}:${b}`, to, acc.id, reason, judgeValue],
-    );
-  } else {
-    await query(
-      `INSERT INTO member_score (sheet_id, student_id, field, value, corrected_by, corrected_at, correction_reason, judge_value) VALUES ($1, $2, $3, $4, $5, now(), $6, $7)
-       ON CONFLICT (sheet_id, student_id, field) DO UPDATE SET value = EXCLUDED.value, updated_at = now(), corrected_by = EXCLUDED.corrected_by,
-         corrected_at = now(), correction_reason = EXCLUDED.correction_reason, judge_value = EXCLUDED.judge_value`,
-      [sheet.id, a, b, to, acc.id, reason, judgeValue],
-    );
-  }
-  await log(event.id, acc.id, 'score.correct', { group: sheet.group_id, half: sheet.half, sheet: sheet.id, judge: sheet.judge_name, key, label, from, to, reason });
+  const res = await applyCorrection(event, acc.id, s(fd, 'sheetId'), s(fd, 'key'), s(fd, 'value'), reasonOf(fd));
+  const path = res.group ? `/admin/events/${event.id}/groups/${res.group}/scores?half=${res.half}` : `/admin/events/${event.id}/progress`;
+  if (!res.ok) back(path, { error: res.error });
   const show = (v: number | null) => (v === null ? 'blank' : fmtScore(v));
-  back(path, { ok: `Corrected ${label} for ${sheet.judge_name}: ${show(from)} → ${show(to)}.` });
+  back(path, { ok: `Corrected ${res.label} for ${res.judge}: ${show(res.from)} → ${show(res.to)}.` });
 }
 
 // ── scoring sheet wording ─────────────────────────────────────

@@ -53,6 +53,8 @@ export interface GridRow {
   notes?: Record<string, string>;
   /** Numbers to sort by where the text is not one, for example a rank shown beside a percentage. */
   sort?: Record<string, number | null>;
+  /** The maximum for this row's score cells, when it differs by row (one criterion per row). */
+  max?: number;
 }
 
 export interface CellChange {
@@ -178,7 +180,7 @@ export function suggestOptions(text: string, options: GridOption[], limit = 8): 
 export type Resolved = { value: string; label: string } | { error: string };
 
 /** What a typed cell means for its column: the value to save and the text to show, or why it is refused. */
-export function resolveCell(column: GridColumn, text: string, options: GridOption[] = column.options ?? []): Resolved {
+export function resolveCell(column: GridColumn, text: string, options: GridOption[] = column.options ?? [], rowMax?: number): Resolved {
   const t = text.trim();
   if (!t) return { value: '', label: '' };
   if (column.type === 'choice') {
@@ -188,8 +190,9 @@ export function resolveCell(column: GridColumn, text: string, options: GridOptio
     if (column.allowNew) return { value: t, label: t };
     return { error: `“${t}” is not on the list for ${column.label}.` };
   }
-  if (column.max !== undefined) {
-    const check = checkScore(t, column.max);
+  const max = column.type === 'number' ? (rowMax ?? column.max) : column.max;
+  if (max !== undefined) {
+    const check = checkScore(t, max);
     if (check.state === 'error') return { error: check.msg };
     if (check.state === 'ok') return { value: String(check.n), label: fmtScore(check.n) };
   }
@@ -313,7 +316,7 @@ export function planPaste(opts: {
         if (text !== '' || row) skippedColumns.add(row?.locked?.[column.key] ? `${column.label} (${row.locked[column.key]})` : column.label);
         return;
       }
-      const resolved = resolveCell(column, text, opts.optionsFor?.(column));
+      const resolved = resolveCell(column, text, opts.optionsFor?.(column), row?.max);
       if ('error' in resolved) {
         refused.push(`${row ? (opts.rowName?.(row) ?? `Row ${r + 1}`) : 'New row'}, ${column.label}: ${resolved.error}`);
         return;

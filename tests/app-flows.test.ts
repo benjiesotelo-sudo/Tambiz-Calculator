@@ -33,7 +33,17 @@ vi.mock('@/lib/auth', () => {
 });
 
 import { acceptGroup, addMembers, correctScore, deleteGroup, excludeStudent, importAdvisers, includeStudent, removeMember, saveGroup, setMemberAbsent } from '@/app/admin/actions';
-import { removeGroupsTable, removeMembersTable, saveGroupsTable, saveMembersTable } from '@/app/admin/table-actions';
+import {
+  removeAdvisersTable,
+  removeGroupsTable,
+  removeJudgesTable,
+  removeMembersTable,
+  saveAdvisersTable,
+  saveGroupsTable,
+  saveJudgesTable,
+  saveMembersTable,
+  saveRollTable,
+} from '@/app/admin/table-actions';
 import { POST as mailing } from '@/app/api/admin/events/[id]/mailing/route';
 import { one, query } from '@/lib/db';
 import { buildWorkbook } from '@/lib/excel-export';
@@ -170,6 +180,91 @@ describe('the Groups and Members tables save cell by cell (14 September 2026)', 
 
     await setEvent('setup', false);
     expect((await removeMembersTable(event.id, group.id, [free.id])).rows).toEqual([{ rowId: free.id, removed: true }]);
+  });
+});
+
+describe('the Class roll, Advisers and Judges tables (14 September 2026)', () => {
+  it('a student is moved between groups, left out only when in no group, and a duplicate student number is refused', async () => {
+    await setEvent('setup', false);
+    const [g1, g2] = await query<{ id: string; code: string }>(`SELECT id, code FROM tgroup WHERE event_id = $1 ORDER BY code LIMIT 2`, [event.id]);
+    const st = (await one<{ id: string; student_number: string; surname: string }>(
+      'SELECT s.id, s.student_number, s.surname FROM group_member m JOIN student s ON s.id = m.student_id WHERE m.group_id = $1 ORDER BY s.student_number LIMIT 1',
+      [g1.id],
+    ))!;
+
+    const moved = await saveRollTable(event.id, [{ rowId: st.id, key: 'group', value: g2.code.toLowerCase() }]);
+    expect(moved.rows[0].row!.cells).toMatchObject({ group: g2.code, status: 'In a group', leftout: '' });
+    expect(moved.notice).toMatch(/Moved 1 student out of another group/);
+    expect(await one('SELECT group_id FROM group_member WHERE student_id = $1', [st.id])).toEqual({ group_id: g2.id });
+
+    const refused = await saveRollTable(event.id, [{ rowId: st.id, key: 'leftout', value: 'Dropped the course' }]);
+    expect(refused.rows[0].errors?.leftout).toMatch(/Clear their Group first/);
+
+    // Clearing the group and giving a reason in one paste leaves them out; a surname typed empty is refused on its own cell only.
+    const out = await saveRollTable(event.id, [
+      { rowId: st.id, key: 'group', value: '' },
+      { rowId: st.id, key: 'leftout', value: 'Dropped the course' },
+      { rowId: st.id, key: 'surname', value: '' },
+      { rowId: st.id, key: 'section', value: 'ba-3z' },
+    ]);
+    expect(out.rows[0].errors).toEqual({ surname: 'Surname cannot be empty.' });
+    expect(out.rows[0].row!.cells).toMatchObject({ group: '', status: 'Left out', leftout: 'Dropped the course', surname: st.surname, section: 'BA-3Z' });
+
+    const dup = await saveRollTable(event.id, [
+      { rowId: 'new:1', key: 'student', value: st.student_number },
+      { rowId: 'new:1', key: 'surname', value: 'Twin' },
+      { rowId: 'new:1', key: 'first', value: 'Tess' },
+      { rowId: 'new:1', key: 'section', value: 'BA-3A' },
+      { rowId: 'new:1', key: 'email', value: 'tess.twin@tambiz.test' },
+    ]);
+    expect(dup.rows[0].errors?.student).toMatch(/already on the roll/);
+
+    await saveRollTable(event.id, [
+      { rowId: st.id, key: 'group', value: g1.id },
+      { rowId: st.id, key: 'section', value: 'BA-3A' },
+    ]);
+    expect(await one('SELECT excluded_reason FROM student WHERE id = $1', [st.id])).toEqual({ excluded_reason: null });
+  });
+
+  it('adviser codes follow the link rules, and an adviser with groups cannot be removed', async () => {
+    await setEvent('setup', false);
+    const [a, b] = await query<{ id: string; name: string; link_code: string }>('SELECT id, name, link_code FROM adviser WHERE event_id = $1 ORDER BY name LIMIT 2', [event.id]);
+    expect((await saveAdvisersTable(event.id, [{ rowId: a.id, key: 'code', value: b.link_code }])).rows[0].errors?.code).toBe('Another adviser already has that code.');
+    expect((await saveAdvisersTable(event.id, [{ rowId: a.id, key: 'code', value: 'ab' }])).rows[0].errors?.code).toMatch(/at least four/);
+    const added = await saveAdvisersTable(event.id, [
+      { rowId: 'new:x', key: 'name', value: 'Prof. Table Test' },
+      { rowId: 'new:x', key: 'email', value: 'k7z9qp@feu.test' },
+      { rowId: 'new:x', key: 'code', value: 'K7Z-9QP' },
+    ]);
+    expect(added.rows[0].errors?.code).toMatch(/email contains the adviser code/);
+    const ok = await saveAdvisersTable(event.id, [
+      { rowId: 'new:y', key: 'name', value: 'Prof. Table Test' },
+      { rowId: 'new:y', key: 'email', value: 'table.test@feu.test' },
+    ]);
+    const id = ok.rows[0].row!.id;
+    expect((await removeAdvisersTable(event.id, [a.id])).rows[0].error).toMatch(/advises \d+ group/);
+    expect((await removeAdvisersTable(event.id, [id])).rows[0]).toEqual({ rowId: id, removed: true });
+  });
+
+  it('a new judge gets a password shown once; a known login is added to the event with its password unchanged', async () => {
+    const created = await saveJudgesTable(event.id, [
+      { rowId: 'new:j', key: 'name', value: 'Dr. Table Judge' },
+      { rowId: 'new:j', key: 'login', value: 'Table.Judge@tambiz.test' },
+    ]);
+    expect(created.secret).toMatch(/^Dr\. Table Judge signs in with table\.judge@tambiz\.test and password \S+/);
+    const id = created.rows[0].row!.id;
+    const hash = (await one<{ password_hash: string }>('SELECT password_hash FROM account WHERE id = $1', [id]))!.password_hash;
+
+    await removeJudgesTable(event.id, [id]);
+    const again = await saveJudgesTable(event.id, [
+      { rowId: 'new:k', key: 'name', value: 'Someone Else' },
+      { rowId: 'new:k', key: 'login', value: 'table.judge@tambiz.test' },
+    ]);
+    expect(again.secret).toBeUndefined();
+    expect(again.notice).toMatch(/already had an account, as Dr\. Table Judge/);
+    expect(await one('SELECT password_hash FROM account WHERE id = $1', [id])).toEqual({ password_hash: hash });
+    expect((await saveJudgesTable(event.id, [{ rowId: 'new:l', key: 'name', value: 'X' }, { rowId: 'new:l', key: 'login', value: 'admin@tambiz.demo' }])).rows[0].errors?.login).toMatch(/coordinator/);
+    await removeJudgesTable(event.id, [id]);
   });
 });
 

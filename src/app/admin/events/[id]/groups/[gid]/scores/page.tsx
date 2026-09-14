@@ -1,15 +1,18 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { AppBar, Notice } from '@/components/AppBar';
+import { DataGrid } from '@/components/DataGrid';
 import { requireAdmin } from '@/lib/auth';
-import { getEvent, getGroup, groupMembers, groupScoreDetail, type StoredScore } from '@/lib/repo';
-import { criterionLabel, type Half } from '@/lib/rubric';
-import { critKey, fmtScore, memberKey } from '@/lib/sheet';
-import { correctScore } from '../../../../../actions';
+import type { GridColumn } from '@/lib/grid';
+import { getEvent, getGroup, groupMembers, groupScoreDetail } from '@/lib/repo';
+import type { Half } from '@/lib/rubric';
+import { fmtScore } from '@/lib/sheet';
+import { scoreGridRows } from '@/lib/tables';
+import { saveScoresTable } from '../../../../../table-actions';
 
 export const dynamic = 'force-dynamic';
 
-// Every judge's scores for one group and half, with the coordinator's corrections (decision 7).
+// Every judge's scores for one group and half, as one table: a row per score box, a column per judge (decision 7).
 
 export default async function GroupScoresPage({
   params,
@@ -31,56 +34,27 @@ export default async function GroupScoresPage({
   const locked = !!event.released_at;
   const base = `/admin/events/${id}/groups/${gid}`;
 
-  const cell = (sheetId: string, judgeName: string, key: string, label: string, max: number) => {
-    const stored: StoredScore | undefined = detail.scores.get(sheetId)?.get(key);
-    const removed = stored ? undefined : detail.removed.get(sheetId)?.get(key);
-    const show = (v: number | null) => (v === null ? 'no score' : fmtScore(v));
-    return (
-      <div className="corr" key={`${sheetId}:${key}`}>
-        <span className="corr-judge">{judgeName}</span>
-        <span className="corr-val">{stored ? fmtScore(stored.value) : '–'}</span>
-        {stored?.correctedByName ? (
-          <span className="corr-note">
-            Corrected by the coordinator. The judge gave {show(stored.judgeValue)}. Reason: {stored.reason}
-          </span>
-        ) : null}
-        {removed ? (
-          <span className="corr-note">
-            Corrected by the coordinator to blank. The judge gave {show(removed.judgeValue)}
-            {removed.previous !== removed.judgeValue ? `; it was ${show(removed.previous)} before removal` : ''}. Reason: {removed.reason}
-          </span>
-        ) : null}
-        {locked ? null : (
-          <details className="inline-form corr-form">
-            <summary>Correct</summary>
-            <form action={correctScore} className="form">
-              <input type="hidden" name="eventId" value={id} />
-              <input type="hidden" name="sheetId" value={sheetId} />
-              <input type="hidden" name="key" value={key} />
-              <label className="field">
-                <span className="label-text">
-                  New score for {label}, out of {max} (leave empty to remove it)
-                </span>
-                <input className="input" name="value" inputMode="decimal" autoComplete="off" defaultValue={stored ? fmtScore(stored.value) : ''} style={{ maxWidth: 140 }} />
-              </label>
-              <label className="field">
-                <span className="label-text">Reason</span>
-                <input className="input" name="reason" required minLength={3} maxLength={200} placeholder="For example: judge confirmed 18, typed 13" />
-              </label>
-              <button className="btn small" type="submit">
-                Save correction
-              </button>
-            </form>
-          </details>
-        )}
-      </div>
-    );
-  };
+  const columns: GridColumn[] = [
+    { key: 'category', label: half === 'defense' ? 'Category or member' : 'Category', filter: true, width: 'minmax(8rem, 1.1fr)' },
+    { key: 'item', label: 'Criterion', width: 'minmax(10rem, 2fr)' },
+    { key: 'max', label: 'Max', type: 'number', align: 'right', width: '4rem' },
+    ...detail.sheets.map(
+      (sh): GridColumn => ({
+        key: sh.id,
+        label: `${sh.judge_name} · ${sh.status === 'complete' ? 'submitted' : 'in progress, not counted'}`,
+        type: 'number',
+        editable: true,
+        align: 'right',
+        width: 'minmax(7rem, 1fr)',
+      }),
+    ),
+    { key: 'avg', label: 'Average of submitted', type: 'number', align: 'right', width: '7rem' },
+  ];
 
   return (
     <>
       <AppBar subtitle="Coordinator" account={acc} home="/admin" />
-      <main className={`page half-${half}`}>
+      <main className={`page wide half-${half}`}>
         <div className="crumbs">
           <Link href={base}>‹ {group.name}</Link>
         </div>
@@ -99,66 +73,33 @@ export default async function GroupScoresPage({
         </nav>
         <Notice ok={sp.ok} error={sp.error} />
         <p className="lead">
-          Every judge’s scores for this group. To correct one, press <b>Correct</b> beside it, type the new score and a short reason. The judge’s own score is kept, the entry
-          shows as corrected by the coordinator, and the change is listed at the bottom of this page.
+          Every judge’s scores for this group, one column per judge. To correct a score, type the reason first, then type the new score over the old one (empty it to remove
+          the score). The judge’s own score is kept, the cell turns yellow, and selecting it shows what the judge gave and why it changed. Only submitted sheets count.
         </p>
         {locked ? <div className="notice warn">Results have been released, so scores can no longer be corrected.</div> : null}
         {!detail.sheets.length ? (
           <div className="notice warn">No judge has scored this group’s {halfDef.label.toLowerCase()} yet.</div>
         ) : (
-          <>
-            <p className="sub">
-              Judges:{' '}
-              {detail.sheets.map((s) => `${s.judge_name} (${s.status === 'complete' ? 'submitted' : 'in progress, not counted'})`).join(', ')}
-            </p>
-            {halfDef.categories.map((cat) => (
-              <div className="card" key={cat.key}>
-                <h3>{cat.name}</h3>
-                {cat.maxes.map((max, i) => {
-                  const key = critKey(cat.key, i);
-                  const label = `${cat.name} ${i + 1}`;
-                  return (
-                    <div className="corr-crit" key={key}>
-                      <div className="corr-head">
-                        <span className="num">{i + 1}</span>
-                        <span className="grow-1">{criterionLabel(cat, i)}</span>
-                        <span className="max">/{max}</span>
-                      </div>
-                      {detail.sheets.map((sh) => cell(sh.id, sh.judge_name, key, label, max))}
-                    </div>
-                  );
-                })}
-              </div>
-            ))}
-            {half === 'defense' ? (
-              <>
-                <div className="section-title">Members</div>
-                {members.map((m) => (
-                  <div className="card" key={m.id}>
-                    <h3>
-                      {m.first_name} {m.surname} {m.absent_at ? <span className="pill part">Absent</span> : null}
-                    </h3>
-                    {event.rubric.memberFields.map((f) => {
-                      const key = memberKey(m.id, f.key);
-                      return (
-                        <div className="corr-crit" key={key}>
-                          <div className="corr-head">
-                            <span className="grow-1">{f.name}</span>
-                            <span className="max">/{f.max}</span>
-                          </div>
-                          {detail.sheets.map((sh) => cell(sh.id, sh.judge_name, key, `${m.first_name} ${m.surname}, ${f.name}`, f.max))}
-                        </div>
-                      );
-                    })}
-                  </div>
-                ))}
-                {!members.length ? <p className="sub">This group has no members.</p> : null}
-              </>
-            ) : null}
-          </>
+          <DataGrid
+            label={`${group.name} ${halfDef.label} scores`}
+            columns={columns}
+            rows={scoreGridRows(event, half, detail, members)}
+            save={locked ? undefined : saveScoresTable.bind(null, id, gid, half)}
+            canAdd={false}
+            note={
+              locked
+                ? undefined
+                : { label: 'Reason for these corrections', placeholder: 'For example: judge confirmed 18, typed 13', requiredMessage: 'Type the reason for the correction first, in the box above the table.' }
+            }
+            rowName="item"
+            searchPlaceholder="Search criteria and members"
+          />
         )}
 
         <div className="section-title">Corrections made</div>
+        <p className="sub" style={{ marginTop: 0 }}>
+          As they stood when this page opened; corrections you make now show in their cells straight away.
+        </p>
         <ul className="list">
           {detail.history.map((h, i) => (
             <li key={i} style={{ display: 'block' }}>

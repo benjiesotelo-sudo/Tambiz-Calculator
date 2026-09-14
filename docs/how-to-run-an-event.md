@@ -83,11 +83,15 @@ The file must have these columns: **Student No.**, **Student Email**, **Surname*
 
 If students are added or dropped later, import the new file again. Importing the same file twice **updates** students; it never adds them twice.
 
+The roll is one table: Student No., Surname, First name, Middle name, Section, Email, Group, Status and Left out because. Type over a name, section or email to correct it. A student missing from the registrar's file can be typed into the empty last row (Student No., names, section and email are all needed).
+
+**Placing students in groups from the roll.** Type a group code (for example `G03`) in a student's **Group** cell to place them, type another code to move them, or empty the cell to take them out of their group. To place many at once, copy a column of group codes from Excel in the same order as the table, click the first **Group** cell and press **Ctrl+V**, then **Enter**. Moving a student out of a group means their scores from that group no longer count.
+
 **A student who dropped the course** stays on the roll file but should not be in a group. Judging cannot close while anyone on the roll is in no group, so leave them out on purpose:
 
-1. On the **Class roll** tab, find the student under **Not in any group**.
-2. Press **Leave out with a reason…**, type the reason (for example `Dropped the course`), and press **Leave out**.
-3. They now show **Left out** with your reason. Press **Undo** if you change your mind. Adding them to a group also undoes it.
+1. On the **Class roll** tab, choose **Not in a group** in the **Status** list to see who is left.
+2. In the student's **Left out because** cell, type the reason, for example `Dropped the course`, and press **Enter**. (If they are in a group, empty their **Group** cell first.)
+3. Their **Status** now reads **Left out**. Empty the reason to undo it. Placing them in a group also undoes it.
 
 Students left out are listed at the bottom of the **For Encoding** sheet with your reason and no grade.
 
@@ -106,18 +110,17 @@ Choose **one** of these.
 3. Press **Import**.
 4. Read the green message.
 
-**By hand**
+**By hand, or by pasting**
 
-1. Press the **Advisers** tab.
-2. Scroll to **Add one adviser by hand**.
-3. Type the **Name** and, if you have it, the **Email**.
-4. Press **Save adviser**.
-5. Repeat for each adviser.
+1. Press the **Advisers** tab. The advisers are a table: Adviser, Email, Adviser code and Groups.
+2. Click the empty last row (it says *Add an adviser here*), type the name, press **Tab**, and type the email if you have it.
+3. Carry on in the next empty row. To add a list at once, copy the names and emails from Excel, click the empty **Adviser** cell and press **Ctrl+V**, then **Enter**.
+4. To correct a name or email, type over it. To remove an adviser who advises no group, select the row and press **Ctrl+Delete**, then **Enter**.
 
 **Adviser codes.** After results are released, each adviser opens a private link and types an **adviser code** to see their groups. The code is never in the email, so you hand it out yourself.
 
 1. On the **Advisers** tab, press **Make codes for the advisers without one**. Each adviser gets a code such as `K7Q-4MP`.
-2. To choose a code yourself, press **Set code…** beside the adviser, type it, and press **Save code**. (Or add an **Adviser Code** column to the adviser file.)
+2. To choose a code yourself, type it in the adviser's **Adviser code** cell. It needs at least four letters or numbers, must differ from every other adviser's code, and must not appear in the adviser's email; a code that breaks a rule turns red and says why. (Or add an **Adviser Code** column to the adviser file.)
 3. Give each adviser their code, for example on a slip at a faculty meeting. Do not email it.
 
 An adviser without an email or without a code gets no link.
@@ -172,22 +175,20 @@ Judges are a standing department list: an account made one year is kept for the 
 **A judge who has judged before**
 
 1. Press the **Judges** tab.
-2. Scroll to **Add from the department list**.
-3. Press **Add to this event** beside their name. Their password is unchanged; press **Reset password** if they have forgotten it.
+2. In the **Department list** table, select the judge's row.
+3. Press **Add to this event**. They move to the table of this event's judges. Their password is unchanged; use **Reset password** if they have forgotten it.
 
 **A new judge.** Do this once for every new judge.
 
 1. Press the **Judges** tab.
-2. Scroll to **Add a new judge**.
-3. Type the name the judge will see, for example `Dr. Liza Manalo`.
-4. Type their email (or a short login such as `lmanalo`).
-5. Press **Create judge account**.
-6. A yellow box shows the login and a temporary password. **Write both down now**, for example on a sign-in slip for that judge. The box disappears after two minutes and the password cannot be shown again.
-7. Repeat from step 2 for the next judge.
+2. Click the empty last row of the first table (it says *Add a judge here*) and type the name the judge will see, for example `Dr. Liza Manalo`. Press **Tab**.
+3. Type their email (or a short login such as `lmanalo`) and press **Enter**.
+4. A yellow box above the table shows the login and a temporary password. **Write both down now**, for example on a sign-in slip for that judge. Press **I have written it down** to close it; the password cannot be shown again.
+5. Carry on in the next empty row. Several new judges pasted at once each get a password, all listed in the yellow box.
 
-If a judge forgets their password: press **Reset password** beside their name, write down the new password from the yellow box, and give it to them.
+If a judge forgets their password: select their row, press **Reset password**, press **Enter** to confirm, and write down the new password from the yellow box.
 
-A judge from last year keeps their account. Typing their email again simply adds them to this event.
+A judge from last year keeps their account. Typing their email in the empty row simply adds them to this event, with their password unchanged. Changing a judge's name or login on this table changes their account for every event, and they keep their password. To take a judge off this event, select their row and press **Ctrl+Delete**, then **Enter**; sheets they already submitted still count.
 
 ☐ Done: every judge has a sign-in slip.
 
@@ -252,12 +253,12 @@ If a group shows **No scores** or **Nothing submitted** in a half at the end of 
 You can correct any judge's score yourself, for example when a judge tells you they typed 13 instead of 18.
 
 1. On the **Progress** tab, tap the **Defense** or **Booth** pill beside the group. (Or open the group and press **Defense scores and corrections**.)
-2. Each criterion lists every judge's score. Find the one to change and press **Correct** beside it.
-3. Type the new score. Leave the box empty to remove the score altogether.
-4. Type a short **Reason**, for example `Judge confirmed 18, typed 13`. A reason is required.
-5. Press **Save correction**. The green message shows the old and new score.
+2. The scores are one table: a row for each criterion (and, for Defense, each member's Presentation, Communication and Q&A), a column for each judge, and the **Average of submitted**. Each judge's heading says whether their sheet is **submitted** or **in progress, not counted**. Use **Category or member** to show one category or one student.
+3. Type a short reason in **Reason for these corrections**, for example `Judge confirmed 18, typed 13`. A reason is required; the table will not take a change without one.
+4. Click the judge's score and type the new one, then press **Enter**. Empty the cell to remove the score altogether. A score above that row's maximum is refused and stays red.
+5. The green message says what changed. The same reason is used for every correction until you change the box.
 
-The judge's own score is kept. The entry shows **Corrected by the coordinator**, with what the judge gave and your reason, and **Corrections made** at the bottom of the page lists every correction with who and when. The Excel **Scores** and **Booth Scores** sheets list corrections in their last column.
+The judge's own score is kept. The corrected cell turns yellow; select it and the line under the table says who corrected it, what the judge gave and your reason. **Corrections made** at the bottom of the page lists every correction with who and when (reload the page to see new ones there). The Excel **Scores** and **Booth Scores** sheets list corrections in their last column.
 
 You can correct scores while judging is open and after it is closed, until results are released.
 
@@ -304,7 +305,7 @@ How scores are worked out:
    - Type in **Search** to find a group, or use the **Sec**, **Adviser** and **Judged** lists to show only some groups.
    - A category that is not fully scored shows its percentage with *incomplete* and no rank; nothing scored shows a dash.
    - Click a group's name to open its page.
-4. Press the **Grades** tab. Students are grouped by section. Each card shows:
+4. Press the **Grades** tab. Every student in a group is one row of a table, sorted by section and surname. Use **Search** to find a student, and the **Section**, **Group**, **Adviser**, **Letter**, **At the defense** and **Status** lists to narrow it down: for example **No grade yet** under Status shows who still needs scores. Select a **Status** cell to see why a student has no grade, and a **Member total** cell to see each judge's three scores. Type `Absent` or `Present` in **At the defense** to mark a student. The columns are:
    - **Member total**: for Presentation /20, Communication /40 and Q&A /40, the average across the defense judges who scored it, added up (out of 100). A field one judge left blank is not counted as zero. Until every field has at least one judge's score the total shows a dash (—) and reads **(incomplete)** here; in the workbook the cell is left empty, with the note beside it saying why. A partial total is never scaled up to 100.
    - **Group overall**: the group's overall percentage.
    - **Final grade**: (member total + group overall) ÷ 2, using the two-decimal numbers shown.
