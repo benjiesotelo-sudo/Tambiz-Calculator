@@ -22,7 +22,7 @@ You do not need to remember anything from last year.
 
 Groups, a group's members, Class roll, Advisers, Judges, a group's scores, Grades and Results are all the same table, and it works like Excel. Learn it once:
 
-- Click a cell, or move to it with the arrow keys, and type. **Enter** goes down, **Tab** goes right (Shift+Tab left). **Esc** throws away what you typed in that cell.
+- Click a cell, or move to it with the arrow keys, and type. **Enter** goes down, **Tab** goes right (Shift+Tab left). **Esc** throws away what you typed in that cell. Tab past the very last cell leaves the table.
 - **F2** or a double-click puts the cursor inside the cell's text, to change part of it.
 - **To add a row, type in the empty last row.** It saves once its required cells are filled; until then the label says what it still needs.
 - **To paste from Excel:** copy the cells in Excel, click the cell where the top-left one should go, and press **Ctrl+V** (⌘V on a Mac). A yellow bar says how many cells will change and how many rows will be added, and the new values are highlighted in the table. Press **Enter** to apply or **Esc** to cancel. Rows past the end become new rows.
