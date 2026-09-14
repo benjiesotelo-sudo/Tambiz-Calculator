@@ -271,6 +271,28 @@ describe('after release a group can be corrected but not removed (14 September 2
 
     await act(saveGroup, { ...fields });
   });
+
+  it('a group change whose history entry cannot be written is not saved either', async () => {
+    await setEvent('finalised', true);
+    const g = (await one<{ id: string; code: string; name: string; section: string; adviser_id: string | null }>(
+      'SELECT id, code, name, section, adviser_id FROM tgroup WHERE event_id = $1 ORDER BY code LIMIT 1',
+      [event.id],
+    ))!;
+    const before = (await changesFor(g.id)).length;
+    // Make the history write fail, as a dropped connection would, after the group update has been sent.
+    await query(`CREATE OR REPLACE FUNCTION refuse_group_log() RETURNS trigger LANGUAGE plpgsql AS $$
+      BEGIN IF NEW.action = 'group.update' THEN RAISE EXCEPTION 'history write failed'; END IF; RETURN NEW; END $$`);
+    await query('CREATE TRIGGER refuse_group_log BEFORE INSERT ON change_log FOR EACH ROW EXECUTE FUNCTION refuse_group_log()');
+    try {
+      await expect(
+        act(saveGroup, { eventId: event.id, groupId: g.id, code: g.code, name: `${g.name} Unrecorded`, section: g.section, adviserId: g.adviser_id ?? '' }),
+      ).rejects.toThrow(/history write failed/);
+    } finally {
+      await query('DROP TRIGGER refuse_group_log ON change_log');
+    }
+    expect(await one('SELECT name FROM tgroup WHERE id = $1', [g.id])).toEqual({ name: g.name });
+    expect(await changesFor(g.id)).toHaveLength(before);
+  });
 });
 
 describe('releasing results (decisions 8 and 11)', () => {

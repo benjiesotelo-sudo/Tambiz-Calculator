@@ -40,8 +40,9 @@ export default async function ReleasePage({ params, searchParams }: { params: Pr
           to send with Microsoft Power Automate.
         </p>
         <ul className="sub" style={{ paddingLeft: 18, marginTop: 0 }}>
-          <li>A student sees their own letter grade, their own scores and their group’s percentages. No ranks.</li>
-          <li>An adviser sees only their own groups’ results and their own position in the adviser ranking. No student grades.</li>
+          <li>A student sees their own letter grade, their own scores and their group’s percentages.</li>
+          <li>An adviser sees only their own groups’ percentages and their groups’ average overall. No position in the adviser ranking, and no student grades.</li>
+          <li>No place number is ever shown to a student or an adviser. A page may say a group is in the top 10 of a category or overall, but never which place.</li>
           <li>
             The link shows nothing until the person types their student number, or the adviser code you gave them. {MAX_TRIES} wrong tries lock it. Links stay open for{' '}
             {LINK_DAYS} days and can be opened any number of times.
