@@ -1,10 +1,10 @@
 import type { Metadata } from 'next';
 import { AppBar } from '@/components/AppBar';
 import { one } from '@/lib/db';
-import { MAX_TRIES, linkState, ordinal } from '@/lib/link-rules';
+import { MAX_TRIES, linkState } from '@/lib/link-rules';
 import { findLink, hasLinkSession, type LinkRow } from '@/lib/links';
 import { eventReport, getEvent, type EventReport } from '@/lib/repo';
-import { adviserRanking, fmt2, fmtPct, type GroupResult } from '@/lib/scoring';
+import { adviserRanking, fmt2, fmtPct, TOP_PLACES, topTenPlacings, type GroupResult } from '@/lib/scoring';
 import { checkLink, closeLink } from '../actions';
 
 export const dynamic = 'force-dynamic';
@@ -109,10 +109,16 @@ function CloseButton({ code }: { code: string }) {
   );
 }
 
-/** A group's percentages, with no ranks (decision 9: students see percentages only). */
+/** A group's percentages, and where it placed in the top 10 without saying which place: places are revealed at the awarding. */
 function GroupPercentages({ result }: { result: GroupResult }) {
+  const top = topTenPlacings(result);
   return (
     <>
+      {top.length ? (
+        <p className="sub" style={{ margin: '6px 0 0' }}>
+          <b>Top {TOP_PLACES}</b> in {top.join(', ')}. Places are announced at the awarding.
+        </p>
+      ) : null}
       <div className="kv">
         <div>
           <span>Defense</span>
@@ -220,8 +226,7 @@ async function AdviserResult({ link, code, report }: { link: LinkRow; code: stri
   const adviser = await one<{ id: string; name: string }>('SELECT id, name FROM adviser WHERE id = $1 AND event_id = $2', [link.recipient_id, link.event_id]);
   if (!adviser) return <Closed {...CLOSED.missing} />;
   const mine = report.groups.filter((g) => g.adviser_id === adviser.id);
-  const ranked = report.results.groups.filter((g) => g.overallRank !== null).length;
-  // Decision 10: only this adviser's own position is shown, never the table of colleagues.
+  // Decision 10: only this adviser's own average is shown, never the table of colleagues, and never a position.
   const standing = adviserRanking(report.groups.map((g) => ({ adviserId: g.adviser_id, result: report.resultById.get(g.id)! }))).get(adviser.id);
   return (
     <Shell subtitle={report.event.title}>
@@ -232,11 +237,11 @@ async function AdviserResult({ link, code, report }: { link: LinkRow; code: stri
       <div className="notice warn">
         {standing ? (
           <>
-            Your position in the adviser ranking: <b>{ordinal(standing.rank)} of {standing.of} advisers</b>, with an average overall of {fmtPct(standing.average)} across{' '}
-            {standing.groups} group{standing.groups === 1 ? '' : 's'}.
+            Your groups’ average overall, used for the adviser ranking: <b>{fmtPct(standing.average)}</b> across {standing.groups} group{standing.groups === 1 ? '' : 's'}.
+            Positions are announced at the awarding.
           </>
         ) : (
-          'You have no position in the adviser ranking, because none of your groups has a complete result.'
+          'You are not in the adviser ranking, because none of your groups has a complete result.'
         )}
       </div>
 
@@ -250,7 +255,6 @@ async function AdviserResult({ link, code, report }: { link: LinkRow; code: stri
               </h3>
               <span className="bignum">{r.complete || r.accepted ? fmtPct(r.overall) : 'Incomplete'}</span>
             </div>
-            <div className="sub">{r.overallRank ? `Overall rank ${ordinal(r.overallRank)} of ${ranked} groups` : 'Not ranked'}</div>
             <GroupPercentages result={r} />
           </div>
         );

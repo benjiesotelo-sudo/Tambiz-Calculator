@@ -2,7 +2,8 @@
 import { describe, expect, it } from 'vitest';
 import { databaseUrl } from '@/lib/db';
 import { checkMatches, emailGivesAway, linkState, makeAdviserCode, normaliseCheck, ordinal } from '@/lib/link-rules';
-import { adviserRanking, type GroupResult } from '@/lib/scoring';
+import { adviserRanking, computeResults, topTenPlacings, type GroupResult, type ScoredGroup } from '@/lib/scoring';
+import { DEFAULT_RUBRIC } from '@/lib/rubric';
 
 describe('private links', () => {
   it('the check ignores spaces, dashes and letter case', () => {
@@ -70,6 +71,31 @@ describe('adviser ranking (decision 10)', () => {
     ]);
     expect(r.get('a')).toEqual({ average: 90, rank: 1, of: 1, groups: 1 });
     expect(r.has('b')).toBe(false);
+  });
+});
+
+describe('what a student or adviser page says about placing (decision 9, 14 September 2026)', () => {
+  const { halves } = DEFAULT_RUBRIC;
+  /** Every criterion of every category scored at the same fraction of its maximum. */
+  const sheet = (half: 'defense' | 'booth', f: number) => Object.fromEntries(halves[half].categories.map((c) => [c.key, c.maxes.map((m) => m * f)]));
+  const group = (i: number, f: number): ScoredGroup => ({ id: `g${i}`, name: `Group ${i}`, defense: [sheet('defense', f)], booth: [sheet('booth', f)] });
+
+  it('names the categories and overall where a group is in the top 10, and never a place number', () => {
+    // Twelve groups, Group 1 highest; Group 10 is 10th and Group 11 is 11th everywhere.
+    const res = computeResults(DEFAULT_RUBRIC, Array.from({ length: 12 }, (_, i) => group(i + 1, (100 - i) / 100)));
+    const names = [...halves.defense.categories, ...halves.booth.categories].map((c) => c.name);
+    expect(topTenPlacings(res.groups[9])).toEqual([...names, 'Overall']);
+    expect(topTenPlacings(res.groups[10])).toEqual([]);
+    for (const g of res.groups) for (const said of topTenPlacings(g)) expect(said).not.toMatch(/\d/);
+  });
+
+  it('only the categories where it placed, and nothing for a group that is not fully judged', () => {
+    const r = computeResults(DEFAULT_RUBRIC, [group(1, 0.9)]).groups[0];
+    const onlyFirst: GroupResult = { ...r, overallRank: 11, categories: r.categories.map((c, i) => ({ ...c, rank: i === 0 ? 3 : 12 })) };
+    expect(topTenPlacings(onlyFirst)).toEqual([halves.defense.categories[0].name]);
+    const partial: ScoredGroup = { ...group(2, 0.9), booth: [] };
+    expect(topTenPlacings(computeResults(DEFAULT_RUBRIC, [partial]).groups[0])).toEqual(halves.defense.categories.map((c) => c.name));
+    expect(topTenPlacings(computeResults(DEFAULT_RUBRIC, [{ ...partial, defense: [] }]).groups[0])).toEqual([]);
   });
 });
 

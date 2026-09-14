@@ -15,6 +15,16 @@ export const dynamic = 'force-dynamic';
 //   one      after release: reissue one person's link; their old link stops working
 //   all      after release: reissue everyone's link; every earlier link stops working
 
+/** A request from a page on this app, or with no Origin at all. An Origin that is not a URL, such as "null", is refused. */
+function fromThisApp(origin: string | null, host: string | null) {
+  if (!origin) return true;
+  try {
+    return new URL(origin).host === host;
+  } catch {
+    return false;
+  }
+}
+
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const page = `/admin/events/${id}/release`;
@@ -29,7 +39,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (!acc || acc.role !== 'admin') return NextResponse.json({ error: 'Coordinator sign-in required.' }, { status: 401 });
   // A form on this app only: refuse a cross-site post.
   const origin = req.headers.get('origin');
-  if (origin && new URL(origin).host !== req.headers.get('host')) return NextResponse.json({ error: 'Refused.' }, { status: 403 });
+  if (!fromThisApp(origin, req.headers.get('host'))) return NextResponse.json({ error: 'Refused.' }, { status: 403 });
 
   const event = await getEvent(id);
   if (!event) return NextResponse.json({ error: 'Event not found.' }, { status: 404 });

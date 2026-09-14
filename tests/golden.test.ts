@@ -168,8 +168,11 @@ describe('golden case D: member total and final grade', () => {
   it('D member total averages each field over the judges who scored it: 16 + 34 + 31 = 81 (index.html: 64, counting a blank as 0)', () =>
     expect(r4(memberTotal(sets))).toBe(81));
   it('D final grade (81 + 85) / 2 = 83 (index.html: 74.5)', () => expect(r4(finalGrade(memberTotal(sets), ov(fullG)))).toBe(83));
-  it('a member field nobody scored leaves the total incomplete, scaled to the fields that were scored', () => {
-    expect(memberScore([{ presentation: 15, communication: 30, qa: null }])).toEqual({ total: 75, complete: false });
+  // Changed on the coordinator's decision of 14 September 2026 (decision 1 applied to member totals): this total was
+  // 75, the 45 scored points scaled up to 100, which read like a real total. Now there is no total until every field is scored.
+  it('a member field nobody scored leaves no total, not a partial total scaled up to 100 (was 75)', () => {
+    expect(memberScore([{ presentation: 15, communication: 30, qa: null }])).toEqual({ total: null, complete: false });
+    expect(memberScore([{ presentation: 17.5, communication: null, qa: null }, { presentation: 16 }])).toEqual({ total: null, complete: false });
   });
   it('a member with no scores at all has no total', () => expect(memberScore([{}, { presentation: null }])).toEqual({ total: null, complete: false }));
 });

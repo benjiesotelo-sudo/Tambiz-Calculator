@@ -133,7 +133,7 @@ Rules the app enforces for you:
 - Two groups cannot share a code, or a name that differs only in spaces or punctuation ("PAYONG PALAY" and "PayongPalay" count as the same).
 - Members are always chosen from the roll. They are never typed.
 
-To fix a mistake: open the group, press **Remove** beside a member, or change the details under **Group details** and press **Save group**.
+To fix a mistake: open the group, press **Remove** beside a member, or change the details under **Group details** and press **Save group**. Every change to a group's code, name, section or adviser is listed at the bottom of the group's page under **Changes to this group's details**, with who made it and when.
 
 **Final check**
 
@@ -277,7 +277,7 @@ How scores are worked out:
 2. **Top 10 leaderboard** shows one card per category plus **Overall**. Groups that still share a place are listed alphabetically.
 3. **Every group by category** shows each group's overall percentage and rank at the top right (or **Incomplete**), its Defense and Booth halves, and every category percentage with its rank.
 4. Press the **Grades** tab. Students are grouped by section. Each card shows:
-   - **Member total**: for Presentation /20, Communication /40 and Q&A /40, the average across the defense judges who scored it, added up (out of 100). A field one judge left blank is not counted as zero.
+   - **Member total**: for Presentation /20, Communication /40 and Q&A /40, the average across the defense judges who scored it, added up (out of 100). A field one judge left blank is not counted as zero. Until every field has at least one judge's score the total shows a dash (—) and reads **(incomplete)**, here and in the workbook; a partial total is never scaled up to 100.
    - **Group overall**: the group's overall percentage.
    - **Final grade**: (member total + group overall) ÷ 2, using the two-decimal numbers shown.
    - **Rounded up**: the final grade rounded up to a whole number (84.5 becomes 85).
@@ -311,10 +311,11 @@ Releasing gives every student and adviser a private link to their own results. *
 
 What people see:
 
-- **A student** sees their own letter grade and final grade, their own average Presentation, Communication and Q&A scores and total, and their group's percentages. No ranks anywhere.
-- **An adviser** sees only their own groups' results (percentages and each group's overall rank) and their own position in the adviser ranking, for example "2nd of 4 advisers". Never the full table of advisers, and no student grades.
+- **A student** sees their own letter grade and final grade, their own average Presentation, Communication and Q&A scores and total, and their group's percentages.
+- **An adviser** sees only their own groups' percentages and their own groups' average overall, the figure the adviser ranking uses. Never the full table of advisers, and no student grades.
+- **No place number is ever shown to a student or an adviser**: not "3rd of 8", not "7th of 57", and not an adviser's position in the adviser ranking, because the awarding reveals the order. A page may say that a group is in the **top 10** of a category or overall, for example "Top 10 in Marketing, Overall", without saying which place.
 
-The **adviser ranking** is the average of the overall percentages of each adviser's groups. Advisers with the same average share a position. Only you see the full table, at the bottom of the **Results** tab.
+The **adviser ranking** is the average of the overall percentages of each adviser's groups. Advisers with the same average share a position. Only you see the positions and the full table, at the bottom of the **Results** tab. Your own screens keep every rank.
 
 How a link works:
 
@@ -322,7 +323,9 @@ How a link works:
 - **Five wrong tries lock the link.** You can unlock it.
 - A link stays open for **30 days** from when it was issued, and can be opened any number of times. An email scanner that opens it first does no harm.
 
-Before you start: judging is closed (Part I), every adviser has a code (Part C), and you have checked the grades (Part J). **After release, scores can no longer be corrected and judging cannot be reopened.**
+Before you start: judging is closed (Part I), every adviser has a code (Part C), and you have checked the grades (Part J). **After release, scores can no longer be corrected or cleared, judging cannot be reopened, and a group cannot be deleted.**
+
+After release you can still correct a mistake in a group's **code**, **name** or **adviser**, on the group's page or with the adviser import. The app says what the change affects the moment you make it: a new code or name shows on the members' and adviser's pages; a new adviser changes both advisers' pages and the adviser ranking, and the mailing sheet already sent no longer matches (give an adviser who had no link one with **Download links for the people with none yet**). Every change is recorded with your name and the time on the group's page, so nothing changes out of sight.
 
 1. Press the **Release** tab. If something was changed after judging closed so that an item **Needs you** again (for example you pressed **Undo** on an accepted group, cleared a group's only score, or removed a student from a group), the tab says how many items need you instead of showing the release button. They are listed under **Close judging** on the **Progress** tab; settle them as in Part I, then come back.
 2. Read **Check before sending**. It lists students with no email, advisers with no email or code, and any email that contains the person's student number or code. Fix what you can on the Class roll and Advisers tabs.

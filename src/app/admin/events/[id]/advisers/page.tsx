@@ -22,6 +22,12 @@ export default async function AdvisersPage({ params, searchParams }: { params: P
       <main className="page">
         <EventHeader event={event} tab="advisers" title="Advisers" />
         <Notice ok={sp.ok} error={sp.error} />
+        {event.released_at ? (
+          <div className="notice warn">
+            Results have been released. An import can still change which adviser a group has. If it does, both advisers’ result pages and the adviser ranking change, and the
+            mailing sheet already sent no longer matches. Each change is recorded on the group’s page.
+          </div>
+        ) : null}
 
         <form action={importAdvisers} className="card form">
           <h3>Import the adviser list</h3>

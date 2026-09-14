@@ -84,6 +84,16 @@ export async function getGroup(eventId: string, groupId: string) {
   );
 }
 
+/** Every recorded change to a group's code, name, section or adviser, newest first, with who made it and when. */
+export async function groupDetailChanges(eventId: string, groupId: string) {
+  return query<{ created_at: Date; who: string | null; detail: { changes: string[]; released?: boolean; file?: string } }>(
+    `SELECT c.created_at, a.display_name AS who, c.detail FROM change_log c LEFT JOIN account a ON a.id = c.account_id
+     WHERE c.event_id = $1 AND c.action = 'group.update' AND c.detail->>'groupId' = $2 AND jsonb_array_length(coalesce(c.detail->'changes', '[]'::jsonb)) > 0
+     ORDER BY c.created_at DESC`,
+    [eventId, groupId],
+  );
+}
+
 export async function groupMembers(groupId: string) {
   return query<StudentRow>(
     `SELECT s.*, m.absent_at FROM group_member m JOIN student s ON s.id = m.student_id WHERE m.group_id = $1 ORDER BY s.surname, s.first_name`,

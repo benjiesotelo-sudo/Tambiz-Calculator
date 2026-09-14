@@ -6,7 +6,7 @@ import { requireAdmin } from '@/lib/auth';
 import { newId, one, query, transaction, type Statement } from '@/lib/db';
 import { ADVISER_COLUMNS, ImportError, parseWorkbook, ROLL_COLUMNS } from '@/lib/excel-import';
 import { generatePassword, hashPassword } from '@/lib/passwords';
-import { eventFinaliseChecks, eventReport, getEvent, listEvents, removedScores } from '@/lib/repo';
+import { eventFinaliseChecks, eventReport, getEvent, getGroup, listEvents, removedScores } from '@/lib/repo';
 import { criterionLabel, findCriterion, HALVES, rubricForNewEvent, withCriterionWording } from '@/lib/rubric';
 import { nameKey } from '@/lib/seed';
 import { emailGivesAway, makeAdviserCode, MAX_TRIES, normaliseCheck } from '@/lib/link-rules';
@@ -243,6 +243,12 @@ async function adviserIdFor(eventId: string, fd: FormData): Promise<string | nul
   return chosen || null;
 }
 
+const adviserWord = (name: string | null | undefined) => name || 'no adviser';
+
+/** The consequence of a released group's adviser changing, said at the moment it happens. */
+const adviserChangeWarning = (who: string) =>
+  `Results were already released, so ${who} result pages and the adviser ranking change, and the mailing sheet already sent no longer matches. An adviser who had no link yet can be given one on the Release tab with “Download links for the people with none yet”.`;
+
 export async function saveGroup(fd: FormData) {
   const acc = await requireAdmin();
   const event = await eventOr404(s(fd, 'eventId'));
@@ -251,6 +257,11 @@ export async function saveGroup(fd: FormData) {
   const name = s(fd, 'name');
   const section = s(fd, 'section').toUpperCase();
   const path = groupId ? `/admin/events/${event.id}/groups/${groupId}` : `/admin/events/${event.id}/groups`;
+  const before = groupId ? await getGroup(event.id, groupId) : null;
+  if (groupId && !before) back(`/admin/events/${event.id}/groups`, { error: 'Group not found.' });
+  // After release only a group's code, name and adviser can be corrected; each change is recorded and its consequence shown.
+  if (event.released_at && !before) back(path, { error: 'Results have been released, so no new group can be added.' });
+  if (event.released_at && before && before.section !== section) back(path, { error: 'Results have been released, so the section cannot change now. The code, name and adviser can still be corrected.' });
   if (!code || !name) back(path, { error: 'A group needs a code and a name.' });
   const key = nameKey(name);
   if (!key) back(path, { error: 'The group name needs at least one letter or number.' });
@@ -261,10 +272,25 @@ export async function saveGroup(fd: FormData) {
   if (clash) back(path, { error: clash.code === code ? `Code ${code} is already used by ${clash.name}.` : `“${name}” is the same name as ${clash.code} ${clash.name} (spacing and punctuation are ignored).` });
   const adviserId = await adviserIdFor(event.id, fd);
   try {
-    if (groupId) {
+    if (before) {
       await query('UPDATE tgroup SET code = $3, name = $4, name_key = $5, section = $6, adviser_id = $7 WHERE id = $1 AND event_id = $2', [groupId, event.id, code, name, key, section, adviserId]);
-      await log(event.id, acc.id, 'group.update', { groupId, code, name, section });
-      back(path, { ok: 'Group saved.' });
+      const adviser = adviserId ? await one<{ name: string }>('SELECT name FROM adviser WHERE id = $1', [adviserId]) : null;
+      const changes = [
+        before.code !== code ? `Code ${before.code} → ${code}` : '',
+        before.name !== name ? `Name ${before.name} → ${name}` : '',
+        before.section !== section ? `Section ${before.section || 'none'} → ${section || 'none'}` : '',
+        (before.adviser_id ?? null) !== adviserId ? `Adviser ${adviserWord(before.adviser_name)} → ${adviserWord(adviser?.name)}` : '',
+      ].filter(Boolean);
+      const released = !!event.released_at;
+      await log(event.id, acc.id, 'group.update', { groupId, code, name, section, adviserId, from: { code: before.code, name: before.name, section: before.section, adviserId: before.adviser_id }, changes, released });
+      if (!released || !changes.length) back(path, { ok: 'Group saved.' });
+      const warnings = [
+        before.code !== code || before.name !== name ? 'Results were already released, so the members’ and adviser’s result pages now show the new code and name.' : '',
+        (before.adviser_id ?? null) !== adviserId
+          ? adviserChangeWarning(`${adviserWord(before.adviser_name)}’s and ${adviserWord(adviser?.name)}’s`)
+          : '',
+      ].filter(Boolean);
+      back(path, { ok: `Group saved: ${changes.join('; ')}. ${warnings.join(' ')} The change is recorded with your name and the time.` });
     }
     const id = newId();
     await query('INSERT INTO tgroup (id, event_id, code, name, name_key, section, adviser_id) VALUES ($1, $2, $3, $4, $5, $6, $7)', [id, event.id, code, name, key, section, adviserId]);
@@ -280,6 +306,7 @@ export async function deleteGroup(fd: FormData) {
   const acc = await requireAdmin();
   const event = await eventOr404(s(fd, 'eventId'));
   const groupId = s(fd, 'groupId');
+  if (event.released_at) back(`/admin/events/${event.id}/groups/${groupId}`, { error: 'Results have been released, so a group cannot be deleted. Its code, name and adviser can still be corrected.' });
   const sheets = await one<{ n: number }>('SELECT count(*)::int AS n FROM score_sheet WHERE group_id = $1', [groupId]);
   if (sheets && sheets.n > 0) back(`/admin/events/${event.id}/groups/${groupId}`, { error: 'This group already has scores, so it cannot be deleted.' });
   await query('DELETE FROM tgroup WHERE id = $1 AND event_id = $2', [groupId, event.id]);
@@ -393,11 +420,14 @@ export async function importAdvisers(fd: FormData) {
     if (e instanceof ImportError) back(path, { error: e.message });
     throw e;
   }
-  const groups = await query<{ id: string; code: string; name_key: string }>('SELECT id, code, name_key FROM tgroup WHERE event_id = $1', [event.id]);
-  const existing = await query<{ id: string; name_key: string }>('SELECT id, name_key FROM adviser WHERE event_id = $1', [event.id]);
+  const groups = await query<{ id: string; code: string; name_key: string; adviser_id: string | null }>('SELECT id, code, name_key, adviser_id FROM tgroup WHERE event_id = $1', [event.id]);
+  const existing = await query<{ id: string; name: string; name_key: string }>('SELECT id, name, name_key FROM adviser WHERE event_id = $1', [event.id]);
   const idByKey = new Map(existing.map((a) => [a.name_key, a.id]));
+  const nameById = new Map(existing.map((a) => [a.id, a.name]));
   const problems = [...parsed.problems];
   const statements: Statement[] = [];
+  const reassigned: string[] = [];
+  const released = !!event.released_at;
   let added = 0;
   let linked = 0;
   const seen = new Set<string>();
@@ -408,6 +438,7 @@ export async function importAdvisers(fd: FormData) {
     if (!id) {
       id = newId();
       idByKey.set(key, id);
+      nameById.set(id, r.values.name);
       added++;
       statements.push({ text: 'INSERT INTO adviser (id, event_id, name, name_key, email, link_code) VALUES ($1, $2, $3, $4, $5, $6)', params: [id, event.id, r.values.name, key, r.values.email, adviserCode] });
     } else if (!seen.has(key) && r.values.email) {
@@ -422,6 +453,15 @@ export async function importAdvisers(fd: FormData) {
       if (g) {
         statements.push({ text: 'UPDATE tgroup SET adviser_id = $2 WHERE id = $1', params: [g.id, id] });
         linked++;
+        if (g.adviser_id !== id) {
+          const change = `Adviser ${adviserWord(g.adviser_id ? nameById.get(g.adviser_id) : null)} → ${adviserWord(nameById.get(id))}`;
+          reassigned.push(`${g.code} (${change.slice('Adviser '.length)})`);
+          statements.push({
+            text: 'INSERT INTO change_log (id, event_id, account_id, action, detail) VALUES ($1, $2, $3, $4, $5::jsonb)',
+            params: [newId(), event.id, acc.id, 'group.update', JSON.stringify({ groupId: g.id, adviserId: id, from: { adviserId: g.adviser_id }, changes: [change], released, file: name })],
+          });
+          g.adviser_id = id;
+        }
       } else problems.push(`Row ${r.rowNumber}: no group ${code || r.values.group_name} in this event.`);
     }
   }
@@ -430,8 +470,11 @@ export async function importAdvisers(fd: FormData) {
     params: [newId(), event.id, 'advisers', name, parsed.rows.length, added, seen.size - added],
   });
   await transaction(statements);
-  await log(event.id, acc.id, 'advisers.import', { file: name, added, linked });
-  const msg = `Read ${seen.size} adviser${seen.size === 1 ? '' : 's'} from ${name}: ${added} new. ${linked} group${linked === 1 ? '' : 's'} given an adviser.`;
+  await log(event.id, acc.id, 'advisers.import', { file: name, added, linked, reassigned: reassigned.length });
+  let msg = `Read ${seen.size} adviser${seen.size === 1 ? '' : 's'} from ${name}: ${added} new. ${linked} group${linked === 1 ? '' : 's'} given an adviser.`;
+  if (released && reassigned.length) {
+    msg += ` ${reassigned.length} group${reassigned.length === 1 ? '' : 's'} changed adviser: ${reassigned.join(', ')}. ${adviserChangeWarning('those advisers’')} Each change is recorded with your name and the time.`;
+  }
   back(path, { ok: problems.length ? `${msg} ${problems.slice(0, 8).join(' ')}` : msg });
 }
 

@@ -32,7 +32,7 @@ vi.mock('@/lib/auth', () => {
   return { currentAccount: async () => admin, requireAccount: async () => admin, requireAdmin: async () => admin, requireJudge: async () => admin };
 });
 
-import { acceptGroup, addMembers, correctScore, excludeStudent, includeStudent, removeMember, setMemberAbsent } from '@/app/admin/actions';
+import { acceptGroup, addMembers, correctScore, deleteGroup, excludeStudent, importAdvisers, includeStudent, removeMember, saveGroup, setMemberAbsent } from '@/app/admin/actions';
 import { POST as mailing } from '@/app/api/admin/events/[id]/mailing/route';
 import { one, query } from '@/lib/db';
 import { buildWorkbook } from '@/lib/excel-export';
@@ -202,6 +202,77 @@ describe('after release the roster stays as released', () => {
   });
 });
 
+describe('after release a group can be corrected but not removed (14 September 2026)', () => {
+  const changesFor = (groupId: string) =>
+    query<{ account_id: string; created_at: Date; detail: { changes: string[]; released: boolean } }>(
+      `SELECT account_id, created_at, detail FROM change_log WHERE event_id = $1 AND action = 'group.update' AND detail->>'groupId' = $2 ORDER BY created_at, id`,
+      [event.id, groupId],
+    );
+
+  it('deleting a group and clearing a judge’s score to blank are refused', async () => {
+    await setEvent('finalised', true);
+    const empty = (await one<{ id: string }>('SELECT id FROM tgroup g WHERE event_id = $1 LIMIT 1', [event.id]))!;
+    expect((await act(deleteGroup, { eventId: event.id, groupId: empty.id })).error).toMatch(/released, so a group cannot be deleted/);
+    expect(await one('SELECT count(*)::int AS n FROM tgroup WHERE id = $1', [empty.id])).toEqual({ n: 1 });
+
+    const score = (await one<{ sheet_id: string; criterion_key: string; value: number }>(
+      'SELECT v.sheet_id, v.criterion_key, v.value FROM score_value v JOIN score_sheet s ON s.id = v.sheet_id WHERE s.event_id = $1 LIMIT 1',
+      [event.id],
+    ))!;
+    const cleared = await act(correctScore, { eventId: event.id, sheetId: score.sheet_id, key: `c:${score.criterion_key}`, value: '', reason: 'Judge asked to remove it' });
+    expect(cleared.error).toMatch(/released/);
+    expect(await one('SELECT value FROM score_value WHERE sheet_id = $1 AND criterion_key = $2', [score.sheet_id, score.criterion_key])).toEqual({ value: score.value });
+  });
+
+  it('a new code, name or adviser is saved, recorded with who and when, and its consequence is said at once', async () => {
+    await setEvent('finalised', true);
+    const g = (await one<{ id: string; code: string; name: string; section: string; adviser_id: string | null }>(
+      'SELECT id, code, name, section, adviser_id FROM tgroup WHERE event_id = $1 AND adviser_id IS NOT NULL ORDER BY code LIMIT 1',
+      [event.id],
+    ))!;
+    const other = (await one<{ id: string; name: string }>('SELECT id, name FROM adviser WHERE event_id = $1 AND id <> $2 ORDER BY name LIMIT 1', [event.id, g.adviser_id]))!;
+    const fields = { eventId: event.id, groupId: g.id, code: g.code, name: g.name, section: g.section, adviserId: g.adviser_id! };
+    const before = (await changesFor(g.id)).length;
+
+    expect((await act(saveGroup, { ...fields, section: `${g.section}X` })).error).toMatch(/section cannot change/);
+    expect((await act(saveGroup, { ...fields, groupId: '', code: 'G99', name: 'Brand new' })).error).toMatch(/no new group/);
+
+    const renamed = await act(saveGroup, { ...fields, name: `${g.name} Corrected` });
+    expect(renamed.error).toBeNull();
+    expect(renamed.ok).toMatch(/result pages now show the new code and name/);
+
+    const moved = await act(saveGroup, { ...fields, name: `${g.name} Corrected`, adviserId: other.id });
+    expect(moved.ok).toMatch(new RegExp(`→ ${other.name}`));
+    expect(moved.ok).toMatch(/adviser ranking change, and the mailing sheet already sent no longer matches/);
+    expect(await one('SELECT name, adviser_id FROM tgroup WHERE id = $1', [g.id])).toEqual({ name: `${g.name} Corrected`, adviser_id: other.id });
+
+    const recorded = (await changesFor(g.id)).slice(before);
+    expect(recorded.map((c) => [c.account_id, c.detail.changes, c.detail.released])).toEqual([
+      ['test-coordinator', [`Name ${g.name} → ${g.name} Corrected`], true],
+      ['test-coordinator', [expect.stringMatching(new RegExp(`^Adviser .+ → ${other.name}$`))], true],
+    ]);
+    expect(recorded.every((c) => c.created_at instanceof Date)).toBe(true);
+
+    // The adviser import reassigning the group back is allowed too, recorded and warned about.
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet('Advisers');
+    const original = (await one<{ name: string }>('SELECT name FROM adviser WHERE id = $1', [g.adviser_id]))!;
+    ws.addRow(['Adviser', 'Group Code']);
+    ws.addRow([original.name, g.code]);
+    const fd = new FormData();
+    fd.set('eventId', event.id);
+    fd.set('file', new File([await wb.xlsx.writeBuffer()], 'advisers.xlsx'));
+    let imported = '';
+    await importAdvisers(fd).catch((e: Error & { url?: string }) => (imported = new URL(e.url!, 'http://localhost').searchParams.get('ok') ?? ''));
+    expect(imported).toMatch(new RegExp(`1 group changed adviser: ${g.code} \\(${other.name} → ${original.name}\\)`));
+    expect(imported).toMatch(/mailing sheet already sent no longer matches/);
+    expect(await one('SELECT adviser_id FROM tgroup WHERE id = $1', [g.id])).toEqual({ adviser_id: g.adviser_id });
+    expect((await changesFor(g.id)).slice(before).map((c) => c.detail.changes)).toHaveLength(3);
+
+    await act(saveGroup, { ...fields });
+  });
+});
+
 describe('releasing results (decisions 8 and 11)', () => {
   const release = () => {
     const fd = new FormData();
@@ -244,6 +315,17 @@ describe('releasing results (decisions 8 and 11)', () => {
     await settle();
     expect((await release()).status).toBe(200);
     expect((await getEvent(event.id))!.released_at).not.toBeNull();
+  });
+
+  it('a post with an Origin of "null" or one that is not a web address is refused, not an error', async () => {
+    for (const origin of ['null', 'not a url', 'https://elsewhere.example']) {
+      const fd = new FormData();
+      fd.set('mode', 'missing');
+      const res = await mailing(new Request(`http://localhost/api/admin/events/${event.id}/mailing`, { method: 'POST', body: fd, headers: { origin, host: 'localhost' } }), {
+        params: Promise.resolve({ id: event.id }),
+      });
+      expect(res.status).toBe(403);
+    }
   });
 
   it('pressing release twice makes one set of links, and every link in the downloaded mailing sheet works', async () => {

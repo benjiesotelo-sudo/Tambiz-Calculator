@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { AppBar, Notice } from '@/components/AppBar';
 import { requireAdmin } from '@/lib/auth';
-import { getEvent, getGroup, groupMembers, listAdvisers, listStudents, rollName } from '@/lib/repo';
+import { getEvent, getGroup, groupDetailChanges, groupMembers, listAdvisers, listStudents, rollName } from '@/lib/repo';
 import { addMembers, deleteGroup, removeMember, saveGroup, setMemberAbsent } from '../../../../actions';
 
 export const dynamic = 'force-dynamic';
@@ -21,7 +21,8 @@ export default async function GroupPage({
   if (!event) notFound();
   const group = await getGroup(id, gid);
   if (!group) notFound();
-  const [members, advisers, students] = await Promise.all([groupMembers(gid), listAdvisers(id), listStudents(id)]);
+  const [members, advisers, students, changes] = await Promise.all([groupMembers(gid), listAdvisers(id), listStudents(id), groupDetailChanges(id, gid)]);
+  const released = !!event.released_at;
 
   // Students not in any group; same section first unless "all sections" is chosen. A search looks at everyone unplaced.
   const q = (sp.q ?? '').trim().toLowerCase();
@@ -143,6 +144,13 @@ export default async function GroupPage({
         )}
 
         <div className="section-title">Group details</div>
+        {released ? (
+          <div className="notice warn">
+            Results have been released. You can still correct the code, name or adviser, and each change is recorded below with your name and the time. A new code or name
+            shows on the members’ and adviser’s result pages. A new adviser changes both advisers’ result pages and the adviser ranking, and the mailing sheet already sent no
+            longer matches.
+          </div>
+        ) : null}
         <form action={saveGroup} className="card form">
           <input type="hidden" name="eventId" value={id} />
           <input type="hidden" name="groupId" value={gid} />
@@ -153,7 +161,7 @@ export default async function GroupPage({
             </div>
             <div className="field">
               <label htmlFor="section">Section</label>
-              <input className="input" id="section" name="section" defaultValue={group.section} />
+              <input className="input" id="section" name="section" defaultValue={group.section} readOnly={released} />
             </div>
           </div>
           <div className="field">
@@ -184,11 +192,29 @@ export default async function GroupPage({
         <form action={deleteGroup} className="actions">
           <input type="hidden" name="eventId" value={id} />
           <input type="hidden" name="groupId" value={gid} />
-          <button className="btn small danger" type="submit">
+          <button className="btn small danger" type="submit" disabled={released}>
             Delete this group
           </button>
-          <span className="sub">Only possible before any judge has scored it.</span>
+          <span className="sub">{released ? 'Not possible after results are released.' : 'Only possible before any judge has scored it.'}</span>
         </form>
+
+        {changes.length ? (
+          <>
+            <div className="section-title">Changes to this group’s details</div>
+            <ul className="list">
+              {changes.map((c, i) => (
+                <li key={i} style={{ display: 'block' }}>
+                  <div className="title">{c.detail.changes.join('; ')}</div>
+                  <div className="sub">
+                    {c.who ?? 'Coordinator'}, {new Date(c.created_at).toLocaleString('en-PH', { timeZone: 'Asia/Manila' })}
+                    {c.detail.file ? `, from the adviser import ${c.detail.file}` : ''}
+                    {c.detail.released ? '. After results were released.' : '.'}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </>
+        ) : null}
       </main>
     </>
   );

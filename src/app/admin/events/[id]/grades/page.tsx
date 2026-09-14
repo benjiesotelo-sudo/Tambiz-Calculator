@@ -68,7 +68,7 @@ export default async function GradesPage({ params }: { params: Promise<{ id: str
                 </div>
                 <div className="kv">
                   <div>
-                    <span>Member total{g.total !== null && !g.memberComplete ? ' (incomplete)' : ''}</span>
+                    <span>Member total{!g.absent && !g.memberComplete ? ' (incomplete)' : ''}</span>
                     <b>{g.total === null ? '—' : fmt2(g.total)}</b>
                   </div>
                   <div>

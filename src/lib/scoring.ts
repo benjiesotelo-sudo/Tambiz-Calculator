@@ -184,7 +184,7 @@ export function leaderboard<T extends { id: string; name: string }>(
 // ── members and grades ──────────────────────────────────────────────
 
 export interface MemberResult {
-  /** Out of the member fields' full total (100). Worked out from the fields that have a score. */
+  /** Out of the member fields' full total (100); null until every field has a score. */
   total: number | null;
   /** Every field has at least one judge's score. */
   complete: boolean;
@@ -192,24 +192,17 @@ export interface MemberResult {
 
 /**
  * A member's total: for each field, the average across the judges who filled it in; then those averages added up.
- * A field nobody filled stays out, and the total is scaled to the fields that were scored and marked incomplete.
+ * Until every field has at least one score there is no total (a dash), never a partial sum scaled up to 100.
  * index.html (808-820) added up each judge's fields with that judge's blanks counted as zero, then averaged.
  */
 export function memberScore(sets: MemberSet[], fields: MemberField[] = DEFAULT_RUBRIC.memberFields): MemberResult {
   let sum = 0;
-  let max = 0;
-  let scoredFields = 0;
   for (const f of fields) {
     const vals = sets.map((s) => s[f.key]).filter(has);
-    if (!vals.length) continue;
+    if (!vals.length) return { total: null, complete: false };
     sum += vals.reduce((a, b) => a + b, 0) / vals.length;
-    max += f.max;
-    scoredFields++;
   }
-  if (!scoredFields) return { total: null, complete: false };
-  const fullMax = fields.reduce((a, f) => a + f.max, 0);
-  const complete = scoredFields === fields.length;
-  return { total: complete ? sum : (sum / max) * fullMax, complete };
+  return { total: sum, complete: true };
 }
 
 export const memberTotal = (sets: MemberSet[], fields?: MemberField[]) => memberScore(sets, fields).total;
@@ -282,6 +275,17 @@ export interface AdviserStanding {
   groups: number;
 }
 
+export const TOP_PLACES = 10;
+
+/**
+ * What a student's or adviser's private page may say about a group's placing: the categories, then "Overall", in
+ * which it placed in the top 10, never which place. Places are revealed at the awarding, so no number is shown there.
+ */
+export function topTenPlacings(result: GroupResult): string[] {
+  const inTop = (rank: number | null) => rank !== null && rank <= TOP_PLACES;
+  return [...result.categories.filter((c) => inTop(c.rank)).map((c) => c.name), ...(inTop(result.overallRank) ? ['Overall'] : [])];
+}
+
 /**
  * The adviser ranking (decision 10): the average of the overall percentages people see for the groups an adviser
  * advises, ranked highest first, tied advisers sharing a position. Only groups that are ranked count, so an
@@ -346,7 +350,7 @@ export function computeResults(rubric: Rubric, groups: ScoredGroup[]): EventResu
       .map((g) => ({ id: g.id, name: g.name, score: scoreOf(g), rank: rankOf(g) }))
       .filter((e): e is LeaderboardEntry => e.rank !== null && e.score !== null)
       .sort((a, b) => a.rank - b.rank || byName(a.name, b.name))
-      .slice(0, 10),
+      .slice(0, TOP_PLACES),
   });
   const leaderboards: EventResults['leaderboards'] = [];
   let ci = 0;
