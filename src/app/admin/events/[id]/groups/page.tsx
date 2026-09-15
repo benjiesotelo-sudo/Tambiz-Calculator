@@ -20,7 +20,6 @@ export default async function GroupsPage({ params, searchParams }: { params: Pro
   const released = !!event.released_at;
 
   const columns: GridColumn[] = [
-    { key: 'code', label: 'Code', editable: true, width: '6.5rem' },
     { key: 'name', label: 'Business name', editable: true, required: true, width: 'minmax(11rem, 2fr)' },
     { key: 'section', label: 'Section', editable: true, filter: true, width: '7.5rem' },
     {
@@ -44,12 +43,12 @@ export default async function GroupsPage({ params, searchParams }: { params: Pro
         <EventHeader event={event} tab="groups" title="Groups" />
         <Notice ok={sp.ok} error={sp.error} />
         <p className="lead">
-          One row per group. Type into a cell to change it; to add a group, type in the last row (leave the code empty and the app gives the next one). Press a business
-          name to add its members.
+          One row per group. Type into a cell to change it; to add a group, type its business name in the last row. Two groups cannot share a name: spacing,
+          punctuation and capitals are ignored when names are compared. Press a business name to add its members.
         </p>
         {released ? (
           <div className="notice warn">
-            Results have been released. You can still correct a group’s code, name or adviser; each change is recorded on the group’s page with your name and the time. A new
+            Results have been released. You can still correct a group’s name or adviser; each change is recorded on the group’s page with your name and the time. A new
             adviser changes both advisers’ result pages and the adviser ranking, and the mailing sheet already sent no longer matches. No group can be added or deleted.
           </div>
         ) : null}

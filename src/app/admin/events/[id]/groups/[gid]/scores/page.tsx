@@ -58,9 +58,7 @@ export default async function GroupScoresPage({
         <div className="crumbs">
           <Link href={base}>‹ {group.name}</Link>
         </div>
-        <div className="eyebrow">
-          {event.title} · {group.code}
-        </div>
+        <div className="eyebrow">{event.title} · Scores and corrections</div>
         <h1 className="page-title">
           {group.name} · {halfDef.label}
         </h1>

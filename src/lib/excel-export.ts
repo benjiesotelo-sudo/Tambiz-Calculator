@@ -3,7 +3,7 @@
 // All export code lives here so the library can be swapped without touching the rest of the app.
 
 import ExcelJS from 'exceljs';
-import { fullName, rollName, type EventReport, type GradeRow } from './repo';
+import { byGroupName, fullName, rollName, type EventReport, type GradeRow } from './repo';
 import { criteriaOf, type Half } from './rubric';
 import { fmt2, round2, TOP_PLACES } from './scoring';
 
@@ -49,7 +49,6 @@ export async function buildWorkbook(report: EventReport): Promise<Buffer> {
     const ws = wb.addWorksheet(title);
     const crits = criteriaOf(rubric, half);
     ws.columns = [
-      { header: 'Group Code', width: 11 },
       { header: 'Group Name', width: 26 },
       { header: 'Panelist', width: 22 },
       { header: 'Status', width: 12 },
@@ -66,7 +65,7 @@ export async function buildWorkbook(report: EventReport): Promise<Buffer> {
           .filter((c) => critName.has(c.key))
           .map((c) => `${critName.get(c.key)}: judge gave ${c.judgeValue ?? 'no score'}, now ${c.value ?? 'blank'} (${c.reason})`)
           .join('; ');
-        ws.addRow([g.code, g.name, s.judge_name, s.status === 'complete' ? 'Complete' : 'In progress', ...crits.map((c) => vals[c.category.key]?.[c.index] ?? null), corrected]);
+        ws.addRow([g.name, s.judge_name, s.status === 'complete' ? 'Complete' : 'In progress', ...crits.map((c) => vals[c.category.key]?.[c.index] ?? null), corrected]);
       }
     }
   };
@@ -78,7 +77,6 @@ export async function buildWorkbook(report: EventReport): Promise<Buffer> {
     const ws = wb.addWorksheet('Results');
     const cats = results.groups[0]?.categories ?? [...rubric.halves.defense.categories.map((c) => ({ name: c.name })), ...rubric.halves.booth.categories.map((c) => ({ name: c.name }))];
     ws.columns = [
-      { header: 'Group Code', width: 11 },
       { header: 'Group Name', width: 26 },
       ...cats.flatMap((c) => [
         { header: `${c.name} %`, width: 14 },
@@ -91,11 +89,9 @@ export async function buildWorkbook(report: EventReport): Promise<Buffer> {
       { header: 'Judged', width: 20 },
     ];
     header(ws, ws.getRow(1), DARK, GOLD);
-    const code = new Map(groups.map((g) => [g.id, g.code]));
     const order = [...results.groups].sort((a, b) => (a.overallRank ?? 1e9) - (b.overallRank ?? 1e9));
     for (const g of order) {
       const row = ws.addRow([
-        code.get(g.id),
         g.name,
         ...g.categories.flatMap((c) => [n2(c.pct), c.rank === null ? '' : `Rank ${c.rank}`]),
         n2(g.defense),
@@ -138,7 +134,7 @@ export async function buildWorkbook(report: EventReport): Promise<Buffer> {
       { header: 'Note', width: 44 },
     ];
     header(ws, ws.getRow(1));
-    const sorted = [...grades].sort((a, b) => a.group.code.localeCompare(b.group.code, undefined, { numeric: true }) || a.student.surname.localeCompare(b.student.surname));
+    const sorted = [...grades].sort((a, b) => byGroupName(a.group.name, b.group.name) || a.student.surname.localeCompare(b.student.surname));
     for (const g of sorted) {
       const judges = g.perJudge.length ? g.perJudge : [{ judge: '', set: {} }];
       const nFields = rubric.memberFields.length;

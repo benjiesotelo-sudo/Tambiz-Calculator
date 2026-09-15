@@ -7,7 +7,6 @@ import { readDraft } from './draft';
 
 export interface JudgeGroup {
   id: string;
-  code: string;
   name: string;
   section: string;
   adviser: string;
@@ -71,7 +70,7 @@ export function GroupList({ judgeId, groups }: { judgeId: string; groups: JudgeG
   const shown = rows.filter(
     (r) =>
       (filter === 'all' || r.cls === filter || (filter === 'part' && r.cls === 'err')) &&
-      (!needle || `${r.g.code} ${r.g.name} ${r.g.section} ${r.g.adviser}`.toLowerCase().includes(needle)),
+      (!needle || `${r.g.name} ${r.g.section} ${r.g.adviser}`.toLowerCase().includes(needle)),
   );
 
   return (
@@ -107,7 +106,6 @@ export function GroupList({ judgeId, groups }: { judgeId: string; groups: JudgeG
         {shown.map(({ g, cls, label, unsent }) => (
           <li key={g.id}>
             <Link className="grow" href={`/judge/score/${g.id}?half=${half}`}>
-              <span className="gcode">{g.code}</span>
               <span style={{ minWidth: 0 }}>
                 <span className="gname">{g.name}</span>
                 <span className="gmeta">

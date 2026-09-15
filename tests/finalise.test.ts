@@ -4,7 +4,7 @@ import { finaliseChecks, releaseRefusal, type FinaliseInput } from '@/lib/finali
 
 const base = (): FinaliseInput => ({
   halfLabel: { defense: 'Defense', booth: 'Booth' },
-  groups: [{ id: 'g1', code: 'G01', name: 'Kape Kultura', acceptReason: null, complete: true }],
+  groups: [{ id: 'g1', name: 'Kape Kultura', acceptReason: null, complete: true }],
   sheets: [
     { groupId: 'g1', half: 'defense', status: 'complete', judgeName: 'A', filled: 21 },
     { groupId: 'g1', half: 'defense', status: 'complete', judgeName: 'B', filled: 21 },
@@ -24,7 +24,7 @@ describe('finalising', () => {
     const x = base();
     x.sheets = x.sheets.filter((s) => s.half !== 'booth');
     x.groups[0].complete = false;
-    expect(finaliseChecks(x).blockers.map((b) => b.text)).toEqual(['G01 Kape Kultura: no completed Booth sheet.']);
+    expect(finaliseChecks(x).blockers.map((b) => b.text)).toEqual(['Kape Kultura: no completed Booth sheet.']);
   });
 
   it('the coordinator can accept it with a reason, which is then shown rather than blocking', () => {
@@ -41,20 +41,20 @@ describe('finalising', () => {
     x.sheets = x.sheets.filter((s) => !(s.half === 'booth' && s.judgeName === 'A'));
     const c = finaliseChecks(x);
     expect(c.blockers).toEqual([]);
-    expect(c.warnings.map((w) => w.text)).toEqual(['G01 Kape Kultura: only one completed Booth sheet.']);
+    expect(c.warnings.map((w) => w.text)).toEqual(['Kape Kultura: only one completed Booth sheet.']);
   });
 
   it('a sheet still in progress is a warning that says its scores do not count (before: "still count")', () => {
     const x = base();
     x.sheets.push({ groupId: 'g1', half: 'defense', status: 'in_progress', judgeName: 'C', filled: 4 });
-    expect(finaliseChecks(x).warnings[0].text).toBe('G01 Kape Kultura: C has not submitted their Defense sheet (marked it complete). None of its scores count until they do.');
+    expect(finaliseChecks(x).warnings[0].text).toBe('Kape Kultura: C has not submitted their Defense sheet (marked it complete). None of its scores count until they do.');
   });
 
   it('a half whose only sheet is in progress has no completed sheet, so it blocks', () => {
     const x = base();
     x.sheets = [...x.sheets.filter((s) => s.half !== 'booth'), { groupId: 'g1', half: 'booth', status: 'in_progress', judgeName: 'C', filled: 18 }];
     x.groups[0].complete = false;
-    expect(finaliseChecks(x).blockers.map((b) => b.text)).toEqual(['G01 Kape Kultura: no completed Booth sheet.']);
+    expect(finaliseChecks(x).blockers.map((b) => b.text)).toEqual(['Kape Kultura: no completed Booth sheet.']);
   });
 
   it('a student in no group blocks until placed or left out with a reason', () => {
@@ -80,7 +80,7 @@ describe('finalising', () => {
   it('a member with incomplete member scores blocks until scored or marked absent', () => {
     const x = base();
     x.members[0].memberComplete = false;
-    expect(finaliseChecks(x).blockers[0].text).toBe('Andrea Dela Cruz (G01) has incomplete member scores.');
+    expect(finaliseChecks(x).blockers[0].text).toBe('Andrea Dela Cruz (Kape Kultura) has incomplete member scores.');
     x.members[0].absent = true;
     const c = finaliseChecks(x);
     expect(c.blockers).toEqual([]);

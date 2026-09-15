@@ -11,7 +11,7 @@ import { HALVES, type Half } from './rubric';
 
 export interface FinaliseInput {
   halfLabel: Record<Half, string>;
-  groups: { id: string; code: string; name: string; acceptReason: string | null; complete: boolean }[];
+  groups: { id: string; name: string; acceptReason: string | null; complete: boolean }[];
   sheets: { groupId: string; half: Half; status: 'in_progress' | 'complete'; judgeName: string; filled: number }[];
   members: { studentId: string; name: string; groupId: string; absent: boolean; memberComplete: boolean }[];
   unplaced: { studentId: string; name: string; section: string; excludedReason: string | null }[];
@@ -48,7 +48,7 @@ export function finaliseChecks(input: FinaliseInput): FinaliseChecks {
   const groupById = new Map(input.groups.map((g) => [g.id, g]));
 
   for (const g of input.groups) {
-    const label = `${g.code} ${g.name}`;
+    const label = g.name;
     const missing: string[] = [];
     for (const half of HALVES) {
       const mine = input.sheets.filter((s) => s.groupId === g.id && s.half === half);
@@ -76,7 +76,7 @@ export function finaliseChecks(input: FinaliseInput): FinaliseChecks {
 
   for (const m of input.members) {
     const group = groupById.get(m.groupId);
-    const where = group ? ` (${group.code})` : '';
+    const where = group ? ` (${group.name})` : '';
     if (m.absent) decided.push({ kind: 'member', id: m.studentId, text: `${m.name}${where} is marked absent from the defense. Their grade is left blank for you to enter.` });
     else if (!m.memberComplete) blockers.push({ kind: 'member', id: m.studentId, text: `${m.name}${where} has incomplete member scores.` });
   }

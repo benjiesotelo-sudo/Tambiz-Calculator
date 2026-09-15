@@ -70,7 +70,7 @@ export default async function JudgeProfilePage({ params, searchParams }: { param
           {h.rows.map((r) => (
             <div className="prow" role="row" key={r.groupId}>
               <span role="cell" className="pgroup">
-                <b>{r.groupCode}</b> {r.groupName}
+                {r.groupName}
               </span>
               <span role="cell" data-label="Their score">
                 {fmt2(r.their)}
@@ -98,7 +98,7 @@ export default async function JudgeProfilePage({ params, searchParams }: { param
               {h.uncompared.map((u) => (
                 <li key={u.groupId} style={{ flexWrap: 'wrap' }}>
                   <span className="grow-1">
-                    <b>{u.groupCode}</b> {u.groupName}
+                    {u.groupName}
                   </span>
                   {u.flags.map((f) => (
                     <span key={f} className="flag">

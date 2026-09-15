@@ -14,7 +14,7 @@ function report(overall: number): EventReport {
   const event = { id: 'e1', year: 2027, title: 'Tambiz 2027', status: 'finalised' as const, rubric: DEFAULT_RUBRIC, created_at: new Date() };
   return {
     event,
-    groups: [{ id: 'g1', event_id: 'e1', code: 'G01', name: 'Kape Kultura', section: 'BA-3A', adviser_id: null, adviser_name: null, member_count: 0 }],
+    groups: [{ id: 'g1', event_id: 'e1', name: 'Kape Kultura', section: 'BA-3A', adviser_id: null, adviser_name: null, member_count: 0 }],
     results: { groups: [g], leaderboards: [] },
     resultById: new Map([['g1', g]]),
     grades: [],
@@ -31,6 +31,16 @@ async function open(r: EventReport) {
   await wb.xlsx.load((await buildWorkbook(r)) as unknown as ArrayBuffer);
   return wb;
 }
+
+describe('groups are known by their name (15 September 2026)', () => {
+  it('no sheet has a Group Code column; each group is its name', async () => {
+    const wb = await open(report(90));
+    for (const ws of wb.worksheets) {
+      ws.eachRow((row) => row.eachCell((c) => expect(c.text).not.toMatch(/group code/i)));
+    }
+    expect(wb.getWorksheet('Results')!.getRow(2).getCell(1).text).toBe('Kape Kultura');
+  });
+});
 
 describe('the Leaderboard sheet', () => {
   it('has a row for every group tied at 10th place', async () => {
@@ -51,8 +61,8 @@ describe('the workbook rounds exactly like the screens', () => {
   it('89.85 is 89.85 in both (the first app showed 89.8 on screen and 89.9 in Excel)', async () => {
     const wb = await open(report(89.85));
     const ws = wb.getWorksheet('Results')!;
-    const cell = ws.getRow(2).getCell(5); // Group Code, Group Name, Defense %, Booth %, Overall %
-    expect(ws.getRow(1).getCell(5).text).toBe('Overall %');
+    const cell = ws.getRow(2).getCell(4); // Group Name, Defense %, Booth %, Overall %
+    expect(ws.getRow(1).getCell(4).text).toBe('Overall %');
     expect(cell.value).toBe(89.85);
     expect(cell.numFmt).toBe('0.00');
     expect(`${(cell.value as number).toFixed(2)}%`).toBe(fmtPct(89.85));
@@ -60,7 +70,7 @@ describe('the workbook rounds exactly like the screens', () => {
   it('an average the computer holds as 89.84499… is 89.85 in both', async () => {
     const avg = (89.84 + 89.85) / 2;
     const wb = await open(report(avg));
-    const cell = wb.getWorksheet('Results')!.getRow(2).getCell(5);
+    const cell = wb.getWorksheet('Results')!.getRow(2).getCell(4);
     expect(cell.value).toBe(89.85);
     expect(fmtPct(avg)).toBe('89.85%');
   });

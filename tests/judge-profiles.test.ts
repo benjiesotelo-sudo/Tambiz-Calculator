@@ -12,7 +12,6 @@ const sheet = (judge: string, group: number, s: number, over?: Record<string, (n
   judgeId: judge,
   judgeName: judge.toUpperCase(),
   groupId: `g${group}`,
-  groupCode: `G0${group}`,
   groupName: `Group ${group}`,
   half: 'defense',
   values: share(s, over),
@@ -33,7 +32,7 @@ describe('judge profiles', () => {
     // Group 1: A gives 76; B gives 80 and C 94, an average of 87, so the gap is −11. Across all eight the gaps average −4.
     expect(a.marksAt).toBeCloseTo(-4, 6);
     expect(a.groups).toBe(8);
-    expect(a.halves.defense.rows[0]).toMatchObject({ groupCode: 'G01', their: expect.closeTo(76, 6), others: expect.closeTo(87, 6), gap: expect.closeTo(-11, 6) });
+    expect(a.halves.defense.rows[0]).toMatchObject({ groupName: 'Group 1', their: expect.closeTo(76, 6), others: expect.closeTo(87, 6), gap: expect.closeTo(-11, 6) });
   });
 
   it('a strict judge who orders groups like the panel agrees highly', () => {

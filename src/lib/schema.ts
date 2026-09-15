@@ -161,4 +161,11 @@ export const SCHEMA: string[] = [
     expires_at timestamptz NOT NULL,
     created_at timestamptz NOT NULL DEFAULT now()
   )`,
+
+  // ── Added 15 September 2026 (groups are known by their name alone). ──
+  // The app no longer reads or writes a group code. Stored codes are kept; the column only stops being required, and
+  // (event_id, name_key) stays the one rule keeping two groups apart. Earlier versions sort groups by their code, so once
+  // this version has added a group (with no code), an earlier version must not serve that database again.
+  `ALTER TABLE tgroup ALTER COLUMN code DROP NOT NULL`,
+  `ALTER TABLE tgroup DROP CONSTRAINT IF EXISTS tgroup_event_id_code_key`,
 ];

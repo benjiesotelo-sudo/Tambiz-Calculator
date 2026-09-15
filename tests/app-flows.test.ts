@@ -52,7 +52,7 @@ import { MAX_TRIES } from '@/lib/link-rules';
 import { issueLinks, openLink } from '@/lib/links';
 import { sha256 } from '@/lib/passwords';
 import { judgeEventProfile } from '@/lib/profiles-data';
-import { eventFinaliseChecks, eventReport, getEvent, groupScoreDetail, type EventRow } from '@/lib/repo';
+import { eventFinaliseChecks, eventReport, getEvent, groupDetailChanges, groupScoreDetail, type EventRow } from '@/lib/repo';
 import { criteriaOf, type Half } from '@/lib/rubric';
 import { computeResults } from '@/lib/scoring';
 
@@ -113,7 +113,7 @@ describe('only a submitted sheet counts (14 September 2026)', () => {
     const wb = new ExcelJS.Workbook();
     await wb.xlsx.load((await buildWorkbook(report)) as unknown as ArrayBuffer);
     const statuses: string[] = [];
-    for (const name of ['Scores', 'Booth Scores']) wb.getWorksheet(name)!.eachRow((row, n) => n > 1 && statuses.push(String(row.getCell(4).value)));
+    for (const name of ['Scores', 'Booth Scores']) wb.getWorksheet(name)!.eachRow((row, n) => n > 1 && statuses.push(String(row.getCell(3).value)));
     expect(new Set(statuses)).toEqual(new Set(['Complete']));
 
     // Finalising names the sheet in progress and says it does not count.
@@ -123,7 +123,7 @@ describe('only a submitted sheet counts (14 September 2026)', () => {
 });
 
 describe('the Groups and Members tables save cell by cell (14 September 2026)', () => {
-  it('a typed new row becomes a group with the next code; a clash is refused on its cell; the row comes back as saved', async () => {
+  it('a typed new row becomes a group with no code; a name clash is refused on its cell, naming the group; the row comes back as saved', async () => {
     await setEvent('setup', false);
     const res = await saveGroupsTable(event.id, [
       { rowId: 'new:a', key: 'name', value: 'Table Venture' },
@@ -132,11 +132,14 @@ describe('the Groups and Members tables save cell by cell (14 September 2026)', 
     const saved = res.rows[0];
     expect(saved.error).toBeUndefined();
     expect(saved.row!.cells).toMatchObject({ name: 'Table Venture', section: 'BA-3A', members: '0' });
-    expect(saved.row!.cells.code).toMatch(/^G\d\d$/);
+    expect(Object.keys(saved.row!.cells)).not.toContain('code');
     const id = saved.row!.id;
+    expect(await one('SELECT code FROM tgroup WHERE id = $1', [id])).toEqual({ code: null });
 
     const clash = await saveGroupsTable(event.id, [{ rowId: id, key: 'name', value: 'Kape  Kultura!' }]);
-    expect(clash.rows[0].errors?.name).toMatch(/same name as G01 Kape Kultura/);
+    expect(clash.rows[0].errors?.name).toBe('“Kape  Kultura!” counts as the same name as the group Kape Kultura: spacing, punctuation and capitals are ignored. Two groups cannot share a name.');
+    const twin = await saveGroupsTable(event.id, [{ rowId: 'new:b', key: 'name', value: 'Kape Kultura' }]);
+    expect(twin.rows[0].errors?.name).toBe('There is already a group called Kape Kultura. Two groups cannot share a name.');
     expect(await one('SELECT name FROM tgroup WHERE id = $1', [id])).toEqual({ name: 'Table Venture' });
 
     // Only the changed row is sent back, not the whole table.
@@ -150,13 +153,13 @@ describe('the Groups and Members tables save cell by cell (14 September 2026)', 
 
   it('members are added by student number, never twice, and removals are refused after release while corrections stay open', async () => {
     await setEvent('setup', false);
-    const group = (await one<{ id: string }>(`SELECT id FROM tgroup WHERE event_id = $1 AND code = 'G01'`, [event.id]))!;
+    const group = (await one<{ id: string }>(`SELECT id FROM tgroup WHERE event_id = $1 AND name = 'Kape Kultura'`, [event.id]))!;
     const free = (await one<{ id: string; student_number: string }>(
       'SELECT id, student_number FROM student s WHERE event_id = $1 AND NOT EXISTS (SELECT 1 FROM group_member m WHERE m.student_id = s.id) ORDER BY student_number LIMIT 1',
       [event.id],
     ))!;
-    const taken = (await one<{ student_number: string; code: string }>(
-      `SELECT s.student_number, g.code FROM group_member m JOIN student s ON s.id = m.student_id JOIN tgroup g ON g.id = m.group_id WHERE m.event_id = $1 AND g.id <> $2 LIMIT 1`,
+    const taken = (await one<{ student_number: string; group_name: string }>(
+      `SELECT s.student_number, g.name AS group_name FROM group_member m JOIN student s ON s.id = m.student_id JOIN tgroup g ON g.id = m.group_id WHERE m.event_id = $1 AND g.id <> $2 LIMIT 1`,
       [event.id, group.id],
     ))!;
 
@@ -165,7 +168,7 @@ describe('the Groups and Members tables save cell by cell (14 September 2026)', 
       { rowId: 'new:2', key: 'student', value: taken.student_number },
     ]);
     expect(added.rows[0].row).toMatchObject({ id: free.id, cells: { student: free.student_number, absent: 'Present' } });
-    expect(added.rows[1].errors?.student).toMatch(new RegExp(`is in ${taken.code} already`));
+    expect(added.rows[1].errors?.student).toContain(`is in ${taken.group_name} already`);
 
     const absent = await saveMembersTable(event.id, group.id, [{ rowId: free.id, key: 'absent', value: 'absent' }]);
     expect(absent.rows[0].row!.cells.absent).toBe('Absent');
@@ -176,7 +179,7 @@ describe('the Groups and Members tables save cell by cell (14 September 2026)', 
     expect(rename.rows[0].errors?.section).toMatch(/section cannot change/);
     const g = (await one<{ name: string }>('SELECT name FROM tgroup WHERE id = $1', [group.id]))!;
     const corrected = await saveGroupsTable(event.id, [{ rowId: group.id, key: 'name', value: `${g.name} Corp` }]);
-    expect(corrected.notice).toMatch(/result pages now show the new code and name/);
+    expect(corrected.notice).toMatch(/result pages now show the new name/);
     await saveGroupsTable(event.id, [{ rowId: group.id, key: 'name', value: g.name }]);
 
     await setEvent('setup', false);
@@ -187,14 +190,16 @@ describe('the Groups and Members tables save cell by cell (14 September 2026)', 
 describe('the Class roll, Advisers and Judges tables (14 September 2026)', () => {
   it('a student is moved between groups, left out only when in no group, and a duplicate student number is refused', async () => {
     await setEvent('setup', false);
-    const [g1, g2] = await query<{ id: string; code: string }>(`SELECT id, code FROM tgroup WHERE event_id = $1 ORDER BY code LIMIT 2`, [event.id]);
+    const [g1, g2] = await query<{ id: string; name: string }>(`SELECT id, name FROM tgroup WHERE event_id = $1 ORDER BY name LIMIT 2`, [event.id]);
     const st = (await one<{ id: string; student_number: string; surname: string }>(
       'SELECT s.id, s.student_number, s.surname FROM group_member m JOIN student s ON s.id = m.student_id WHERE m.group_id = $1 ORDER BY s.student_number LIMIT 1',
       [g1.id],
     ))!;
 
-    const moved = await saveRollTable(event.id, [{ rowId: st.id, key: 'group', value: g2.code.toLowerCase() }]);
-    expect(moved.rows[0].row!.cells).toMatchObject({ group: g2.code, status: 'In a group', leftout: '' });
+    // A group typed whole by name, with different capitals and punctuation, is found; a name it only starts is not.
+    expect((await saveRollTable(event.id, [{ rowId: st.id, key: 'group', value: g2.name.slice(0, 3) }])).rows[0].errors?.group).toBe(`There is no group ${g2.name.slice(0, 3)}.`);
+    const moved = await saveRollTable(event.id, [{ rowId: st.id, key: 'group', value: g2.name.toLowerCase().replace(/[^a-z0-9]+/g, ' ') }]);
+    expect(moved.rows[0].row!.cells).toMatchObject({ group: g2.name, status: 'In a group', leftout: '' });
     expect(moved.notice).toMatch(/Moved 1 student out of another group/);
     expect(await one('SELECT group_id FROM group_member WHERE student_id = $1', [st.id])).toEqual({ group_id: g2.id });
 
@@ -358,7 +363,7 @@ describe('the scores table corrects only its own group and half (14 September 20
        WHERE s.event_id = $1 AND s.half = 'defense' AND s.status = 'complete' AND v.corrected_by IS NULL ORDER BY v.sheet_id DESC, v.criterion_key LIMIT 1`,
       [event.id],
     ))!;
-    const other = (await one<{ id: string }>('SELECT id FROM tgroup WHERE event_id = $1 AND id <> $2 ORDER BY code LIMIT 1', [event.id, v.group_id]))!;
+    const other = (await one<{ id: string }>('SELECT id FROM tgroup WHERE event_id = $1 AND id <> $2 ORDER BY name LIMIT 1', [event.id, v.group_id]))!;
     const key = `c:${v.criterion_key}`;
     const state = async () => ({
       value: Number((await one<{ value: number }>('SELECT value FROM score_value WHERE sheet_id = $1 AND criterion_key = $2', [v.sheet_id, v.criterion_key]))!.value),
@@ -391,7 +396,7 @@ describe('judge profiles (item 14)', () => {
 
     const past = 'test-event-2026';
     await query(`INSERT INTO event (id, year, title, status, rubric) VALUES ($1, 2026, 'Tambiz 2026', 'finalised', $2::jsonb)`, [past, JSON.stringify(event.rubric)]);
-    await query(`INSERT INTO tgroup (id, event_id, code, name, name_key) VALUES ('test-group-2026', $1, 'G01', 'Old Group', 'oldgroup')`, [past]);
+    await query(`INSERT INTO tgroup (id, event_id, name, name_key) VALUES ('test-group-2026', $1, 'Old Group', 'OLDGROUP')`, [past]);
     await query(`INSERT INTO score_sheet (id, event_id, group_id, half, judge_id) VALUES ('test-sheet-2026', $1, 'test-group-2026', 'defense', $2)`, [past, judgeId]);
     await query(`INSERT INTO score_value (sheet_id, criterion_key, value) VALUES ('test-sheet-2026', $1, 10)`, [criteriaOf(event.rubric, 'defense')[0].key]);
     // A sheet only started, never submitted, is not part of the judge's record (before: 2026 was listed).
@@ -400,6 +405,94 @@ describe('judge profiles (item 14)', () => {
     const later = (await judgeEventProfile(event, judgeId))!;
     expect(later.scoredHere).toBe(false);
     expect(later.history.map((h) => h.event.title)).toEqual(['Tambiz 2026']);
+  });
+});
+
+describe('groups are known by their name alone (15 September 2026)', () => {
+  /** Imports an adviser list built from these rows and returns the message the page shows. */
+  async function importList(rows: string[][]) {
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet('Advisers');
+    rows.forEach((r) => ws.addRow(r));
+    const file = new File([await wb.xlsx.writeBuffer()], 'advisers.xlsx');
+    return act(importAdvisers, { eventId: event.id, file } as unknown as Record<string, string>);
+  }
+
+  it('the adviser list matches groups by name; a Group Code column is accepted and ignored, and the import says so', async () => {
+    await setEvent('setup', false);
+    const [kape, banig] = await query<{ id: string; name: string; adviser_id: string }>(
+      `SELECT id, name, adviser_id FROM tgroup WHERE event_id = $1 AND name IN ('Kape Kultura', 'Banig & Co.') ORDER BY name DESC`,
+      [event.id],
+    );
+    const adviser = (await one<{ id: string; name: string }>('SELECT id, name FROM adviser WHERE event_id = $1 AND id <> $2 ORDER BY name LIMIT 1', [event.id, kape.adviser_id]))!;
+    await query(`UPDATE tgroup SET code = 'G02' WHERE id = $1`, [banig.id]);
+
+    // Group Code says G02 (Banig & Co.) but the name says Kape Kultura: the name decides, and the code is left alone.
+    const both = await importList([['Adviser', 'Group Code', 'Group Name'], [adviser.name, 'G02', 'kape kultura']]);
+    expect(both.error).toBeNull();
+    expect(both.ok).toMatch(/1 group given an adviser\.$/);
+    expect(await query('SELECT id, adviser_id, code FROM tgroup WHERE id = ANY($1::text[]) ORDER BY id = $2 DESC', [[kape.id, banig.id], kape.id])).toEqual([
+      { id: kape.id, adviser_id: adviser.id, code: null },
+      { id: banig.id, adviser_id: banig.adviser_id, code: 'G02' },
+    ]);
+
+    const codeOnly = await importList([['Adviser', 'Group Code'], [adviser.name, 'G02']]);
+    expect(codeOnly.error).toBeNull();
+    expect(codeOnly.ok).toMatch(/0 groups given an adviser\. 1 row has a Group Code but no Group Name\. Groups are matched by their name now/);
+    expect(await one('SELECT adviser_id FROM tgroup WHERE id = $1', [banig.id])).toEqual({ adviser_id: banig.adviser_id });
+
+    const unknown = await importList([['Adviser', 'Group Name'], [adviser.name, 'Kape']]);
+    expect(unknown.ok).toMatch(/Row 2: no group called Kape in this event\./);
+    await query('UPDATE tgroup SET adviser_id = $2 WHERE id = $1', [kape.id, kape.adviser_id]);
+  });
+
+  it('an adviser list with a column headed just Code is refused and changes nothing; Group Code and Adviser Code still import', async () => {
+    await setEvent('setup', false);
+    const kape = (await one<{ id: string; adviser_id: string }>(`SELECT id, adviser_id FROM tgroup WHERE event_id = $1 AND name = 'Kape Kultura'`, [event.id]))!;
+    const adviser = (await one<{ id: string; name: string; link_code: string | null }>('SELECT id, name, link_code FROM adviser WHERE event_id = $1 AND id <> $2 ORDER BY name LIMIT 1', [event.id, kape.adviser_id]))!;
+    const state = async () => ({
+      advisers: await query('SELECT id, name, email, link_code FROM adviser WHERE event_id = $1 ORDER BY id', [event.id]),
+      groups: await query('SELECT id, adviser_id FROM tgroup WHERE event_id = $1 ORDER BY id', [event.id]),
+      imports: await one('SELECT count(*)::int AS n FROM roll_import WHERE event_id = $1', [event.id]),
+    });
+    const before = await state();
+
+    for (const rows of [
+      [['Adviser', 'Code'], ['Prof. Someone New', 'G01']],
+      [['Adviser', 'Code', 'Group Name'], [adviser.name, 'K7Q-4MP', 'Kape Kultura']],
+    ]) {
+      const refused = await importList(rows);
+      expect(refused).toEqual({
+        ok: null,
+        error: 'The column headed "Code" could mean the group code or the adviser\'s access code. Rename it to "Group Code" or "Adviser Code" and import again.',
+      });
+    }
+    expect(await state()).toEqual(before);
+
+    const codeOnly = await importList([['Adviser', 'Group Code'], [adviser.name, 'G01'], [adviser.name, 'G02']]);
+    expect(codeOnly.error).toBeNull();
+    expect(codeOnly.ok).toMatch(/0 groups given an adviser\. 2 rows have a Group Code but no Group Name\./);
+
+    const withCode = await importList([['Adviser', 'Adviser Code'], [adviser.name, 'zz9 q7m']]);
+    expect(withCode.error).toBeNull();
+    expect(await one('SELECT link_code FROM adviser WHERE id = $1', [adviser.id])).toEqual({ link_code: 'ZZ9Q7M' });
+    await query('UPDATE adviser SET link_code = $2 WHERE id = $1', [adviser.id, adviser.link_code]);
+  });
+
+  it('a group’s history leaves out a code change recorded by an earlier version, and keeps the rest of that entry', async () => {
+    const g = (await one<{ id: string }>(`SELECT id FROM tgroup WHERE event_id = $1 AND name = 'Kape Kultura'`, [event.id]))!;
+    const logged = (changes: string[]) =>
+      query(`INSERT INTO change_log (id, event_id, account_id, action, detail) VALUES ($1, $2, 'test-coordinator', 'group.update', $3::jsonb)`, [
+        `test-log-${changes.length}`,
+        event.id,
+        JSON.stringify({ groupId: g.id, changes }),
+      ]);
+    await logged(['Code G01 → G09']);
+    await logged(['Code G09 → G01', 'Name Kape → Kape Kultura']);
+    const shown = (await groupDetailChanges(event.id, g.id)).map((c) => c.detail.changes);
+    expect(shown).toContainEqual(['Name Kape → Kape Kultura']);
+    expect(shown.flat().some((line) => line.startsWith('Code '))).toBe(false);
+    await query(`DELETE FROM change_log WHERE id LIKE 'test-log-%'`);
   });
 });
 
@@ -452,22 +545,22 @@ describe('after release a group can be corrected but not removed (14 September 2
     expect(await one('SELECT value FROM score_value WHERE sheet_id = $1 AND criterion_key = $2', [score.sheet_id, score.criterion_key])).toEqual({ value: score.value });
   });
 
-  it('a new code, name or adviser is saved, recorded with who and when, and its consequence is said at once', async () => {
+  it('a new name or adviser is saved, recorded with who and when, and its consequence is said at once', async () => {
     await setEvent('finalised', true);
-    const g = (await one<{ id: string; code: string; name: string; section: string; adviser_id: string | null }>(
-      'SELECT id, code, name, section, adviser_id FROM tgroup WHERE event_id = $1 AND adviser_id IS NOT NULL ORDER BY code LIMIT 1',
+    const g = (await one<{ id: string; name: string; section: string; adviser_id: string | null }>(
+      'SELECT id, name, section, adviser_id FROM tgroup WHERE event_id = $1 AND adviser_id IS NOT NULL ORDER BY name LIMIT 1',
       [event.id],
     ))!;
     const other = (await one<{ id: string; name: string }>('SELECT id, name FROM adviser WHERE event_id = $1 AND id <> $2 ORDER BY name LIMIT 1', [event.id, g.adviser_id]))!;
-    const fields = { eventId: event.id, groupId: g.id, code: g.code, name: g.name, section: g.section, adviserId: g.adviser_id! };
+    const fields = { eventId: event.id, groupId: g.id, name: g.name, section: g.section, adviserId: g.adviser_id! };
     const before = (await changesFor(g.id)).length;
 
     expect((await act(saveGroup, { ...fields, section: `${g.section}X` })).error).toMatch(/section cannot change/);
-    expect((await act(saveGroup, { ...fields, groupId: '', code: 'G99', name: 'Brand new' })).error).toMatch(/no new group/);
+    expect((await act(saveGroup, { ...fields, groupId: '', name: 'Brand new' })).error).toMatch(/no new group/);
 
     const renamed = await act(saveGroup, { ...fields, name: `${g.name} Corrected` });
     expect(renamed.error).toBeNull();
-    expect(renamed.ok).toMatch(/result pages now show the new code and name/);
+    expect(renamed.ok).toMatch(/result pages now show the new name/);
 
     const moved = await act(saveGroup, { ...fields, name: `${g.name} Corrected`, adviserId: other.id });
     expect(moved.ok).toMatch(new RegExp(`→ ${other.name}`));
@@ -485,14 +578,14 @@ describe('after release a group can be corrected but not removed (14 September 2
     const wb = new ExcelJS.Workbook();
     const ws = wb.addWorksheet('Advisers');
     const original = (await one<{ name: string }>('SELECT name FROM adviser WHERE id = $1', [g.adviser_id]))!;
-    ws.addRow(['Adviser', 'Group Code']);
-    ws.addRow([original.name, g.code]);
+    ws.addRow(['Adviser', 'Group Name']);
+    ws.addRow([original.name, `${g.name.toUpperCase()} CORRECTED`]);
     const fd = new FormData();
     fd.set('eventId', event.id);
     fd.set('file', new File([await wb.xlsx.writeBuffer()], 'advisers.xlsx'));
     let imported = '';
     await importAdvisers(fd).catch((e: Error & { url?: string }) => (imported = new URL(e.url!, 'http://localhost').searchParams.get('ok') ?? ''));
-    expect(imported).toMatch(new RegExp(`1 group changed adviser: ${g.code} \\(${other.name} → ${original.name}\\)`));
+    expect(imported).toContain(`1 group changed adviser: ${g.name} Corrected (${other.name} → ${original.name})`);
     expect(imported).toMatch(/mailing sheet already sent no longer matches/);
     expect(await one('SELECT adviser_id FROM tgroup WHERE id = $1', [g.id])).toEqual({ adviser_id: g.adviser_id });
     expect((await changesFor(g.id)).slice(before).map((c) => c.detail.changes)).toHaveLength(3);
@@ -502,8 +595,8 @@ describe('after release a group can be corrected but not removed (14 September 2
 
   it('a group change whose history entry cannot be written is not saved either', async () => {
     await setEvent('finalised', true);
-    const g = (await one<{ id: string; code: string; name: string; section: string; adviser_id: string | null }>(
-      'SELECT id, code, name, section, adviser_id FROM tgroup WHERE event_id = $1 ORDER BY code LIMIT 1',
+    const g = (await one<{ id: string; name: string; section: string; adviser_id: string | null }>(
+      'SELECT id, name, section, adviser_id FROM tgroup WHERE event_id = $1 ORDER BY name LIMIT 1',
       [event.id],
     ))!;
     const before = (await changesFor(g.id)).length;
@@ -513,7 +606,7 @@ describe('after release a group can be corrected but not removed (14 September 2
     await query('CREATE TRIGGER refuse_group_log BEFORE INSERT ON change_log FOR EACH ROW EXECUTE FUNCTION refuse_group_log()');
     try {
       await expect(
-        act(saveGroup, { eventId: event.id, groupId: g.id, code: g.code, name: `${g.name} Unrecorded`, section: g.section, adviserId: g.adviser_id ?? '' }),
+        act(saveGroup, { eventId: event.id, groupId: g.id, name: `${g.name} Unrecorded`, section: g.section, adviserId: g.adviser_id ?? '' }),
       ).rejects.toThrow(/history write failed/);
     } finally {
       await query('DROP TRIGGER refuse_group_log ON change_log');

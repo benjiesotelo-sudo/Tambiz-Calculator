@@ -160,7 +160,6 @@ export default async function ProgressPage({ params, searchParams }: { params: P
           {report.groups.map((g) => (
             <li key={g.id} style={{ display: 'block' }}>
               <div style={{ display: 'flex', gap: 10, alignItems: 'baseline' }}>
-                <span className="code">{g.code}</span>
                 <Link href={`/admin/events/${id}/groups/${g.id}`} className="title" style={{ color: 'inherit', textDecoration: 'none', minWidth: 0 }}>
                   {g.name}
                 </Link>

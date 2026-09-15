@@ -20,7 +20,6 @@ export interface EventRow {
 export interface GroupRow {
   id: string;
   event_id: string;
-  code: string;
   name: string;
   section: string;
   adviser_id: string | null;
@@ -39,13 +38,15 @@ export interface StudentRow {
   middle_name: string;
   section: string;
   group_id?: string | null;
-  group_code?: string | null;
   group_name?: string | null;
   /** Set when the coordinator left this student out of every group, with this reason (decision 6). */
   excluded_reason?: string | null;
   /** Only from groupMembers: marked absent from the defense. */
   absent_at?: Date | null;
 }
+
+/** Groups in name order, as people read them: "Group 2" before "Group 10", capitals ignored. */
+export const byGroupName = (a: string, b: string) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
 
 const parseRubric = (r: unknown): Rubric => (typeof r === 'string' ? JSON.parse(r) : (r as Rubric)) ?? DEFAULT_RUBRIC;
 
@@ -74,7 +75,7 @@ export async function listGroups(eventId: string) {
      FROM tgroup g LEFT JOIN adviser a ON a.id = g.adviser_id WHERE g.event_id = $1`,
     [eventId],
   );
-  return rows.sort((a, b) => a.code.localeCompare(b.code, undefined, { numeric: true }));
+  return rows.sort((a, b) => byGroupName(a.name, b.name));
 }
 
 export async function getGroup(eventId: string, groupId: string) {
@@ -85,14 +86,18 @@ export async function getGroup(eventId: string, groupId: string) {
   );
 }
 
-/** Every recorded change to a group's code, name, section or adviser, newest first, with who made it and when. */
+/** Every recorded change to a group's name, section or adviser, newest first, with who made it and when. */
 export async function groupDetailChanges(eventId: string, groupId: string) {
-  return query<{ created_at: Date; who: string | null; detail: { changes: string[]; released?: boolean; file?: string } }>(
+  const rows = await query<{ created_at: Date; who: string | null; detail: { changes: string[]; released?: boolean; file?: string } }>(
     `SELECT c.created_at, a.display_name AS who, c.detail FROM change_log c LEFT JOIN account a ON a.id = c.account_id
      WHERE c.event_id = $1 AND c.action = 'group.update' AND c.detail->>'groupId' = $2 AND jsonb_array_length(coalesce(c.detail->'changes', '[]'::jsonb)) > 0
      ORDER BY c.created_at DESC`,
     [eventId, groupId],
   );
+  // Groups once had codes, and an old entry may record a code change. Codes are no longer shown, so those lines are left out.
+  return rows
+    .map((r) => ({ ...r, detail: { ...r.detail, changes: r.detail.changes.filter((line) => !line.startsWith('Code ')) } }))
+    .filter((r) => r.detail.changes.length);
 }
 
 export async function groupMembers(groupId: string) {
@@ -104,7 +109,7 @@ export async function groupMembers(groupId: string) {
 
 export async function listStudents(eventId: string) {
   return query<StudentRow>(
-    `SELECT s.*, g.id AS group_id, g.code AS group_code, g.name AS group_name FROM student s
+    `SELECT s.*, g.id AS group_id, g.name AS group_name FROM student s
      LEFT JOIN group_member m ON m.student_id = s.id LEFT JOIN tgroup g ON g.id = m.group_id
      WHERE s.event_id = $1 ORDER BY s.section, s.surname, s.first_name`,
     [eventId],
@@ -351,7 +356,7 @@ export async function eventFinaliseChecks(report: EventReport) {
   const students = await listStudents(event.id);
   return finaliseChecks({
     halfLabel: { defense: event.rubric.halves.defense.label, booth: event.rubric.halves.booth.label },
-    groups: report.groups.map((g) => ({ id: g.id, code: g.code, name: g.name, acceptReason: g.accept_reason ?? null, complete: report.resultById.get(g.id)?.complete ?? false })),
+    groups: report.groups.map((g) => ({ id: g.id, name: g.name, acceptReason: g.accept_reason ?? null, complete: report.resultById.get(g.id)?.complete ?? false })),
     sheets: [...report.sheets, ...report.openSheets].map((s) => ({ groupId: s.group_id, half: s.half, status: s.status, judgeName: s.judge_name, filled: report.filled.get(s.id) ?? 0 })),
     members: report.grades.map((g) => ({ studentId: g.student.id, name: fullName(g.student), groupId: g.group.id, absent: g.absent, memberComplete: g.memberComplete })),
     unplaced: students.filter((s) => !s.group_id).map((s) => ({ studentId: s.id, name: fullName(s), section: s.section, excludedReason: s.excluded_reason ?? null })),
