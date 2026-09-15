@@ -106,7 +106,7 @@ Choose **one** of these.
 **With an adviser file**
 
 1. Press the **Advisers** tab.
-2. Press **Choose File** and pick the adviser `.xlsx` file. (No file yet? Press **Download template** for an Excel file with the right columns and one invented example row to type over.) It needs an **Adviser** column. An **Email** column is optional. A **Group Name** column sets each group's adviser in one go: one row per group, the business name spelled as on the **Groups** table (capitals, spaces and punctuation do not matter). Do this after Part D if you use it. An older file with a **Group Code** column still imports, but the code is ignored: the message says how many rows had a code and no name.
+2. Press **Choose File** and pick the adviser `.xlsx` file. (No file yet? Press **Download template** for an Excel file with the right columns and one invented example row to type over.) It needs an **Adviser** column. An **Email** column is optional. A **Group Name** column sets each group's adviser in one go: one row per group, the business name spelled as on the **Groups** table (capitals, spaces and punctuation do not matter). Do this after Part D if you use it. An older file with a **Group Code** column still imports, but the code is ignored: the message says how many rows had a code and no name. A column headed just **Code** is refused, because it could mean the group code or the adviser's code: rename it **Group Code** or **Adviser Code** and import again.
 3. Press **Import**.
 4. Read the green message.
 

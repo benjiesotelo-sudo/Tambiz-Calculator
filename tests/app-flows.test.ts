@@ -446,6 +446,39 @@ describe('groups are known by their name alone (15 September 2026)', () => {
     await query('UPDATE tgroup SET adviser_id = $2 WHERE id = $1', [kape.id, kape.adviser_id]);
   });
 
+  it('an adviser list with a column headed just Code is refused and changes nothing; Group Code and Adviser Code still import', async () => {
+    await setEvent('setup', false);
+    const kape = (await one<{ id: string; adviser_id: string }>(`SELECT id, adviser_id FROM tgroup WHERE event_id = $1 AND name = 'Kape Kultura'`, [event.id]))!;
+    const adviser = (await one<{ id: string; name: string; link_code: string | null }>('SELECT id, name, link_code FROM adviser WHERE event_id = $1 AND id <> $2 ORDER BY name LIMIT 1', [event.id, kape.adviser_id]))!;
+    const state = async () => ({
+      advisers: await query('SELECT id, name, email, link_code FROM adviser WHERE event_id = $1 ORDER BY id', [event.id]),
+      groups: await query('SELECT id, adviser_id FROM tgroup WHERE event_id = $1 ORDER BY id', [event.id]),
+      imports: await one('SELECT count(*)::int AS n FROM roll_import WHERE event_id = $1', [event.id]),
+    });
+    const before = await state();
+
+    for (const rows of [
+      [['Adviser', 'Code'], ['Prof. Someone New', 'G01']],
+      [['Adviser', 'Code', 'Group Name'], [adviser.name, 'K7Q-4MP', 'Kape Kultura']],
+    ]) {
+      const refused = await importList(rows);
+      expect(refused).toEqual({
+        ok: null,
+        error: 'The column headed "Code" could mean the group code or the adviser\'s access code. Rename it to "Group Code" or "Adviser Code" and import again.',
+      });
+    }
+    expect(await state()).toEqual(before);
+
+    const codeOnly = await importList([['Adviser', 'Group Code'], [adviser.name, 'G01'], [adviser.name, 'G02']]);
+    expect(codeOnly.error).toBeNull();
+    expect(codeOnly.ok).toMatch(/0 groups given an adviser\. 2 rows have a Group Code but no Group Name\./);
+
+    const withCode = await importList([['Adviser', 'Adviser Code'], [adviser.name, 'zz9 q7m']]);
+    expect(withCode.error).toBeNull();
+    expect(await one('SELECT link_code FROM adviser WHERE id = $1', [adviser.id])).toEqual({ link_code: 'ZZ9Q7M' });
+    await query('UPDATE adviser SET link_code = $2 WHERE id = $1', [adviser.id, adviser.link_code]);
+  });
+
   it('a group’s history leaves out a code change recorded by an earlier version, and keeps the rest of that entry', async () => {
     const g = (await one<{ id: string }>(`SELECT id FROM tgroup WHERE event_id = $1 AND name = 'Kape Kultura'`, [event.id]))!;
     const logged = (changes: string[]) =>

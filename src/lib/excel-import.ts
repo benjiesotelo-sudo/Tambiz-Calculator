@@ -39,6 +39,13 @@ export const ADVISER_COLUMNS: ColumnSpec[] = [
   { field: 'group_code', header: 'Group Code', aliases: ['groupcode', 'groupno', 'groupnumber'], required: false, example: '', ignored: true },
 ];
 
+/** Headings, normalised, that could mean more than one column. A file with one is refused rather than guessed. */
+export type AmbiguousHeadings = Record<string, (heading: string) => string>;
+
+export const ADVISER_AMBIGUOUS: AmbiguousHeadings = {
+  code: (h) => `The column headed "${h}" could mean the group code or the adviser's access code. Rename it to "Group Code" or "Adviser Code" and import again.`,
+};
+
 export interface Template {
   columns: ColumnSpec[];
   /** The name of the sheet to fill in. */
@@ -92,7 +99,7 @@ export interface ParsedSheet {
 
 export class ImportError extends Error {}
 
-export async function parseWorkbook(buffer: ArrayBuffer, columns: ColumnSpec[], fileLabel: string): Promise<ParsedSheet> {
+export async function parseWorkbook(buffer: ArrayBuffer, columns: ColumnSpec[], fileLabel: string, ambiguous: AmbiguousHeadings = {}): Promise<ParsedSheet> {
   const wb = new ExcelJS.Workbook();
   try {
     await wb.xlsx.load(buffer);
@@ -123,6 +130,11 @@ export async function parseWorkbook(buffer: ArrayBuffer, columns: ColumnSpec[], 
       }
     }
     if (headerRow < 0) return;
+    ws.getRow(headerRow).eachCell((cell) => {
+      const heading = (cell.text ?? '').trim();
+      const refuse = Object.hasOwn(ambiguous, norm(heading)) ? ambiguous[norm(heading)] : null;
+      if (refuse) throw new ImportError(refuse(heading));
+    });
     const missing = columns.filter((c) => c.required && !(c.field in headerMap)).map((c) => c.header);
     if (missing.length) {
       if (!bestMissing || missing.length < bestMissing.length) bestMissing = missing;

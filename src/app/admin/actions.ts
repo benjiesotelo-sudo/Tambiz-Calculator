@@ -6,7 +6,7 @@ import { requireAdmin } from '@/lib/auth';
 import { logStatement } from '@/lib/change-log';
 import { newId, one, query, transaction, type Statement } from '@/lib/db';
 import { adviserChangeWarning, adviserWord, editGroup, removeGroup } from '@/lib/group-edit';
-import { ADVISER_COLUMNS, ImportError, parseWorkbook, ROLL_COLUMNS } from '@/lib/excel-import';
+import { ADVISER_AMBIGUOUS, ADVISER_COLUMNS, ImportError, parseWorkbook, ROLL_COLUMNS } from '@/lib/excel-import';
 import { generatePassword, hashPassword } from '@/lib/passwords';
 import { eventFinaliseChecks, eventReport, getEvent, getGroup, listEvents } from '@/lib/repo';
 import { HALVES, rubricForNewEvent, withCriterionWording } from '@/lib/rubric';
@@ -297,7 +297,7 @@ export async function importAdvisers(fd: FormData) {
   const { name, buffer } = await readUpload(fd, path);
   let parsed;
   try {
-    parsed = await parseWorkbook(buffer, ADVISER_COLUMNS, 'adviser list');
+    parsed = await parseWorkbook(buffer, ADVISER_COLUMNS, 'adviser list', ADVISER_AMBIGUOUS);
   } catch (e) {
     if (e instanceof ImportError) back(path, { error: e.message });
     throw e;

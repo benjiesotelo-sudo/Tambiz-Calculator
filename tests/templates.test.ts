@@ -15,6 +15,7 @@ describe('download templates', () => {
       wb.worksheets[0].getRow(1).eachCell((c) => headings.push(String(c.value)));
       expect(headings).toEqual(templateColumns(template).map((c) => c.header));
       expect(headings).not.toContain('Group Code');
+      expect(headings.map(norm)).not.toContain('code');
 
       const parsed = await parseWorkbook(buf as unknown as ArrayBuffer, template.columns, kind);
       expect(parsed.problems).toEqual([]);
