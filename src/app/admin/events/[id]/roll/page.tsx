@@ -1,38 +1,59 @@
-import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { AppBar, Notice } from '@/components/AppBar';
+import { DataGrid } from '@/components/DataGrid';
 import { EventHeader } from '@/components/EventNav';
 import { requireAdmin } from '@/lib/auth';
 import { query } from '@/lib/db';
-import { getEvent, listStudents, rollName } from '@/lib/repo';
-import { excludeStudent, importRoll, includeStudent } from '../../../actions';
+import type { GridColumn } from '@/lib/grid';
+import { getEvent, listGroups, listStudents } from '@/lib/repo';
+import { rollGridRow } from '@/lib/tables';
+import { importRoll } from '../../../actions';
+import { saveRollTable } from '../../../table-actions';
 
 export const dynamic = 'force-dynamic';
 
-export default async function RollPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ ok?: string; error?: string; show?: string }> }) {
+export default async function RollPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ ok?: string; error?: string }> }) {
   const acc = await requireAdmin();
   const { id } = await params;
   const sp = await searchParams;
   const event = await getEvent(id);
   if (!event) notFound();
-  const [students, imports] = await Promise.all([
+  const [students, groups, imports] = await Promise.all([
     listStudents(id),
+    listGroups(id),
     query<{ file_name: string; row_count: number; added: number; updated: number; uploaded_at: Date }>(
-      `SELECT file_name, row_count, added, updated, uploaded_at FROM roll_import WHERE event_id = $1 AND kind = 'roll' ORDER BY uploaded_at DESC LIMIT 5`,
+      `SELECT file_name, row_count, added, updated, uploaded_at FROM roll_import WHERE event_id = $1 AND kind = 'roll' ORDER BY uploaded_at DESC LIMIT 1`,
       [id],
     ),
   ]);
-  const unplaced = students.filter((s) => !s.group_id && !s.excluded_reason);
-  const leftOut = students.filter((s) => !s.group_id && s.excluded_reason);
-  const showAll = sp.show === 'all';
-  const shown = showAll ? students : [...unplaced, ...leftOut];
-  const sections = [...new Set(students.map((s) => s.section))];
-  const here = `/admin/events/${id}/roll${showAll ? '?show=all' : ''}`;
+  const unplaced = students.filter((s) => !s.group_id && !s.excluded_reason).length;
+  const leftOut = students.filter((s) => !s.group_id && s.excluded_reason).length;
+  const sections = new Set(students.map((s) => s.section)).size;
+
+  const columns: GridColumn[] = [
+    { key: 'student', label: 'Student No.', editable: true, addOnly: true, required: true, width: '8.2rem' },
+    { key: 'surname', label: 'Surname', editable: true, required: true, width: 'minmax(6.5rem, 1fr)' },
+    { key: 'first', label: 'First name', editable: true, required: true, width: 'minmax(6.5rem, 1fr)' },
+    { key: 'middle', label: 'Middle name', editable: true, width: 'minmax(5.5rem, .8fr)' },
+    { key: 'section', label: 'Section', editable: true, required: true, filter: true, width: '5.8rem' },
+    { key: 'email', label: 'Email', editable: true, required: true, width: 'minmax(9rem, 1.5fr)' },
+    {
+      key: 'group',
+      label: 'Group',
+      type: 'choice',
+      editable: true,
+      options: groups.map((g) => ({ value: g.id, label: g.code, hint: `${g.name} · ${g.section}` })),
+      filter: true,
+      width: '5.6rem',
+    },
+    { key: 'status', label: 'Status', filter: true, width: '7.4rem' },
+    { key: 'leftout', label: 'Left out because', editable: true, width: 'minmax(8rem, 1.3fr)' },
+  ];
 
   return (
     <>
       <AppBar subtitle="Coordinator" account={acc} home="/admin" />
-      <main className="page">
+      <main className="page wide">
         <EventHeader event={event} tab="roll" title="Class roll" />
         <Notice ok={sp.ok} error={sp.error} />
 
@@ -42,98 +63,42 @@ export default async function RollPage({ params, searchParams }: { params: Promi
           <p className="sub" style={{ margin: 0 }}>
             Upload the registrar’s Excel export (.xlsx). It needs the columns Student No., Student Email, Surname, First Name and Section; other columns are ignored. Importing the
             same file again updates students, it never adds them twice.
+            {imports.length
+              ? ` Last import: ${imports[0].file_name}, ${imports[0].row_count} rows (${imports[0].added} new, ${imports[0].updated} updated), ${new Date(imports[0].uploaded_at).toLocaleString('en-PH', { timeZone: 'Asia/Manila' })}.`
+              : ''}
           </p>
           <input className="input" type="file" name="file" accept=".xlsx" required />
           <button className="btn" type="submit">
             Import
           </button>
+          <div className="actions" style={{ marginTop: 0 }}>
+            <a className="btn small secondary" href="/api/admin/templates/roll">
+              Download template
+            </a>
+            <span className="sub">An Excel file with exactly the columns the import reads, and one example row.</span>
+          </div>
         </form>
-        {imports.length ? (
-          <p className="sub">
-            Last import: {imports[0].file_name}, {imports[0].row_count} rows ({imports[0].added} new, {imports[0].updated} updated), {new Date(imports[0].uploaded_at).toLocaleString('en-PH', { timeZone: 'Asia/Manila' })}.
-          </p>
-        ) : null}
 
-        <div className="grid" style={{ marginTop: 10 }}>
-          <div className="tile">
-            <b>On the roll</b>
-            <div className="stat">{students.length}</div>
-            <div className="sub">{sections.length} section{sections.length === 1 ? '' : 's'}</div>
-          </div>
-          <div className="tile">
-            <b>Not in any group</b>
-            <div className="stat" style={{ color: unplaced.length ? 'var(--error)' : undefined }}>
-              {unplaced.length}
-            </div>
-            <div className="sub">{unplaced.length ? 'Place each one in a group, or leave them out with a reason. Judging cannot close until you do.' : 'Everyone is placed or left out'}</div>
-          </div>
-          <div className="tile">
-            <b>Left out</b>
-            <div className="stat">{leftOut.length}</div>
-            <div className="sub">In no group, with your reason</div>
-          </div>
-        </div>
-
-        <div className="section-title">{showAll ? `Everyone (${students.length})` : `Not in any group (${unplaced.length + leftOut.length})`}</div>
-        <div className="actions" style={{ marginTop: 0, marginBottom: 8 }}>
-          <Link className="btn small secondary" href={`/admin/events/${id}/roll${showAll ? '' : '?show=all'}`}>
-            {showAll ? 'Show only students not in a group' : 'Show everyone'}
-          </Link>
-        </div>
-        <ul className="list">
-          {shown.map((s) => (
-            <li key={s.id} style={{ flexWrap: 'wrap' }}>
-              <span className="grow-1" style={{ minWidth: 200 }}>
-                <span className="title">{rollName(s)}</span>
-                <span className="sub" style={{ display: 'block', overflowWrap: 'anywhere' }}>
-                  {s.student_number} · {s.section} · {s.email}
-                </span>
-                {s.excluded_reason && !s.group_id ? (
-                  <span className="sub" style={{ display: 'block', overflowWrap: 'anywhere' }}>
-                    Left out: {s.excluded_reason}
-                  </span>
-                ) : null}
-              </span>
-              {s.group_id ? (
-                <Link className="pill done" href={`/admin/events/${id}/groups/${s.group_id}`}>
-                  {s.group_code}
-                </Link>
-              ) : s.excluded_reason ? (
-                <>
-                  <span className="pill none">Left out</span>
-                  <form action={includeStudent}>
-                    <input type="hidden" name="eventId" value={id} />
-                    <input type="hidden" name="studentId" value={s.id} />
-                    <input type="hidden" name="return" value={here} />
-                    <button className="btn small secondary" type="submit">
-                      Undo
-                    </button>
-                  </form>
-                </>
-              ) : (
-                <>
-                  <span className="pill err">No group</span>
-                  <details className="inline-form" style={{ flexBasis: '100%' }}>
-                    <summary>Leave out with a reason…</summary>
-                    <form action={excludeStudent} className="form">
-                      <input type="hidden" name="eventId" value={id} />
-                      <input type="hidden" name="studentId" value={s.id} />
-                      <input type="hidden" name="return" value={here} />
-                      <label className="field">
-                        <span className="label-text">Reason</span>
-                        <input className="input" name="reason" required minLength={3} maxLength={200} placeholder="For example: dropped the course" />
-                      </label>
-                      <button className="btn small" type="submit">
-                        Leave out
-                      </button>
-                    </form>
-                  </details>
-                </>
-              )}
-            </li>
-          ))}
-          {!shown.length ? <li className="sub">{students.length ? 'Nobody here.' : 'The roll is empty. Import it above.'}</li> : null}
-        </ul>
+        <p className="lead" style={{ marginTop: 14 }}>
+          <b>{students.length}</b> on the roll in {sections} section{sections === 1 ? '' : 's'} ·{' '}
+          <b style={{ color: unplaced ? 'var(--error-ink)' : undefined }}>{unplaced}</b> not in any group · <b>{leftOut}</b> left out with a reason.{' '}
+          {unplaced ? 'Judging cannot close until every student is in a group or left out.' : ''}
+        </p>
+        <p className="sub" style={{ marginTop: 0 }}>
+          Type a group code in <b>Group</b> to place a student, or change it to move them; empty it to take them out. For a student who dropped, empty their Group and type the
+          reason in <b>Left out because</b>. Choose <b>Not in a group</b> under Status to see who is left. A student added by hand in the last row needs a student number, names,
+          section and email.
+        </p>
+        <DataGrid
+          label="Class roll"
+          columns={columns}
+          rows={students.map((s) => rollGridRow(event, s))}
+          save={saveRollTable.bind(null, id)}
+          addHint="Add a student by hand"
+          rowName="surname"
+          searchPlaceholder="Search names, student numbers, emails and groups"
+          emptyText="The roll is empty. Import it above."
+        />
       </main>
     </>
   );

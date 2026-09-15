@@ -8,6 +8,9 @@
 //     index.html showed toFixed(1), and the first app's workbook rounded differently from its screens.
 //  4. A category tie is broken by overall score everywhere, including the leaderboard, and ranks are worked out
 //     on the rounded values people see. index.html's leaderboard ignored overall, and ranked on unrounded values.
+//  5. Only a submitted sheet counts (countingSheets). A sheet a judge started and never marked complete is left out
+//     of every percentage, rank, grade, export and judge profile. index.html had no sheet status; the first app
+//     counted every value typed, so an abandoned half-filled sheet fed the averages.
 //
 // Pure functions only: the live screens, results, student and adviser pages, and the Excel export all call these.
 // tests/golden.test.ts holds the rules; tests/crosscheck.test.ts holds them to index.html wherever nothing is blank.
@@ -36,6 +39,12 @@ export interface Part {
 }
 
 const has = (v: number | null | undefined): v is number => v !== null && v !== undefined;
+
+/**
+ * The sheets that count (rule 5): those the judge submitted by marking the group complete. A sheet still in progress,
+ * or reopened with "Edit scores", counts again only once it is submitted. Every score reader filters through this.
+ */
+export const countingSheets = <T extends { status: string }>(sheets: T[]): T[] => sheets.filter((s) => s.status === 'complete');
 
 // ── rounding (decision 2) ───────────────────────────────────────────
 

@@ -23,10 +23,13 @@ export default async function ProgressPage({ params, searchParams }: { params: P
   const here = `/admin/events/${id}/progress`;
   const groupOfStudent = new Map(report.grades.map((g) => [g.student.id, g.group.id]));
 
+  // Only submitted sheets count; sheets in progress are shown apart so nobody mistakes them for scores.
   const summary = halves.map((h) => {
-    const withAny = report.groups.filter((g) => report.sheets.some((s) => s.group_id === g.id && s.half === h && (report.filled.get(s.id) ?? 0) > 0)).length;
-    const withComplete = report.groups.filter((g) => report.sheets.some((s) => s.group_id === g.id && s.half === h && s.status === 'complete')).length;
-    return { h, withAny, withComplete };
+    const withComplete = report.groups.filter((g) => report.sheets.some((s) => s.group_id === g.id && s.half === h)).length;
+    const withOpenOnly = report.groups.filter(
+      (g) => !report.sheets.some((s) => s.group_id === g.id && s.half === h) && report.openSheets.some((s) => s.group_id === g.id && s.half === h && (report.filled.get(s.id) ?? 0) > 0),
+    ).length;
+    return { h, withComplete, withOpenOnly };
   });
 
   const hidden = (fields: Record<string, string>) => Object.entries(fields).map(([k, v]) => <input key={k} type="hidden" name={k} value={v} />);
@@ -134,8 +137,9 @@ export default async function ProgressPage({ params, searchParams }: { params: P
         <EventHeader event={event} tab="progress" title="Judging progress" />
         <Notice ok={sp.ok} error={sp.error} />
         <p className="lead">
-          For every group, how many judges have scored it in each half. <span className="pill done">✓ 2</span> means two judges marked it complete;{' '}
-          <span className="pill part">1 in progress</span> means a judge has started but not finished. Tap a group to see and correct its scores.
+          For every group, how many judges have scored it in each half. <span className="pill done">✓ 2 submitted</span> means two judges marked it complete, and
+          only those scores count. <span className="pill none">1 in progress · not counted</span> means a judge has started but not submitted: none of those scores
+          count until the judge taps <b>Mark group complete</b>. Tap a group to see and correct its scores.
         </p>
         <div className="grid">
           {summary.map((x) => (
@@ -145,7 +149,7 @@ export default async function ProgressPage({ params, searchParams }: { params: P
                 {x.withComplete}/{report.groups.length}
               </div>
               <div className="sub">
-                groups with a complete sheet · {x.withAny} with any scores
+                groups with a submitted sheet{x.withOpenOnly ? ` · ${x.withOpenOnly} more only in progress, not counted yet` : ''}
               </div>
             </div>
           ))}
@@ -162,20 +166,23 @@ export default async function ProgressPage({ params, searchParams }: { params: P
                 </Link>
               </div>
               {halves.map((h) => {
-                const sheets = report.sheets.filter((s) => s.group_id === g.id && s.half === h && ((report.filled.get(s.id) ?? 0) > 0 || s.status === 'complete'));
-                const done = sheets.filter((s) => s.status === 'complete');
-                const part = sheets.filter((s) => s.status !== 'complete');
+                const done = report.sheets.filter((s) => s.group_id === g.id && s.half === h);
+                const part = report.openSheets.filter((s) => s.group_id === g.id && s.half === h && (report.filled.get(s.id) ?? 0) > 0);
+                const sheets = [...done, ...part];
                 return (
                   <div key={h} className="judgechips" style={{ alignItems: 'center' }}>
                     <Link href={`/admin/events/${id}/groups/${g.id}/scores?half=${h}`} className={`pill ${h}`} style={{ minWidth: 70, textAlign: 'center', textDecoration: 'none' }}>
                       {event.rubric.halves[h].label}
                     </Link>
-                    {!sheets.length ? <span className="pill err">No scores</span> : null}
-                    {done.length ? <span className="pill done">✓ {done.length}</span> : null}
+                    {!done.length ? <span className="pill err">{part.length ? 'Nothing submitted' : 'No scores'}</span> : null}
+                    {done.length ? <span className="pill done">✓ {done.length} submitted</span> : null}
                     {done.length === 1 ? <span className="pill part">only 1</span> : null}
-                    {part.length ? <span className="pill part">{part.length} in progress</span> : null}
+                    {part.length ? <span className="pill none">{part.length} in progress · not counted</span> : null}
                     <span className="sub" style={{ overflowWrap: 'anywhere' }}>
-                      {sheets.map((s) => `${s.judge_name}${s.status === 'complete' ? '' : ` (${report.filled.get(s.id) ?? 0}/${needed[h]})`}`).join(', ')}
+                      {[
+                        ...done.map((s) => `${s.judge_name} ✓`),
+                        ...part.map((s) => `${s.judge_name} (in progress, ${report.filled.get(s.id) ?? 0}/${needed[h]}, not counted)`),
+                      ].join(', ')}
                     </span>
                   </div>
                 );
@@ -188,7 +195,8 @@ export default async function ProgressPage({ params, searchParams }: { params: P
         <div className="section-title">By judge</div>
         <ul className="list">
           {judges.map((j) => {
-            const mine = report.sheets.filter((s) => s.judge_id === j.id);
+            const submitted = report.sheets.filter((s) => s.judge_id === j.id);
+            const open = report.openSheets.filter((s) => s.judge_id === j.id);
             return (
               <li key={j.id}>
                 <span className="grow-1">
@@ -196,8 +204,9 @@ export default async function ProgressPage({ params, searchParams }: { params: P
                   <span className="sub" style={{ display: 'block' }}>
                     {halves
                       .map((h) => {
-                        const x = mine.filter((s) => s.half === h);
-                        return x.length ? `${event.rubric.halves[h].label}: ${x.filter((s) => s.status === 'complete').length} complete, ${x.filter((s) => s.status !== 'complete').length} in progress` : null;
+                        const done = submitted.filter((s) => s.half === h).length;
+                        const part = open.filter((s) => s.half === h).length;
+                        return done || part ? `${event.rubric.halves[h].label}: ${done} submitted, ${part} in progress (not counted)` : null;
                       })
                       .filter(Boolean)
                       .join(' · ') || 'Has not scored yet'}

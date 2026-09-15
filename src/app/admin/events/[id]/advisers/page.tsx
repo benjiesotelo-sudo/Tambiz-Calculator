@@ -1,9 +1,13 @@
 import { notFound } from 'next/navigation';
 import { AppBar, Notice } from '@/components/AppBar';
+import { DataGrid } from '@/components/DataGrid';
 import { EventHeader } from '@/components/EventNav';
 import { requireAdmin } from '@/lib/auth';
+import type { GridColumn } from '@/lib/grid';
 import { getEvent, listAdvisers } from '@/lib/repo';
-import { addAdviser, importAdvisers, makeAdviserCodes, setAdviserCode } from '../../../actions';
+import { adviserGridRow, type AdviserListRow } from '@/lib/tables';
+import { importAdvisers, makeAdviserCodes } from '../../../actions';
+import { removeAdvisersTable, saveAdvisersTable } from '../../../table-actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,16 +17,24 @@ export default async function AdvisersPage({ params, searchParams }: { params: P
   const sp = await searchParams;
   const event = await getEvent(id);
   if (!event) notFound();
-  const advisers = await listAdvisers(id);
+  const advisers = (await listAdvisers(id)) as AdviserListRow[];
   const withoutCode = advisers.filter((a) => !a.link_code).length;
+  const released = !!event.released_at;
+
+  const columns: GridColumn[] = [
+    { key: 'name', label: 'Adviser', editable: true, required: true, width: 'minmax(12rem, 2fr)' },
+    { key: 'email', label: 'Email', editable: true, width: 'minmax(12rem, 2fr)' },
+    { key: 'code', label: 'Adviser code', editable: true, width: '9rem' },
+    { key: 'groups', label: 'Groups', type: 'number', align: 'right', width: '6rem' },
+  ];
 
   return (
     <>
       <AppBar subtitle="Coordinator" account={acc} home="/admin" />
-      <main className="page">
+      <main className="page wide">
         <EventHeader event={event} tab="advisers" title="Advisers" />
         <Notice ok={sp.ok} error={sp.error} />
-        {event.released_at ? (
+        {released ? (
           <div className="notice warn">
             Results have been released. An import can still change which adviser a group has. If it does, both advisers’ result pages and the adviser ranking change, and the
             mailing sheet already sent no longer matches. Each change is recorded on the group’s page.
@@ -40,12 +52,18 @@ export default async function AdvisersPage({ params, searchParams }: { params: P
           <button className="btn" type="submit">
             Import
           </button>
+          <div className="actions" style={{ marginTop: 0 }}>
+            <a className="btn small secondary" href="/api/admin/templates/advisers">
+              Download template
+            </a>
+            <span className="sub">An Excel file with exactly the columns the import reads, and one example row.</span>
+          </div>
         </form>
 
-        <div className="section-title">Advisers ({advisers.length})</div>
+        <div className="section-title">Advisers</div>
         <p className="sub" style={{ marginTop: 0 }}>
-          Each adviser types their <b>adviser code</b> to open their private results link. Hand each adviser their code yourself, for example at a faculty meeting; it is never in
-          the email. An adviser without a code gets no link.
+          Type in the last row to add an adviser. Each adviser types their <b>adviser code</b> to open their private results link: hand it to them yourself, for example at a
+          faculty meeting; it is never in the email. An adviser without an email or a code gets no link.
         </p>
         {advisers.length ? (
           <form action={makeAdviserCodes} className="actions" style={{ marginTop: 0, marginBottom: 8 }}>
@@ -55,54 +73,18 @@ export default async function AdvisersPage({ params, searchParams }: { params: P
             </button>
           </form>
         ) : null}
-        <ul className="list">
-          {advisers.map((a) => (
-            <li key={a.id} style={{ flexWrap: 'wrap' }}>
-              <span className="grow-1" style={{ minWidth: 180 }}>
-                <span className="title">{a.name}</span>
-                <span className="sub" style={{ display: 'block', overflowWrap: 'anywhere' }}>
-                  {a.email || 'No email'} · {a.link_code ? <>Code <span className="secret">{a.link_code}</span></> : 'No code yet'}
-                </span>
-              </span>
-              <span className={`pill ${a.group_count ? 'done' : 'none'}`}>
-                {a.group_count} group{a.group_count === 1 ? '' : 's'}
-              </span>
-              <details className="inline-form" style={{ flexBasis: '100%' }}>
-                <summary>{a.link_code ? 'Change code…' : 'Set code…'}</summary>
-                <form action={setAdviserCode} className="form">
-                  <input type="hidden" name="eventId" value={id} />
-                  <input type="hidden" name="adviserId" value={a.id} />
-                  <label className="field">
-                    <span className="label-text">Adviser code (leave empty to remove)</span>
-                    <input className="input" name="code" defaultValue={a.link_code} autoCapitalize="characters" autoComplete="off" maxLength={20} style={{ maxWidth: 200 }} />
-                  </label>
-                  <button className="btn small" type="submit">
-                    Save code
-                  </button>
-                </form>
-              </details>
-            </li>
-          ))}
-          {!advisers.length ? <li className="sub">No advisers yet.</li> : null}
-        </ul>
-
-        <div className="section-title">Add one adviser by hand</div>
-        <form action={addAdviser} className="card form">
-          <input type="hidden" name="eventId" value={id} />
-          <div className="row2">
-            <div className="field">
-              <label htmlFor="name">Name</label>
-              <input className="input" id="name" name="name" required />
-            </div>
-            <div className="field">
-              <label htmlFor="email">Email</label>
-              <input className="input" id="email" name="email" type="email" />
-            </div>
-          </div>
-          <button className="btn" type="submit">
-            Save adviser
-          </button>
-        </form>
+        <DataGrid
+          label="Advisers"
+          columns={columns}
+          rows={advisers.map(adviserGridRow)}
+          save={saveAdvisersTable.bind(null, id)}
+          remove={released ? undefined : removeAdvisersTable.bind(null, id)}
+          removeLabel="Remove adviser"
+          addHint="Add an adviser here"
+          rowName="name"
+          searchPlaceholder="Search advisers"
+          emptyText="No advisers yet."
+        />
       </main>
     </>
   );

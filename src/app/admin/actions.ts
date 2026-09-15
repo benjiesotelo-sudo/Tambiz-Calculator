@@ -3,14 +3,17 @@
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { requireAdmin } from '@/lib/auth';
+import { logStatement } from '@/lib/change-log';
 import { newId, one, query, transaction, type Statement } from '@/lib/db';
+import { adviserChangeWarning, adviserWord, editGroup, removeGroup } from '@/lib/group-edit';
 import { ADVISER_COLUMNS, ImportError, parseWorkbook, ROLL_COLUMNS } from '@/lib/excel-import';
 import { generatePassword, hashPassword } from '@/lib/passwords';
-import { eventFinaliseChecks, eventReport, getEvent, getGroup, listEvents, removedScores } from '@/lib/repo';
-import { criterionLabel, findCriterion, HALVES, rubricForNewEvent, withCriterionWording } from '@/lib/rubric';
+import { eventFinaliseChecks, eventReport, getEvent, getGroup, listEvents } from '@/lib/repo';
+import { HALVES, rubricForNewEvent, withCriterionWording } from '@/lib/rubric';
 import { nameKey } from '@/lib/seed';
 import { emailGivesAway, makeAdviserCode, MAX_TRIES, normaliseCheck } from '@/lib/link-rules';
-import { checkScore, fmtScore } from '@/lib/sheet';
+import { applyCorrection } from '@/lib/score-correct';
+import { fmtScore } from '@/lib/sheet';
 
 const s = (fd: FormData, k: string) => String(fd.get(k) ?? '').trim();
 
@@ -21,12 +24,6 @@ function back(path: string, msg: { ok?: string; error?: string }): never {
   redirect(`${path}${path.includes('?') ? '&' : '?'}${u.toString()}`);
 }
 
-const isUnique = (e: unknown) => (e as { code?: string })?.code === '23505';
-
-const logStatement = (eventId: string | null, accountId: string, action: string, detail: object): Statement => ({
-  text: 'INSERT INTO change_log (id, event_id, account_id, action, detail) VALUES ($1, $2, $3, $4, $5::jsonb)',
-  params: [newId(), eventId, accountId, action, JSON.stringify(detail)],
-});
 
 async function log(eventId: string | null, accountId: string, action: string, detail: object) {
   const { text, params } = logStatement(eventId, accountId, action, detail);
@@ -156,69 +153,11 @@ export async function setMemberAbsent(fd: FormData) {
 export async function correctScore(fd: FormData) {
   const acc = await requireAdmin();
   const event = await eventOr404(s(fd, 'eventId'));
-  const sheet = await one<{ id: string; group_id: string; half: 'defense' | 'booth'; judge_name: string }>(
-    `SELECT s.id, s.group_id, s.half, a.display_name AS judge_name FROM score_sheet s JOIN account a ON a.id = s.judge_id WHERE s.id = $1 AND s.event_id = $2`,
-    [s(fd, 'sheetId'), event.id],
-  );
-  if (!sheet) back(`/admin/events/${event.id}/progress`, { error: 'Score sheet not found.' });
-  const path = `/admin/events/${event.id}/groups/${sheet.group_id}/scores?half=${sheet.half}`;
-  if (event.released_at) back(path, { error: 'Results have been released, so scores can no longer be corrected.' });
-  const reason = reasonOf(fd);
-  if (reason.length < 3) back(path, { error: 'Type a short reason for the correction, for example “Judge confirmed 18, typed 13”.' });
-
-  const key = s(fd, 'key');
-  const [kind, a, b] = key.split(':');
-  let max: number | null = null;
-  let label = '';
-  if (kind === 'c') {
-    const crit = findCriterion(event.rubric, sheet.half, `${a}:${b}`);
-    if (crit) {
-      max = crit.max;
-      label = `${crit.category.name} ${crit.index + 1} (${criterionLabel(crit.category, crit.index)})`;
-    }
-  } else if (kind === 'm' && sheet.half === 'defense') {
-    const field = event.rubric.memberFields.find((f) => f.key === b);
-    const member = await one<{ first_name: string; surname: string }>(
-      'SELECT s.first_name, s.surname FROM group_member m JOIN student s ON s.id = m.student_id WHERE m.group_id = $1 AND m.student_id = $2',
-      [sheet.group_id, a],
-    );
-    if (field && member) {
-      max = field.max;
-      label = `${member.first_name} ${member.surname}, ${field.name}`;
-    }
-  }
-  if (max === null) back(path, { error: 'Unknown score box.' });
-  const check = checkScore(s(fd, 'value'), max);
-  if (check.state === 'error') back(path, { error: `${label}: ${check.msg}` });
-  const to = check.state === 'ok' ? check.n : null;
-
-  const table = kind === 'c' ? { name: 'score_value', where: 'sheet_id = $1 AND criterion_key = $2', ids: [sheet.id, `${a}:${b}`] } : { name: 'member_score', where: 'sheet_id = $1 AND student_id = $2 AND field = $3', ids: [sheet.id, a, b] };
-  const current = await one<{ value: number; corrected_by: string | null; judge_value: number | null }>(`SELECT value, corrected_by, judge_value FROM ${table.name} WHERE ${table.where}`, table.ids);
-  const from = current ? Number(current.value) : null;
-  if (from === to) back(path, { error: `${label} is already ${to === null ? 'blank' : fmtScore(to)}.` });
-  // The judge's own value is kept from before the first correction; later corrections leave it alone.
-  const judgeValue = current ? (current.corrected_by ? current.judge_value : from) : ((await removedScores(event.id, [sheet.id])).get(sheet.id)?.get(key)?.judgeValue ?? null);
-
-  if (to === null) {
-    await query(`DELETE FROM ${table.name} WHERE ${table.where}`, table.ids);
-  } else if (kind === 'c') {
-    await query(
-      `INSERT INTO score_value (sheet_id, criterion_key, value, corrected_by, corrected_at, correction_reason, judge_value) VALUES ($1, $2, $3, $4, now(), $5, $6)
-       ON CONFLICT (sheet_id, criterion_key) DO UPDATE SET value = EXCLUDED.value, updated_at = now(), corrected_by = EXCLUDED.corrected_by,
-         corrected_at = now(), correction_reason = EXCLUDED.correction_reason, judge_value = EXCLUDED.judge_value`,
-      [sheet.id, `${a}:${b}`, to, acc.id, reason, judgeValue],
-    );
-  } else {
-    await query(
-      `INSERT INTO member_score (sheet_id, student_id, field, value, corrected_by, corrected_at, correction_reason, judge_value) VALUES ($1, $2, $3, $4, $5, now(), $6, $7)
-       ON CONFLICT (sheet_id, student_id, field) DO UPDATE SET value = EXCLUDED.value, updated_at = now(), corrected_by = EXCLUDED.corrected_by,
-         corrected_at = now(), correction_reason = EXCLUDED.correction_reason, judge_value = EXCLUDED.judge_value`,
-      [sheet.id, a, b, to, acc.id, reason, judgeValue],
-    );
-  }
-  await log(event.id, acc.id, 'score.correct', { group: sheet.group_id, half: sheet.half, sheet: sheet.id, judge: sheet.judge_name, key, label, from, to, reason });
+  const res = await applyCorrection(event, acc.id, s(fd, 'sheetId'), s(fd, 'key'), s(fd, 'value'), reasonOf(fd));
+  const path = res.group ? `/admin/events/${event.id}/groups/${res.group}/scores?half=${res.half}` : `/admin/events/${event.id}/progress`;
+  if (!res.ok) back(path, { error: res.error });
   const show = (v: number | null) => (v === null ? 'blank' : fmtScore(v));
-  back(path, { ok: `Corrected ${label} for ${sheet.judge_name}: ${show(from)} → ${show(to)}.` });
+  back(path, { ok: `Corrected ${res.label} for ${res.judge}: ${show(res.from)} → ${show(res.to)}.` });
 }
 
 // ── scoring sheet wording ─────────────────────────────────────
@@ -234,91 +173,26 @@ export async function saveCriteria(fd: FormData) {
 }
 
 // ── groups and members ────────────────────────────────────────
-
-async function adviserIdFor(eventId: string, fd: FormData): Promise<string | null> {
-  const chosen = s(fd, 'adviserId');
-  const typed = s(fd, 'adviserName');
-  if (typed) {
-    const key = nameKey(typed);
-    const existing = await one<{ id: string }>('SELECT id FROM adviser WHERE event_id = $1 AND name_key = $2', [eventId, key]);
-    if (existing) return existing.id;
-    const id = newId();
-    await query('INSERT INTO adviser (id, event_id, name, name_key) VALUES ($1, $2, $3, $4)', [id, eventId, typed, key]);
-    return id;
-  }
-  return chosen || null;
-}
-
-const adviserWord = (name: string | null | undefined) => name || 'no adviser';
-
-/** The consequence of a released group's adviser changing, said at the moment it happens. */
-const adviserChangeWarning = (who: string) =>
-  `Results were already released, so ${who} result pages and the adviser ranking change, and the mailing sheet already sent no longer matches. An adviser who had no link yet can be given one on the Release tab with “Download links for the people with none yet”.`;
+// The Groups table saves through table-actions.ts; these forms share its rules (lib/group-edit.ts).
 
 export async function saveGroup(fd: FormData) {
   const acc = await requireAdmin();
   const event = await eventOr404(s(fd, 'eventId'));
   const groupId = s(fd, 'groupId');
-  const code = s(fd, 'code').toUpperCase();
-  const name = s(fd, 'name');
-  const section = s(fd, 'section').toUpperCase();
   const path = groupId ? `/admin/events/${event.id}/groups/${groupId}` : `/admin/events/${event.id}/groups`;
   const before = groupId ? await getGroup(event.id, groupId) : null;
   if (groupId && !before) back(`/admin/events/${event.id}/groups`, { error: 'Group not found.' });
-  // After release only a group's code, name and adviser can be corrected; each change is recorded and its consequence shown.
-  if (event.released_at && !before) back(path, { error: 'Results have been released, so no new group can be added.' });
-  if (event.released_at && before && before.section !== section) back(path, { error: 'Results have been released, so the section cannot change now. The code, name and adviser can still be corrected.' });
-  if (!code || !name) back(path, { error: 'A group needs a code and a name.' });
-  const key = nameKey(name);
-  if (!key) back(path, { error: 'The group name needs at least one letter or number.' });
-  const clash = await one<{ code: string; name: string; id: string }>(
-    'SELECT id, code, name FROM tgroup WHERE event_id = $1 AND (code = $2 OR name_key = $3) AND id <> $4',
-    [event.id, code, key, groupId || ''],
-  );
-  if (clash) back(path, { error: clash.code === code ? `Code ${code} is already used by ${clash.name}.` : `“${name}” is the same name as ${clash.code} ${clash.name} (spacing and punctuation are ignored).` });
-  const adviserId = await adviserIdFor(event.id, fd);
-  try {
-    if (before) {
-      const adviser = adviserId ? await one<{ name: string }>('SELECT name FROM adviser WHERE id = $1', [adviserId]) : null;
-      const changes = [
-        before.code !== code ? `Code ${before.code} → ${code}` : '',
-        before.name !== name ? `Name ${before.name} → ${name}` : '',
-        before.section !== section ? `Section ${before.section || 'none'} → ${section || 'none'}` : '',
-        (before.adviser_id ?? null) !== adviserId ? `Adviser ${adviserWord(before.adviser_name)} → ${adviserWord(adviser?.name)}` : '',
-      ].filter(Boolean);
-      const released = !!event.released_at;
-      await transaction([
-        { text: 'UPDATE tgroup SET code = $3, name = $4, name_key = $5, section = $6, adviser_id = $7 WHERE id = $1 AND event_id = $2', params: [groupId, event.id, code, name, key, section, adviserId] },
-        logStatement(event.id, acc.id, 'group.update', { groupId, code, name, section, adviserId, from: { code: before.code, name: before.name, section: before.section, adviserId: before.adviser_id }, changes, released }),
-      ]);
-      if (!released || !changes.length) back(path, { ok: 'Group saved.' });
-      const warnings = [
-        before.code !== code || before.name !== name ? 'Results were already released, so the members’ and adviser’s result pages now show the new code and name.' : '',
-        (before.adviser_id ?? null) !== adviserId
-          ? adviserChangeWarning(`${adviserWord(before.adviser_name)}’s and ${adviserWord(adviser?.name)}’s`)
-          : '',
-      ].filter(Boolean);
-      back(path, { ok: `Group saved: ${changes.join('; ')}. ${warnings.join(' ')} The change is recorded with your name and the time.` });
-    }
-    const id = newId();
-    await query('INSERT INTO tgroup (id, event_id, code, name, name_key, section, adviser_id) VALUES ($1, $2, $3, $4, $5, $6, $7)', [id, event.id, code, name, key, section, adviserId]);
-    await log(event.id, acc.id, 'group.create', { id, code, name, section });
-    back(`/admin/events/${event.id}/groups/${id}`, { ok: `Created ${code} ${name}. Now add its members.` });
-  } catch (e) {
-    if (isUnique(e)) back(path, { error: 'Another group already has that code or name.' });
-    throw e;
-  }
+  const res = await editGroup(event, acc.id, before, { code: s(fd, 'code'), name: s(fd, 'name'), section: s(fd, 'section'), adviser: s(fd, 'adviserName') || s(fd, 'adviserId') });
+  if (!res.ok) back(path, { error: res.error });
+  back(res.created ? `/admin/events/${event.id}/groups/${res.group.id}` : path, { ok: res.message });
 }
 
 export async function deleteGroup(fd: FormData) {
   const acc = await requireAdmin();
   const event = await eventOr404(s(fd, 'eventId'));
   const groupId = s(fd, 'groupId');
-  if (event.released_at) back(`/admin/events/${event.id}/groups/${groupId}`, { error: 'Results have been released, so a group cannot be deleted. Its code, name and adviser can still be corrected.' });
-  const sheets = await one<{ n: number }>('SELECT count(*)::int AS n FROM score_sheet WHERE group_id = $1', [groupId]);
-  if (sheets && sheets.n > 0) back(`/admin/events/${event.id}/groups/${groupId}`, { error: 'This group already has scores, so it cannot be deleted.' });
-  await query('DELETE FROM tgroup WHERE id = $1 AND event_id = $2', [groupId, event.id]);
-  await log(event.id, acc.id, 'group.delete', { groupId });
+  const refused = await removeGroup(event, acc.id, groupId);
+  if (refused) back(`/admin/events/${event.id}/groups/${groupId}`, { error: refused });
   back(`/admin/events/${event.id}/groups`, { ok: 'Group deleted.' });
 }
 

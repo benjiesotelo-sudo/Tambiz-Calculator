@@ -33,6 +33,18 @@ vi.mock('@/lib/auth', () => {
 });
 
 import { acceptGroup, addMembers, correctScore, deleteGroup, excludeStudent, importAdvisers, includeStudent, removeMember, saveGroup, setMemberAbsent } from '@/app/admin/actions';
+import {
+  removeAdvisersTable,
+  removeGroupsTable,
+  removeJudgesTable,
+  removeMembersTable,
+  saveAdvisersTable,
+  saveGroupsTable,
+  saveJudgesTable,
+  saveMembersTable,
+  saveRollTable,
+  saveScoresTable,
+} from '@/app/admin/table-actions';
 import { POST as mailing } from '@/app/api/admin/events/[id]/mailing/route';
 import { one, query } from '@/lib/db';
 import { buildWorkbook } from '@/lib/excel-export';
@@ -41,7 +53,8 @@ import { issueLinks, openLink } from '@/lib/links';
 import { sha256 } from '@/lib/passwords';
 import { judgeEventProfile } from '@/lib/profiles-data';
 import { eventFinaliseChecks, eventReport, getEvent, groupScoreDetail, type EventRow } from '@/lib/repo';
-import { criteriaOf } from '@/lib/rubric';
+import { criteriaOf, type Half } from '@/lib/rubric';
+import { computeResults } from '@/lib/scoring';
 
 type Action = (fd: FormData) => Promise<unknown>;
 
@@ -68,6 +81,192 @@ async function setEvent(status: EventRow['status'], released: boolean) {
 beforeAll(async () => {
   const row = await one<{ id: string }>(`SELECT id FROM event WHERE title = 'Tambiz 2027'`);
   event = (await getEvent(row!.id))!;
+});
+
+describe('only a submitted sheet counts (14 September 2026)', () => {
+  it('sheets in progress feed no result, grade, export or finalise check, but are listed apart for Progress', async () => {
+    const open = await query<{ id: string; group_id: string; half: Half }>(`SELECT id, group_id, half FROM score_sheet WHERE event_id = $1 AND status = 'in_progress'`, [event.id]);
+    expect(open.length).toBeGreaterThan(0);
+    const report = await eventReport(event);
+    expect(report.sheets.every((s) => s.status === 'complete')).toBe(true);
+    expect(new Set(report.openSheets.map((s) => s.id))).toEqual(new Set(open.map((s) => s.id)));
+    expect(open.every((s) => !report.sheetValues.has(s.id))).toBe(true);
+
+    // Every group's results are exactly what its submitted sheets alone give.
+    const scored = report.groups.map((g) => ({
+      id: g.id,
+      name: g.name,
+      accepted: !!g.accept_reason,
+      defense: report.sheets.filter((s) => s.group_id === g.id && s.half === 'defense').map((s) => report.sheetValues.get(s.id)!),
+      booth: report.sheets.filter((s) => s.group_id === g.id && s.half === 'booth').map((s) => report.sheetValues.get(s.id)!),
+    }));
+    expect(report.results).toEqual(computeResults(event.rubric, scored));
+
+    // A half whose only sheet is in progress has no percentage, and its members' in-progress scores give no total.
+    const onlyOpen = open.find((o) => !report.sheets.some((s) => s.group_id === o.group_id && s.half === o.half));
+    expect(onlyOpen).toBeDefined();
+    const result = report.resultById.get(onlyOpen!.group_id)!;
+    expect(onlyOpen!.half === 'defense' ? result.defense : result.booth).toBeNull();
+    if (onlyOpen!.half === 'defense') expect(report.grades.filter((g) => g.group.id === onlyOpen!.group_id).every((g) => g.total === null)).toBe(true);
+
+    // The workbook lists only submitted sheets.
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load((await buildWorkbook(report)) as unknown as ArrayBuffer);
+    const statuses: string[] = [];
+    for (const name of ['Scores', 'Booth Scores']) wb.getWorksheet(name)!.eachRow((row, n) => n > 1 && statuses.push(String(row.getCell(4).value)));
+    expect(new Set(statuses)).toEqual(new Set(['Complete']));
+
+    // Finalising names the sheet in progress and says it does not count.
+    const { warnings } = await eventFinaliseChecks(report);
+    expect(warnings.some((w) => /None of its scores count until they do/.test(w.text))).toBe(true);
+  });
+});
+
+describe('the Groups and Members tables save cell by cell (14 September 2026)', () => {
+  it('a typed new row becomes a group with the next code; a clash is refused on its cell; the row comes back as saved', async () => {
+    await setEvent('setup', false);
+    const res = await saveGroupsTable(event.id, [
+      { rowId: 'new:a', key: 'name', value: 'Table Venture' },
+      { rowId: 'new:a', key: 'section', value: 'ba-3a' },
+    ]);
+    const saved = res.rows[0];
+    expect(saved.error).toBeUndefined();
+    expect(saved.row!.cells).toMatchObject({ name: 'Table Venture', section: 'BA-3A', members: '0' });
+    expect(saved.row!.cells.code).toMatch(/^G\d\d$/);
+    const id = saved.row!.id;
+
+    const clash = await saveGroupsTable(event.id, [{ rowId: id, key: 'name', value: 'Kape  Kultura!' }]);
+    expect(clash.rows[0].errors?.name).toMatch(/same name as G01 Kape Kultura/);
+    expect(await one('SELECT name FROM tgroup WHERE id = $1', [id])).toEqual({ name: 'Table Venture' });
+
+    // Only the changed row is sent back, not the whole table.
+    const adviser = (await one<{ id: string; name: string }>('SELECT id, name FROM adviser WHERE event_id = $1 ORDER BY name LIMIT 1', [event.id]))!;
+    const moved = await saveGroupsTable(event.id, [{ rowId: id, key: 'adviser', value: adviser.id }]);
+    expect(moved.rows).toHaveLength(1);
+    expect(moved.rows[0].row!.cells.adviser).toBe(adviser.name);
+
+    expect((await removeGroupsTable(event.id, [id])).rows).toEqual([{ rowId: id, removed: true }]);
+  });
+
+  it('members are added by student number, never twice, and removals are refused after release while corrections stay open', async () => {
+    await setEvent('setup', false);
+    const group = (await one<{ id: string }>(`SELECT id FROM tgroup WHERE event_id = $1 AND code = 'G01'`, [event.id]))!;
+    const free = (await one<{ id: string; student_number: string }>(
+      'SELECT id, student_number FROM student s WHERE event_id = $1 AND NOT EXISTS (SELECT 1 FROM group_member m WHERE m.student_id = s.id) ORDER BY student_number LIMIT 1',
+      [event.id],
+    ))!;
+    const taken = (await one<{ student_number: string; code: string }>(
+      `SELECT s.student_number, g.code FROM group_member m JOIN student s ON s.id = m.student_id JOIN tgroup g ON g.id = m.group_id WHERE m.event_id = $1 AND g.id <> $2 LIMIT 1`,
+      [event.id, group.id],
+    ))!;
+
+    const added = await saveMembersTable(event.id, group.id, [
+      { rowId: 'new:1', key: 'student', value: ` ${free.student_number} ` },
+      { rowId: 'new:2', key: 'student', value: taken.student_number },
+    ]);
+    expect(added.rows[0].row).toMatchObject({ id: free.id, cells: { student: free.student_number, absent: 'Present' } });
+    expect(added.rows[1].errors?.student).toMatch(new RegExp(`is in ${taken.code} already`));
+
+    const absent = await saveMembersTable(event.id, group.id, [{ rowId: free.id, key: 'absent', value: 'absent' }]);
+    expect(absent.rows[0].row!.cells.absent).toBe('Absent');
+
+    await setEvent('finalised', true);
+    expect((await removeMembersTable(event.id, group.id, [free.id])).rows[0].error).toMatch(/released/);
+    const rename = await saveGroupsTable(event.id, [{ rowId: group.id, key: 'section', value: 'BA-9Z' }]);
+    expect(rename.rows[0].errors?.section).toMatch(/section cannot change/);
+    const g = (await one<{ name: string }>('SELECT name FROM tgroup WHERE id = $1', [group.id]))!;
+    const corrected = await saveGroupsTable(event.id, [{ rowId: group.id, key: 'name', value: `${g.name} Corp` }]);
+    expect(corrected.notice).toMatch(/result pages now show the new code and name/);
+    await saveGroupsTable(event.id, [{ rowId: group.id, key: 'name', value: g.name }]);
+
+    await setEvent('setup', false);
+    expect((await removeMembersTable(event.id, group.id, [free.id])).rows).toEqual([{ rowId: free.id, removed: true }]);
+  });
+});
+
+describe('the Class roll, Advisers and Judges tables (14 September 2026)', () => {
+  it('a student is moved between groups, left out only when in no group, and a duplicate student number is refused', async () => {
+    await setEvent('setup', false);
+    const [g1, g2] = await query<{ id: string; code: string }>(`SELECT id, code FROM tgroup WHERE event_id = $1 ORDER BY code LIMIT 2`, [event.id]);
+    const st = (await one<{ id: string; student_number: string; surname: string }>(
+      'SELECT s.id, s.student_number, s.surname FROM group_member m JOIN student s ON s.id = m.student_id WHERE m.group_id = $1 ORDER BY s.student_number LIMIT 1',
+      [g1.id],
+    ))!;
+
+    const moved = await saveRollTable(event.id, [{ rowId: st.id, key: 'group', value: g2.code.toLowerCase() }]);
+    expect(moved.rows[0].row!.cells).toMatchObject({ group: g2.code, status: 'In a group', leftout: '' });
+    expect(moved.notice).toMatch(/Moved 1 student out of another group/);
+    expect(await one('SELECT group_id FROM group_member WHERE student_id = $1', [st.id])).toEqual({ group_id: g2.id });
+
+    const refused = await saveRollTable(event.id, [{ rowId: st.id, key: 'leftout', value: 'Dropped the course' }]);
+    expect(refused.rows[0].errors?.leftout).toMatch(/Clear their Group first/);
+
+    // Clearing the group and giving a reason in one paste leaves them out; a surname typed empty is refused on its own cell only.
+    const out = await saveRollTable(event.id, [
+      { rowId: st.id, key: 'group', value: '' },
+      { rowId: st.id, key: 'leftout', value: 'Dropped the course' },
+      { rowId: st.id, key: 'surname', value: '' },
+      { rowId: st.id, key: 'section', value: 'ba-3z' },
+    ]);
+    expect(out.rows[0].errors).toEqual({ surname: 'Surname cannot be empty.' });
+    expect(out.rows[0].row!.cells).toMatchObject({ group: '', status: 'Left out', leftout: 'Dropped the course', surname: st.surname, section: 'BA-3Z' });
+
+    const dup = await saveRollTable(event.id, [
+      { rowId: 'new:1', key: 'student', value: st.student_number },
+      { rowId: 'new:1', key: 'surname', value: 'Twin' },
+      { rowId: 'new:1', key: 'first', value: 'Tess' },
+      { rowId: 'new:1', key: 'section', value: 'BA-3A' },
+      { rowId: 'new:1', key: 'email', value: 'tess.twin@tambiz.test' },
+    ]);
+    expect(dup.rows[0].errors?.student).toMatch(/already on the roll/);
+
+    await saveRollTable(event.id, [
+      { rowId: st.id, key: 'group', value: g1.id },
+      { rowId: st.id, key: 'section', value: 'BA-3A' },
+    ]);
+    expect(await one('SELECT excluded_reason FROM student WHERE id = $1', [st.id])).toEqual({ excluded_reason: null });
+  });
+
+  it('adviser codes follow the link rules, and an adviser with groups cannot be removed', async () => {
+    await setEvent('setup', false);
+    const [a, b] = await query<{ id: string; name: string; link_code: string }>('SELECT id, name, link_code FROM adviser WHERE event_id = $1 ORDER BY name LIMIT 2', [event.id]);
+    expect((await saveAdvisersTable(event.id, [{ rowId: a.id, key: 'code', value: b.link_code }])).rows[0].errors?.code).toBe('Another adviser already has that code.');
+    expect((await saveAdvisersTable(event.id, [{ rowId: a.id, key: 'code', value: 'ab' }])).rows[0].errors?.code).toMatch(/at least four/);
+    const added = await saveAdvisersTable(event.id, [
+      { rowId: 'new:x', key: 'name', value: 'Prof. Table Test' },
+      { rowId: 'new:x', key: 'email', value: 'k7z9qp@feu.test' },
+      { rowId: 'new:x', key: 'code', value: 'K7Z-9QP' },
+    ]);
+    expect(added.rows[0].errors?.code).toMatch(/email contains the adviser code/);
+    const ok = await saveAdvisersTable(event.id, [
+      { rowId: 'new:y', key: 'name', value: 'Prof. Table Test' },
+      { rowId: 'new:y', key: 'email', value: 'table.test@feu.test' },
+    ]);
+    const id = ok.rows[0].row!.id;
+    expect((await removeAdvisersTable(event.id, [a.id])).rows[0].error).toMatch(/advises \d+ group/);
+    expect((await removeAdvisersTable(event.id, [id])).rows[0]).toEqual({ rowId: id, removed: true });
+  });
+
+  it('a new judge gets a password shown once; a known login is added to the event with its password unchanged', async () => {
+    const created = await saveJudgesTable(event.id, [
+      { rowId: 'new:j', key: 'name', value: 'Dr. Table Judge' },
+      { rowId: 'new:j', key: 'login', value: 'Table.Judge@tambiz.test' },
+    ]);
+    expect(created.secret).toMatch(/^Dr\. Table Judge signs in with table\.judge@tambiz\.test and password \S+/);
+    const id = created.rows[0].row!.id;
+    const hash = (await one<{ password_hash: string }>('SELECT password_hash FROM account WHERE id = $1', [id]))!.password_hash;
+
+    await removeJudgesTable(event.id, [id]);
+    const again = await saveJudgesTable(event.id, [
+      { rowId: 'new:k', key: 'name', value: 'Someone Else' },
+      { rowId: 'new:k', key: 'login', value: 'table.judge@tambiz.test' },
+    ]);
+    expect(again.secret).toBeUndefined();
+    expect(again.notice).toMatch(/already had an account, as Dr\. Table Judge/);
+    expect(await one('SELECT password_hash FROM account WHERE id = $1', [id])).toEqual({ password_hash: hash });
+    expect((await saveJudgesTable(event.id, [{ rowId: 'new:l', key: 'name', value: 'X' }, { rowId: 'new:l', key: 'login', value: 'admin@tambiz.demo' }])).rows[0].errors?.login).toMatch(/coordinator/);
+    await removeJudgesTable(event.id, [id]);
+  });
 });
 
 describe('private link tries (decision 8)', () => {
@@ -117,7 +316,7 @@ describe('a score corrected to blank keeps its trace (decision 7)', () => {
     await setEvent('judging', false);
     const v = (await one<{ sheet_id: string; criterion_key: string; value: number; group_id: string }>(
       `SELECT v.sheet_id, v.criterion_key, v.value, s.group_id FROM score_value v JOIN score_sheet s ON s.id = v.sheet_id
-       WHERE s.event_id = $1 AND s.half = 'defense' AND v.corrected_by IS NULL ORDER BY v.sheet_id, v.criterion_key LIMIT 1`,
+       WHERE s.event_id = $1 AND s.half = 'defense' AND s.status = 'complete' AND v.corrected_by IS NULL ORDER BY v.sheet_id, v.criterion_key LIMIT 1`,
       [event.id],
     ))!;
     const key = `c:${v.criterion_key}`;
@@ -151,6 +350,32 @@ describe('a score corrected to blank keeps its trace (decision 7)', () => {
   });
 });
 
+describe('the scores table corrects only its own group and half (14 September 2026)', () => {
+  it('a score from another group or half is refused before anything is written or recorded', async () => {
+    await setEvent('judging', false);
+    const v = (await one<{ sheet_id: string; criterion_key: string; value: number; group_id: string }>(
+      `SELECT v.sheet_id, v.criterion_key, v.value, s.group_id FROM score_value v JOIN score_sheet s ON s.id = v.sheet_id
+       WHERE s.event_id = $1 AND s.half = 'defense' AND s.status = 'complete' AND v.corrected_by IS NULL ORDER BY v.sheet_id DESC, v.criterion_key LIMIT 1`,
+      [event.id],
+    ))!;
+    const other = (await one<{ id: string }>('SELECT id FROM tgroup WHERE event_id = $1 AND id <> $2 ORDER BY code LIMIT 1', [event.id, v.group_id]))!;
+    const key = `c:${v.criterion_key}`;
+    const state = async () => ({
+      value: Number((await one<{ value: number }>('SELECT value FROM score_value WHERE sheet_id = $1 AND criterion_key = $2', [v.sheet_id, v.criterion_key]))!.value),
+      logged: Number((await one<{ n: string }>(`SELECT count(*) AS n FROM change_log WHERE action = 'score.correct' AND detail->>'sheet' = $1`, [v.sheet_id]))!.n),
+    });
+    const before = await state();
+    const to = Number(v.value) === 0 ? '1' : '0';
+
+    const elsewhere = await saveScoresTable(event.id, other.id, 'defense', [{ rowId: key, key: v.sheet_id, value: to }], 'Hand-built request');
+    expect(elsewhere.rows[0].errors).toEqual({ [v.sheet_id]: 'That score belongs to another group.' });
+    expect(elsewhere.notice).toBeUndefined();
+    const otherHalf = await saveScoresTable(event.id, v.group_id, 'booth', [{ rowId: key, key: v.sheet_id, value: to }], 'Hand-built request');
+    expect(otherHalf.notice).toBeUndefined();
+    expect(await state()).toEqual(before);
+  });
+});
+
 describe('judge profiles (item 14)', () => {
   it('a judge assigned but not yet scoring has a profile with nothing to compare, plus their record from other events', async () => {
     const judgeId = 'test-judge-new';
@@ -169,6 +394,9 @@ describe('judge profiles (item 14)', () => {
     await query(`INSERT INTO tgroup (id, event_id, code, name, name_key) VALUES ('test-group-2026', $1, 'G01', 'Old Group', 'oldgroup')`, [past]);
     await query(`INSERT INTO score_sheet (id, event_id, group_id, half, judge_id) VALUES ('test-sheet-2026', $1, 'test-group-2026', 'defense', $2)`, [past, judgeId]);
     await query(`INSERT INTO score_value (sheet_id, criterion_key, value) VALUES ('test-sheet-2026', $1, 10)`, [criteriaOf(event.rubric, 'defense')[0].key]);
+    // A sheet only started, never submitted, is not part of the judge's record (before: 2026 was listed).
+    expect((await judgeEventProfile(event, judgeId))!.history).toEqual([]);
+    await query(`UPDATE score_sheet SET status = 'complete', completed_at = now() WHERE id = 'test-sheet-2026'`);
     const later = (await judgeEventProfile(event, judgeId))!;
     expect(later.scoredHere).toBe(false);
     expect(later.history.map((h) => h.event.title)).toEqual(['Tambiz 2026']);

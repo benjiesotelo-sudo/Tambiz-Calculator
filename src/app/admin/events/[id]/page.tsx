@@ -74,7 +74,7 @@ export default async function EventHome({ params, searchParams }: { params: Prom
           {tile(`${base}/roll`, 'Class roll', String(c.students), c.unplaced ? `${c.unplaced} not in any group yet` : 'Every student is in a group')}
           {tile(`${base}/groups`, 'Groups', String(c.groups), c.no_adviser ? `${c.no_adviser} without an adviser` : 'All have an adviser')}
           {tile(`${base}/judges`, 'Judges', String(c.judges), 'Accounts that can score this event')}
-          {tile(`${base}/progress`, 'Judging progress', `${c.complete}/${c.sheets}`, 'Score sheets marked complete')}
+          {tile(`${base}/progress`, 'Judging progress', `${c.complete}/${c.sheets}`, 'Score sheets submitted. Only submitted sheets count')}
           {tile(`${base}/results`, 'Results', '🏆', 'Category ranks, overall and top 10')}
           {tile(`${base}/grades`, 'Individual grades', 'A–F', 'Member totals and letter grades by section')}
         </div>

@@ -4,7 +4,7 @@ import { removedByCoordinator, type CorrectionLogEntry, type RemovedScore } from
 import { one, query } from './db';
 import { finaliseChecks } from './finalise';
 import { criteriaOf, DEFAULT_RUBRIC, HALVES, type Half, type MemberFieldKey, type Rubric } from './rubric';
-import { computeResults, finalGrade, letterGrade, memberScore, type EventResults, type MemberSet, type ScoredGroup, type SheetValues } from './scoring';
+import { computeResults, countingSheets, finalGrade, letterGrade, memberScore, type EventResults, type MemberSet, type ScoredGroup, type SheetValues } from './scoring';
 
 export interface EventRow {
   id: string;
@@ -79,7 +79,8 @@ export async function listGroups(eventId: string) {
 
 export async function getGroup(eventId: string, groupId: string) {
   return one<GroupRow>(
-    `SELECT g.*, a.name AS adviser_name, 0 AS member_count FROM tgroup g LEFT JOIN adviser a ON a.id = g.adviser_id WHERE g.event_id = $1 AND g.id = $2`,
+    `SELECT g.*, a.name AS adviser_name, (SELECT count(*)::int FROM group_member m WHERE m.group_id = g.id) AS member_count
+     FROM tgroup g LEFT JOIN adviser a ON a.id = g.adviser_id WHERE g.event_id = $1 AND g.id = $2`,
     [eventId, groupId],
   );
 }
@@ -161,9 +162,12 @@ export async function removedScores(eventId: string, sheetIds?: string[]) {
 
 export type Correction = { key: string; value: number | null; judgeValue: number | null; reason: string };
 
-/** Every sheet, value and member score of an event, shaped for the scoring functions. */
+/**
+ * Every submitted sheet of an event with its values and member scores, shaped for the scoring functions. Sheets still in
+ * progress are returned apart (openSheets), with how many criteria they have filled, and none of their scores count.
+ */
 export async function loadEventScores(event: EventRow) {
-  const [sheets, values, members, removed] = await Promise.all([
+  const [allSheets, allValues, allMembers, removed] = await Promise.all([
     query<SheetRow>(
       `SELECT s.id, s.group_id, s.half, s.judge_id, s.status, a.display_name AS judge_name FROM score_sheet s JOIN account a ON a.id = s.judge_id WHERE s.event_id = $1 ORDER BY a.display_name`,
       [event.id],
@@ -180,6 +184,12 @@ export async function loadEventScores(event: EventRow) {
     ),
     removedScores(event.id),
   ]);
+  // Only a submitted sheet counts (scoring.ts rule 5); the rest are kept only to show progress.
+  const sheets = countingSheets(allSheets);
+  const counting = new Set(sheets.map((s) => s.id));
+  const openSheets = allSheets.filter((s) => !counting.has(s.id));
+  const values = allValues.filter((v) => counting.has(v.sheet_id));
+  const members = allMembers.filter((m) => counting.has(m.sheet_id));
   /** Coordinator corrections per sheet, keyed like the phone (c:… or m:…); a removed score has value null. */
   const corrections = new Map<string, Correction[]>();
   const addCorrection = (sheetId: string, c: Correction) => corrections.set(sheetId, [...(corrections.get(sheetId) ?? []), c]);
@@ -191,6 +201,7 @@ export async function loadEventScores(event: EventRow) {
   members.forEach((m) => noteCorrection(m.sheet_id, `m:${m.student_id}:${m.field}`, m));
   const stored = new Set([...values.map((v) => `${v.sheet_id}|c:${v.criterion_key}`), ...members.map((m) => `${m.sheet_id}|m:${m.student_id}:${m.field}`)]);
   for (const [sheetId, byKey] of removed) {
+    if (!counting.has(sheetId)) continue;
     for (const [key, r] of byKey) {
       if (!stored.has(`${sheetId}|${key}`)) addCorrection(sheetId, { key, value: null, judgeValue: r.judgeValue, reason: r.reason });
     }
@@ -201,13 +212,15 @@ export async function loadEventScores(event: EventRow) {
     sheetValues.set(sh.id, Object.fromEntries(event.rubric.halves[sh.half].categories.map((c) => [c.key, c.maxes.map(() => null)])));
   }
   const filled = new Map<string, number>();
-  for (const v of values) {
-    const sv = sheetValues.get(v.sheet_id);
+  const halfOf = new Map(allSheets.map((s) => [s.id, s.half]));
+  for (const v of allValues) {
     const [cat, i] = v.criterion_key.split(':');
-    if (sv?.[cat] && +i < sv[cat].length) {
-      sv[cat][+i] = Number(v.value);
-      filled.set(v.sheet_id, (filled.get(v.sheet_id) ?? 0) + 1);
-    }
+    const half = halfOf.get(v.sheet_id);
+    const c = half ? event.rubric.halves[half].categories.find((x) => x.key === cat) : undefined;
+    if (!c || +i >= c.maxes.length) continue;
+    filled.set(v.sheet_id, (filled.get(v.sheet_id) ?? 0) + 1);
+    const sv = sheetValues.get(v.sheet_id);
+    if (sv) sv[cat][+i] = Number(v.value);
   }
   // memberSets: student id → judge sheet id → the three fields
   const memberSets = new Map<string, Map<string, MemberSet>>();
@@ -218,7 +231,7 @@ export async function loadEventScores(event: EventRow) {
     set[m.field] = Number(m.value);
     byJudge.set(m.sheet_id, set);
   }
-  return { sheets, sheetValues, filled, memberSets, corrections };
+  return { sheets, openSheets, sheetValues, filled, memberSets, corrections };
 }
 
 export interface GradeRow {
@@ -245,8 +258,12 @@ export interface EventReport {
   results: EventResults;
   resultById: Map<string, EventResults['groups'][number]>;
   grades: GradeRow[];
+  /** Submitted sheets: the only ones whose scores count. */
   sheets: SheetRow[];
+  /** Sheets a judge started and has not submitted. Shown on Progress; their scores count for nothing. */
+  openSheets: SheetRow[];
   sheetValues: Map<string, SheetValues>;
+  /** Criteria filled, for every sheet, submitted or not. */
   filled: Map<string, number>;
   corrections: Map<string, Correction[]>;
   /** Students on the roll deliberately left out of every group, with the coordinator's reason. */
@@ -320,6 +337,7 @@ export async function eventReport(event: EventRow): Promise<EventReport> {
     resultById,
     grades,
     sheets: scores.sheets,
+    openSheets: scores.openSheets,
     sheetValues: scores.sheetValues,
     filled: scores.filled,
     corrections: scores.corrections,
@@ -334,7 +352,7 @@ export async function eventFinaliseChecks(report: EventReport) {
   return finaliseChecks({
     halfLabel: { defense: event.rubric.halves.defense.label, booth: event.rubric.halves.booth.label },
     groups: report.groups.map((g) => ({ id: g.id, code: g.code, name: g.name, acceptReason: g.accept_reason ?? null, complete: report.resultById.get(g.id)?.complete ?? false })),
-    sheets: report.sheets.map((s) => ({ groupId: s.group_id, half: s.half, status: s.status, judgeName: s.judge_name, filled: report.filled.get(s.id) ?? 0 })),
+    sheets: [...report.sheets, ...report.openSheets].map((s) => ({ groupId: s.group_id, half: s.half, status: s.status, judgeName: s.judge_name, filled: report.filled.get(s.id) ?? 0 })),
     members: report.grades.map((g) => ({ studentId: g.student.id, name: fullName(g.student), groupId: g.group.id, absent: g.absent, memberComplete: g.memberComplete })),
     unplaced: students.filter((s) => !s.group_id).map((s) => ({ studentId: s.id, name: fullName(s), section: s.section, excludedReason: s.excluded_reason ?? null })),
   });

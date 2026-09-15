@@ -5,34 +5,78 @@ import ExcelJS from 'exceljs';
 
 const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
 
-interface ColumnSpec {
+export interface ColumnSpec {
   field: string;
-  /** The header as it appears in the official file, used in error messages. */
+  /** The header as it appears in the official file, used in error messages and in the download template. */
   header: string;
   aliases: string[];
   required: boolean;
+  /** The value in the download template's example row. Invented. */
+  example: string;
 }
 
 export const ROLL_COLUMNS: ColumnSpec[] = [
-  { field: 'student_number', header: 'Student No.', aliases: ['studentno', 'studentnumber', 'studentid', 'idnumber'], required: true },
-  { field: 'email', header: 'Student Email', aliases: ['studentemail', 'email', 'emailaddress', 'feuemail'], required: true },
-  { field: 'surname', header: 'Surname', aliases: ['surname', 'lastname', 'familyname'], required: true },
-  { field: 'first_name', header: 'First Name', aliases: ['firstname', 'givenname'], required: true },
-  { field: 'section', header: 'Section', aliases: ['section'], required: true },
-  { field: 'middle_name', header: 'Middle Name', aliases: ['middlename'], required: false },
-  { field: 'sex', header: 'Sex', aliases: ['sex', 'gender'], required: false },
-  { field: 'program_code', header: 'Program Code', aliases: ['programcode'], required: false },
-  { field: 'course_code', header: 'Course Code', aliases: ['coursecode'], required: false },
-  { field: 'faculty', header: 'Faculty', aliases: ['faculty'], required: false },
+  { field: 'student_number', header: 'Student No.', aliases: ['studentno', 'studentnumber', 'studentid', 'idnumber'], required: true, example: '2027012345' },
+  { field: 'email', header: 'Student Email', aliases: ['studentemail', 'email', 'emailaddress', 'feuemail'], required: true, example: 'juan.delacruz@feu.edu.ph' },
+  { field: 'surname', header: 'Surname', aliases: ['surname', 'lastname', 'familyname'], required: true, example: 'Dela Cruz' },
+  { field: 'first_name', header: 'First Name', aliases: ['firstname', 'givenname'], required: true, example: 'Juan' },
+  { field: 'section', header: 'Section', aliases: ['section'], required: true, example: 'BA-3A' },
+  { field: 'middle_name', header: 'Middle Name', aliases: ['middlename'], required: false, example: 'Santos' },
+  { field: 'sex', header: 'Sex', aliases: ['sex', 'gender'], required: false, example: 'M' },
+  { field: 'program_code', header: 'Program Code', aliases: ['programcode'], required: false, example: 'BSBA-MM' },
+  { field: 'course_code', header: 'Course Code', aliases: ['coursecode'], required: false, example: 'MGT1114' },
+  { field: 'faculty', header: 'Faculty', aliases: ['faculty'], required: false, example: 'IABF' },
 ];
 
 export const ADVISER_COLUMNS: ColumnSpec[] = [
-  { field: 'name', header: 'Adviser', aliases: ['adviser', 'advisername', 'advisor', 'advisorname', 'name', 'facultyname'], required: true },
-  { field: 'email', header: 'Email', aliases: ['email', 'adviseremail', 'advisoremail', 'emailaddress'], required: false },
-  { field: 'group_code', header: 'Group Code', aliases: ['groupcode', 'code', 'groupno', 'groupnumber'], required: false },
-  { field: 'group_name', header: 'Group Name', aliases: ['groupname', 'group', 'businessname'], required: false },
-  { field: 'link_code', header: 'Adviser Code', aliases: ['advisercode', 'linkcode', 'accesscode', 'checkcode'], required: false },
+  { field: 'name', header: 'Adviser', aliases: ['adviser', 'advisername', 'advisor', 'advisorname', 'name', 'facultyname'], required: true, example: 'Prof. Maria Santos' },
+  { field: 'email', header: 'Email', aliases: ['email', 'adviseremail', 'advisoremail', 'emailaddress'], required: false, example: 'msantos@feu.edu.ph' },
+  { field: 'group_code', header: 'Group Code', aliases: ['groupcode', 'code', 'groupno', 'groupnumber'], required: false, example: 'G01' },
+  { field: 'group_name', header: 'Group Name', aliases: ['groupname', 'group', 'businessname'], required: false, example: 'Kape Kultura' },
+  { field: 'link_code', header: 'Adviser Code', aliases: ['advisercode', 'linkcode', 'accesscode', 'checkcode'], required: false, example: 'K7Q-4MP' },
 ];
+
+export interface Template {
+  columns: ColumnSpec[];
+  /** The name of the sheet to fill in. */
+  sheet: string;
+  file: string;
+  /** What one row is, for the instructions. */
+  row: string;
+  /** Where it is imported. */
+  tab: string;
+}
+
+/** The download templates, one per importer, keyed as in their address. */
+export const TEMPLATES: Record<'roll' | 'advisers', Template> = {
+  roll: { columns: ROLL_COLUMNS, sheet: 'Class roll', file: 'Tambiz class roll template.xlsx', row: 'student', tab: 'Class roll' },
+  advisers: { columns: ADVISER_COLUMNS, sheet: 'Advisers', file: 'Tambiz adviser list template.xlsx', row: 'adviser (one more row for each further group they advise)', tab: 'Advisers' },
+};
+
+/**
+ * A spreadsheet to fill in and import: its headings are the importer's own column list, so the template can never ask
+ * for a column the importer does not read. One example row, and a second sheet saying what to do.
+ */
+export async function buildTemplate(t: Template): Promise<Buffer> {
+  const wb = new ExcelJS.Workbook();
+  wb.creator = 'Tambiz';
+  const ws = wb.addWorksheet(t.sheet);
+  ws.columns = t.columns.map((c) => ({ header: c.header, width: Math.max(12, c.header.length + 4, c.example.length + 3) }));
+  ws.getRow(1).font = { bold: true };
+  ws.addRow(t.columns.map((c) => c.example));
+  ws.views = [{ state: 'frozen', ySplit: 1 }];
+  const help = wb.addWorksheet('How to fill this in');
+  help.getColumn(1).width = 110;
+  const list = (required: boolean) => t.columns.filter((c) => c.required === required).map((c) => c.header).join(', ');
+  [
+    `One row per ${t.row}. The second row is an invented example: type over it or delete it before importing.`,
+    `These columns must be filled in on every row: ${list(true)}.`,
+    `These columns may be left empty: ${list(false)}.`,
+    'Keep the headings as they are. Their order does not matter, and any other columns are ignored.',
+    `Save as Excel Workbook (.xlsx), then import it on the ${t.tab} tab.`,
+  ].forEach((line) => help.addRow([line]));
+  return Buffer.from(await wb.xlsx.writeBuffer());
+}
 
 export interface ParsedSheet {
   rows: { rowNumber: number; sheet: string; values: Record<string, string> }[];

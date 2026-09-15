@@ -1,11 +1,12 @@
-import Link from 'next/link';
-import { cookies } from 'next/headers';
 import { notFound } from 'next/navigation';
 import { AppBar, Notice } from '@/components/AppBar';
+import { DataGrid } from '@/components/DataGrid';
 import { EventHeader } from '@/components/EventNav';
 import { requireAdmin } from '@/lib/auth';
+import type { GridColumn } from '@/lib/grid';
 import { departmentJudges, eventJudges, getEvent } from '@/lib/repo';
-import { addExistingJudge, createJudge, removeJudge, resetJudgePassword } from '../../../actions';
+import { departmentGridRow, judgeGridRow } from '@/lib/tables';
+import { addDepartmentJudgeTable, removeJudgesTable, resetJudgeTable, saveJudgesTable } from '../../../table-actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,100 +17,56 @@ export default async function JudgesPage({ params, searchParams }: { params: Pro
   const event = await getEvent(id);
   if (!event) notFound();
   const [judges, department] = await Promise.all([eventJudges(id), departmentJudges(id)]);
-  let flash: { email: string; password: string } | null = null;
-  try {
-    const raw = (await cookies()).get('tambiz_flash')?.value;
-    flash = raw ? JSON.parse(raw) : null;
-  } catch {
-    flash = null;
-  }
+
+  const columns: GridColumn[] = [
+    { key: 'name', label: 'Name as judges see it', editable: true, required: true, width: 'minmax(12rem, 2fr)' },
+    { key: 'login', label: 'Email or login', editable: true, required: true, width: 'minmax(12rem, 2fr)' },
+    { key: 'profile', label: 'Profile', width: '6.5rem' },
+  ];
+  const departmentColumns: GridColumn[] = [
+    { key: 'name', label: 'Name', width: 'minmax(12rem, 2fr)' },
+    { key: 'login', label: 'Email or login', width: 'minmax(12rem, 2fr)' },
+    { key: 'events', label: 'Events judged', type: 'number', align: 'right', width: '8rem' },
+  ];
 
   return (
     <>
       <AppBar subtitle="Coordinator" account={acc} home="/admin" />
-      <main className="page">
+      <main className="page wide">
         <EventHeader event={event} tab="judges" title="Judges" />
         <Notice ok={sp.ok} error={sp.error} />
-        {flash && sp.ok ? (
-          <div className="notice warn">
-            <b>Write this down now.</b> It is shown only for the next two minutes.
-            <div style={{ marginTop: 6 }}>
-              Sign in at this site with <span className="secret">{flash.email}</span> and password <span className="secret">{flash.password}</span>
-            </div>
-          </div>
-        ) : null}
-
-        <ul className="list">
-          {judges.map((j) => (
-            <li key={j.id} style={{ flexWrap: 'wrap' }}>
-              <span className="grow-1" style={{ minWidth: 180 }}>
-                <span className="title">{j.display_name}</span>
-                <span className="sub" style={{ display: 'block', overflowWrap: 'anywhere' }}>
-                  {j.email} · <Link href={`/admin/events/${id}/profiles/${j.id}`}>Profile</Link>
-                </span>
-              </span>
-              <form action={resetJudgePassword}>
-                <input type="hidden" name="eventId" value={id} />
-                <input type="hidden" name="accountId" value={j.id} />
-                <button className="btn small secondary" type="submit">
-                  Reset password
-                </button>
-              </form>
-              <form action={removeJudge}>
-                <input type="hidden" name="eventId" value={id} />
-                <input type="hidden" name="accountId" value={j.id} />
-                <button className="btn small danger" type="submit">
-                  Remove
-                </button>
-              </form>
-            </li>
-          ))}
-          {!judges.length ? <li className="sub">No judges yet.</li> : null}
-        </ul>
-
-        <div className="section-title">Add from the department list</div>
-        <p className="sub" style={{ marginTop: 0 }}>
-          Judges are kept year after year. Picking the same person again, rather than making a new account, keeps their record together in Judge profiles.
+        <p className="lead">
+          The judges of {event.title}. To add a new judge, type their name and email (or a short login) in the last row: the app makes a temporary password and shows it once,
+          above the table, to write on their sign-in slip. Typing the login of a judge from an earlier year adds that account instead, with its password unchanged.
         </p>
-        <ul className="list">
-          {department.map((j) => (
-            <li key={j.id} style={{ flexWrap: 'wrap' }}>
-              <span className="grow-1" style={{ minWidth: 180 }}>
-                <span className="title">{j.display_name}</span>
-                <span className="sub" style={{ display: 'block', overflowWrap: 'anywhere' }}>
-                  {j.email} · judged {j.events} event{j.events === 1 ? '' : 's'}
-                </span>
-              </span>
-              <form action={addExistingJudge}>
-                <input type="hidden" name="eventId" value={id} />
-                <input type="hidden" name="accountId" value={j.id} />
-                <button className="btn small secondary" type="submit">
-                  Add to this event
-                </button>
-              </form>
-            </li>
-          ))}
-          {!department.length ? <li className="sub">Everyone on the department list is already judging this event.</li> : null}
-        </ul>
+        <DataGrid
+          label="Judges of this event"
+          columns={columns}
+          rows={judges.map((j) => judgeGridRow(id, j))}
+          save={saveJudgesTable.bind(null, id)}
+          remove={removeJudgesTable.bind(null, id)}
+          removeLabel="Remove from this event"
+          actions={[{ label: 'Reset password', run: resetJudgeTable.bind(null, id), confirm: 'Reset the password of {name}? They are signed out everywhere.' }]}
+          addHint="Add a judge here"
+          rowName="name"
+          searchPlaceholder="Search judges"
+          emptyText="No judges yet."
+        />
 
-        <div className="section-title">Add a new judge</div>
-        <form action={createJudge} className="card form">
-          <input type="hidden" name="eventId" value={id} />
-          <div className="row2">
-            <div className="field">
-              <label htmlFor="name">Name as judges see it</label>
-              <input className="input" id="name" name="name" placeholder="Dr. Liza Manalo" required />
-            </div>
-            <div className="field">
-              <label htmlFor="email">Email or short login</label>
-              <input className="input" id="email" name="email" placeholder="lmanalo@feu.edu.ph" autoCapitalize="none" required />
-            </div>
-          </div>
-          <span className="sub">The app makes a temporary password and shows it once. Judges can change it under Account. A new judge joins the department list for future events.</span>
-          <button className="btn" type="submit">
-            Create judge account
-          </button>
-        </form>
+        <div className="section-title">Department list</div>
+        <p className="sub" style={{ marginTop: 0 }}>
+          Judges are kept year after year. Picking the same person again, rather than making a new account, keeps their record together in Judge profiles. Select a judge and
+          press <b>Add to this event</b>.
+        </p>
+        <DataGrid
+          label="Department list"
+          columns={departmentColumns}
+          rows={department.map(departmentGridRow)}
+          actions={[{ label: 'Add to this event', run: addDepartmentJudgeTable.bind(null, id) }]}
+          rowName="name"
+          searchPlaceholder="Search the department list"
+          emptyText="Everyone on the department list is already judging this event."
+        />
       </main>
     </>
   );

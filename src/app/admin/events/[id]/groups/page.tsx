@@ -1,10 +1,12 @@
-import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { AppBar, Notice } from '@/components/AppBar';
+import { DataGrid } from '@/components/DataGrid';
 import { EventHeader } from '@/components/EventNav';
 import { requireAdmin } from '@/lib/auth';
+import type { GridColumn } from '@/lib/grid';
 import { getEvent, listAdvisers, listGroups } from '@/lib/repo';
-import { saveGroup } from '../../../actions';
+import { groupGridRow } from '@/lib/tables';
+import { removeGroupsTable, saveGroupsTable } from '../../../table-actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,72 +17,55 @@ export default async function GroupsPage({ params, searchParams }: { params: Pro
   const event = await getEvent(id);
   if (!event) notFound();
   const [groups, advisers] = await Promise.all([listGroups(id), listAdvisers(id)]);
-  const nextCode = `G${String(groups.length + 1).padStart(2, '0')}`;
+  const released = !!event.released_at;
+
+  const columns: GridColumn[] = [
+    { key: 'code', label: 'Code', editable: true, width: '6.5rem' },
+    { key: 'name', label: 'Business name', editable: true, required: true, width: 'minmax(11rem, 2fr)' },
+    { key: 'section', label: 'Section', editable: true, filter: true, width: '7.5rem' },
+    {
+      key: 'adviser',
+      label: 'Adviser',
+      type: 'choice',
+      editable: true,
+      allowNew: true,
+      newHint: 'Enter adds “{text}” as a new adviser',
+      options: advisers.map((a) => ({ value: a.id, label: a.name, hint: a.email })),
+      filter: true,
+      width: 'minmax(11rem, 1.6fr)',
+    },
+    { key: 'members', label: 'Members', type: 'number', align: 'right', width: '6.5rem' },
+  ];
 
   return (
     <>
       <AppBar subtitle="Coordinator" account={acc} home="/admin" />
-      <main className="page">
+      <main className="page wide">
         <EventHeader event={event} tab="groups" title="Groups" />
         <Notice ok={sp.ok} error={sp.error} />
-        <ul className="list">
-          {groups.map((g) => (
-            <li key={g.id}>
-              <Link className="rowlink" href={`/admin/events/${id}/groups/${g.id}`}>
-                <span className="code">{g.code}</span>
-                <span className="grow-1">
-                  <span className="title">{g.name}</span>
-                  <span className="sub" style={{ display: 'block' }}>
-                    {g.section || 'No section'} · {g.adviser_name ?? 'No adviser'}
-                  </span>
-                </span>
-                <span className={`pill ${g.member_count ? 'done' : 'err'}`}>
-                  {g.member_count} member{g.member_count === 1 ? '' : 's'}
-                </span>
-              </Link>
-            </li>
-          ))}
-          {!groups.length ? <li className="sub">No groups yet. Add the first one below.</li> : null}
-        </ul>
-
-        <div className="section-title">Add a group</div>
-        <form action={saveGroup} className="card form">
-          <input type="hidden" name="eventId" value={id} />
-          <div className="row2">
-            <div className="field">
-              <label htmlFor="code">Code</label>
-              <input className="input" id="code" name="code" defaultValue={nextCode} required />
-            </div>
-            <div className="field">
-              <label htmlFor="section">Section</label>
-              <input className="input" id="section" name="section" placeholder="BA-3A" />
-            </div>
+        <p className="lead">
+          One row per group. Type into a cell to change it; to add a group, type in the last row (leave the code empty and the app gives the next one). Press a business
+          name to add its members.
+        </p>
+        {released ? (
+          <div className="notice warn">
+            Results have been released. You can still correct a group’s code, name or adviser; each change is recorded on the group’s page with your name and the time. A new
+            adviser changes both advisers’ result pages and the adviser ranking, and the mailing sheet already sent no longer matches. No group can be added or deleted.
           </div>
-          <div className="field">
-            <label htmlFor="name">Business name</label>
-            <input className="input" id="name" name="name" placeholder="Kape Kultura" required />
-          </div>
-          <div className="row2">
-            <div className="field">
-              <label htmlFor="adviserId">Adviser</label>
-              <select className="input" id="adviserId" name="adviserId" defaultValue="">
-                <option value="">Choose from the adviser list</option>
-                {advisers.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="field">
-              <label htmlFor="adviserName">…or type a new adviser</label>
-              <input className="input" id="adviserName" name="adviserName" placeholder="Prof. Juan Dela Cruz" />
-            </div>
-          </div>
-          <button className="btn" type="submit">
-            Add group
-          </button>
-        </form>
+        ) : null}
+        <DataGrid
+          label="Groups"
+          columns={columns}
+          rows={groups.map((g) => groupGridRow(event, g))}
+          save={saveGroupsTable.bind(null, id)}
+          remove={released ? undefined : removeGroupsTable.bind(null, id)}
+          removeLabel="Delete group"
+          canAdd={!released}
+          addHint="Add a group here"
+          rowName="name"
+          searchPlaceholder="Search groups, sections and advisers"
+          emptyText="No groups yet."
+        />
       </main>
     </>
   );
