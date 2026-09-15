@@ -105,7 +105,7 @@ describe('completing a typed choice in the cell, as Excel does', () => {
     const third = stepCompletion(second, matches, 1);
     expect(shown(third)).toBe('reyes[ → 2021-00104 · REYES, Dan · BSA-1B]');
     expect(resolveCompletion(studentNo, third)).toEqual({ value: 's4', label: '2021-00104' });
-    expect(stepCompletion(second, matches, -1)).toEqual(c);
+    expect(stepCompletion(second, matches, -1)).toEqual({ ...c, chosen: true });
     expect(resolveCompletion(studentNo, stepCompletion(c, matches, -1))).toEqual({ value: 's4', label: '2021-00104' });
   });
 
@@ -124,7 +124,10 @@ describe('completing a typed choice in the cell, as Excel does', () => {
     expect(leaveCompletion(studentNo, c, true, unplaced)).toEqual({ keep: plainCompletion('reyes') });
     expect(leaveCompletion(studentNo, c, false, unplaced)).toEqual({ keep: plainCompletion('reyes'), reason: expect.stringContaining('“reyes” matches more than one') });
     const chosenWithDown = stepCompletion(c, completionMatches('reyes', unplaced), 1);
-    expect(leaveCompletion(studentNo, chosenWithDown, false, unplaced)).toMatchObject({ keep: plainCompletion('reyes') });
+    expect(leaveCompletion(studentNo, chosenWithDown, false, unplaced)).toEqual({
+      keep: chosenWithDown,
+      reason: 'Student No.: not saved. Press Enter or Tab to save 2021-00102, or Esc to keep only what you typed.',
+    });
   });
 
   it('clicking away saves only the one student the cell shows, and never while in another window', () => {
@@ -151,15 +154,20 @@ describe('completing a typed choice in the cell, as Excel does', () => {
     expect(resolveCompletion(studentNo, c)).toEqual({ value: 's3', label: '2021-00103' });
   });
 
-  it('a group picked with Down is saved by Enter, but clicking away saves nothing and keeps what was typed', () => {
+  it('a group picked with Down is saved by Enter; clicking away saves nothing and the cell still shows the choice Enter saves', () => {
     const groups: GridOption[] = ['G5', 'G50', 'G51', 'G52', 'G53', 'G54', 'G55', 'G56', 'G57'].map((code) => ({ value: code.toLowerCase(), label: code }));
     const group: GridColumn = { key: 'group', label: 'Group', type: 'choice', editable: true, options: groups };
     const g5 = typeCompletion('G5', groups, true);
     expect(shown(g5)).toBe('G5[]');
     const down = stepCompletion(g5, completionMatches('G5', groups), 1);
     expect(shown(down)).toBe('G5[0]');
-    expect(leaveCompletion(group, down, false, groups)).toEqual({ keep: plainCompletion('G5'), reason: 'Group: not saved. Only Enter or Tab save a choice from the list.' });
-    expect(resolveCompletion(group, down)).toEqual({ value: 'g50', label: 'G50' });
+    const leftDown = leaveCompletion(group, down, false, groups);
+    expect(leftDown).toEqual({ keep: down, reason: 'Group: not saved. Press Enter or Tab to save G50, or Esc to keep only what you typed.' });
+    // Back in the open cell, it shows G50 and Enter saves G50; Esc leaves only the typed G5.
+    expect('keep' in leftDown && shown(leftDown.keep)).toBe('G5[0]');
+    expect('keep' in leftDown && resolveCompletion(group, leftDown.keep)).toEqual({ value: 'g50', label: 'G50' });
+    expect(leaveCompletion(group, down, true, groups)).toEqual({ keep: down });
+    expect(shown(plainCompletion(down.typed))).toBe('G5[]');
     const left = leaveCompletion(group, g5, false, groups);
     expect(left).toEqual({ save: g5 });
     expect('save' in left && resolveCompletion(group, left.save)).toEqual({ value: 'g5', label: 'G5' });

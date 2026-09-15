@@ -209,6 +209,8 @@ export interface Completion {
   option: GridOption | null;
   /** The option's place among the matches for what was typed; -1 when nothing is completed. */
   index: number;
+  /** True when the person showed this option with Down or Up, rather than it being completed by itself. */
+  chosen: boolean;
   /** What the cell shows, and so exactly what Enter or Tab saves. */
   text: string;
   /** The completed part of the text, shown highlighted, runs from start to end; they are equal when nothing is completed. */
@@ -234,7 +236,7 @@ export function completionMatches(typed: string, options: GridOption[]): GridOpt
 
 /** The cell holding only what was typed. */
 export function plainCompletion(typed: string): Completion {
-  return { typed, option: null, index: -1, text: typed, start: typed.length, end: typed.length };
+  return { typed, option: null, index: -1, chosen: false, text: typed, start: typed.length, end: typed.length };
 }
 
 /**
@@ -247,7 +249,7 @@ export function completeWith(typed: string, matches: GridOption[], index: number
   const text = option.label.toLowerCase().startsWith(typed.toLowerCase())
     ? option.label
     : `${typed}${/\s$/.test(typed) ? '' : ' '}→ ${option.label}${option.hint ? ` · ${option.hint}` : ''}`;
-  return { typed, option, index, text, start: typed.length, end: text.length };
+  return { typed, option, index, chosen: false, text, start: typed.length, end: text.length };
 }
 
 /** What typing leaves in a choice cell: typing at the end completes the best match; deleting, or typing mid-text, never does. */
@@ -260,7 +262,7 @@ export function stepCompletion(c: Completion, matches: GridOption[], step: 1 | -
   const n = matches.length;
   if (!n) return c;
   const index = c.index < 0 ? (step > 0 ? 0 : n - 1) : (c.index + step + n) % n;
-  return completeWith(c.typed, matches, index);
+  return { ...completeWith(c.typed, matches, index), chosen: true };
 }
 
 /** What finishing a cell saves: the completed option exactly as shown, or else what was typed, checked as a paste is. */
@@ -273,17 +275,21 @@ export type Leaving = { save: Completion } | { keep: Completion; reason?: string
 /**
  * What leaving a cell without Enter or Tab does. Nothing is saved that the cell was not showing: what was typed is
  * saved only when it means exactly the entry on screen (an exact or single match shown in the cell, a new value where
- * the column takes one, or a blank). A choice made with Down is saved only by Enter or Tab. Otherwise, and always
- * while the person is away in another window or tab, the cell stays open with only the typed text, unsaved.
+ * the column takes one, or a blank). A choice shown with Down or Up stays in the open cell, unsaved, until Enter or
+ * Tab saves it. Otherwise, and always while the person is away in another window or tab, the cell stays open with
+ * only the typed text, unsaved.
  */
 export function leaveCompletion(column: GridColumn, c: Completion, away: boolean, options: GridOption[] = column.options ?? [], rowMax?: number): Leaving {
   const typed = plainCompletion(c.typed);
-  if (away) return { keep: typed };
+  const choice = c.option && c.chosen ? c.option : null;
+  const keepChoice = (o: GridOption): Leaving => ({ keep: c, reason: `${column.label}: not saved. Press Enter or Tab to save ${o.label}, or Esc to keep only what you typed.` });
+  if (away) return choice ? { keep: c } : { keep: typed };
   if (column.type !== 'choice') return { save: typed };
   const resolved = resolveCell(column, c.typed, options, rowMax);
+  if (choice && ('error' in resolved || resolved.value !== choice.value)) return keepChoice(choice);
   if ('error' in resolved) return { keep: typed, reason: resolved.error };
   if (c.option) {
-    return resolved.value === c.option.value ? { save: c } : { keep: typed, reason: `${column.label}: not saved. Only Enter or Tab save a choice from the list.` };
+    return resolved.value === c.option.value ? { save: c } : { keep: typed, reason: `${column.label}: not saved. Press Down to choose from the list, then Enter or Tab.` };
   }
   return norm(resolved.label) === norm(c.typed)
     ? { save: typed }
