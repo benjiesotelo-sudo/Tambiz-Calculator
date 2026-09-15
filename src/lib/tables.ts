@@ -15,16 +15,16 @@ export function groupGridRow(event: EventLike, g: GroupRow): GridRow {
   const href = `/admin/events/${event.id}/groups/${g.id}`;
   return {
     id: g.id,
-    cells: { code: g.code, name: g.name, section: g.section, adviser: g.adviser_name ?? '', members: String(g.member_count) },
+    cells: { name: g.name, section: g.section, adviser: g.adviser_name ?? '', members: String(g.member_count) },
     links: { name: href, members: href },
     tones: g.member_count ? undefined : { members: 'err' },
-    locked: event.released_at ? { section: 'Results have been released, so the section cannot change now. The code, name and adviser can still be corrected.' } : undefined,
+    locked: event.released_at ? { section: 'Results have been released, so the section cannot change now. The name and adviser can still be corrected.' } : undefined,
   };
 }
 
 /** A group's line in the Results table: each category's percentage with its rank, then the overall and its rank. */
 export function resultGridRow(event: EventLike, g: GroupRow, r: GroupResult): GridRow {
-  const cells: Record<string, string> = { group: `${g.code} ${g.name}`, section: g.section, adviser: g.adviser_name ?? '' };
+  const cells: Record<string, string> = { group: g.name, section: g.section, adviser: g.adviser_name ?? '' };
   const sort: Record<string, number | null> = {};
   const tones: GridRow['tones'] = {};
   for (const c of r.categories) {
@@ -68,7 +68,7 @@ export function rollGridRow(event: EventLike, s: StudentRow): GridRow {
       middle: s.middle_name,
       section: s.section,
       email: s.email,
-      group: s.group_code ?? '',
+      group: s.group_name ?? '',
       status,
       leftout: inGroup ? '' : (s.excluded_reason ?? ''),
     },
@@ -187,7 +187,7 @@ export function gradeGridRow(event: EventLike, g: GradeRow): GridRow {
       student: g.student.student_number,
       name: rollName(g.student),
       section: g.student.section,
-      group: `${g.group.code} ${g.group.name}`,
+      group: g.group.name,
       adviser: g.group.adviser_name ?? '',
       total: g.total === null ? '' : fmt2(g.total),
       overall: g.overall === null ? '' : fmt2(g.overall),

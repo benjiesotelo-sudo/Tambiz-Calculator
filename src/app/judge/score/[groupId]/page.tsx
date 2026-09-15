@@ -42,7 +42,7 @@ export default async function ScorePage({ params, searchParams }: { params: Prom
       closed={event.status === 'finalised'}
       half={half}
       rubric={event.rubric}
-      group={{ id: group.id, code: group.code, name: group.name, section: group.section, adviser: group.adviser_name ?? 'No adviser' }}
+      group={{ id: group.id, name: group.name, section: group.section, adviser: group.adviser_name ?? 'No adviser' }}
       members={members.map((m) => ({ id: m.id, name: `${m.first_name} ${m.surname}`, initials: (m.first_name[0] ?? '') + (m.surname[0] ?? ''), section: m.section }))}
       initial={initial}
       initialComplete={sheet?.status === 'complete'}

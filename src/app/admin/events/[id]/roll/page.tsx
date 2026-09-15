@@ -42,9 +42,9 @@ export default async function RollPage({ params, searchParams }: { params: Promi
       label: 'Group',
       type: 'choice',
       editable: true,
-      options: groups.map((g) => ({ value: g.id, label: g.code, hint: `${g.name} · ${g.section}` })),
+      options: groups.map((g) => ({ value: g.id, label: g.name, hint: g.section })),
       filter: true,
-      width: '5.6rem',
+      width: 'minmax(8rem, 1.3fr)',
     },
     { key: 'status', label: 'Status', filter: true, width: '7.4rem' },
     { key: 'leftout', label: 'Left out because', editable: true, width: 'minmax(8rem, 1.3fr)' },
@@ -85,7 +85,7 @@ export default async function RollPage({ params, searchParams }: { params: Promi
           {unplaced ? 'Judging cannot close until every student is in a group or left out.' : ''}
         </p>
         <p className="sub" style={{ marginTop: 0 }}>
-          Type a group code in <b>Group</b> to place a student, or change it to move them; empty it to take them out. For a student who dropped, empty their Group and type the
+          Type the first letters of a group’s name in <b>Group</b> and press Enter to place a student, or change it to move them; empty it to take them out. For a student who dropped, empty their Group and type the
           reason in <b>Left out because</b>. Choose <b>Not in a group</b> under Status to see who is left. A student added by hand in the last row needs a student number, names,
           section and email.
         </p>

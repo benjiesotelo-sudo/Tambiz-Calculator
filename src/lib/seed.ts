@@ -37,16 +37,16 @@ const SURNAMES = ['Dela Cruz', 'Santos', 'Reyes', 'Garcia', 'Mendoza', 'Bautista
 const FIRST = ['Andrea', 'Miguel', 'Bea', 'Joshua', 'Kristine', 'Paolo', 'Nicole', 'Carlo', 'Patricia', 'Rafael', 'Angelica', 'Mark', 'Jasmine', 'Gabriel', 'Camille', 'Joaquin', 'Denise', 'Enzo', 'Trisha', 'Luis', 'Bianca', 'Nathan', 'Sofia', 'Adrian', 'Maxine', 'Ivan', 'Alyssa', 'Kyle', 'Janelle', 'Marco'];
 const MIDDLE = ['Cruz', 'Lim', 'Tan', 'Uy', 'Sy', 'Ong', 'Chua', 'Go', 'Yu', 'Co'];
 
-const GROUPS: [string, string, string, number, number][] = [
-  // code, name, section, adviser index, quality (0-1)
-  ['G01', 'Kape Kultura', 'BA-3A', 0, 0.91],
-  ['G02', 'Banig & Co.', 'BA-3A', 0, 0.86],
-  ['G03', 'Sari-Sari Smart', 'BA-3B', 1, 0.83],
-  ['G04', 'Halo-Halo Hub', 'BA-3B', 1, 0.78],
-  ['G05', 'Bayong Bags', 'BA-3C', 2, 0.88],
-  ['G06', 'Kalamansi Glow', 'BA-3C', 2, 0.74],
-  ['G07', 'Pandesal Plus', 'BA-3D', 3, 0.81],
-  ['G08', 'Abaca Threads', 'BA-3D', 3, 0.69],
+const GROUPS: [string, string, number, number][] = [
+  // name, section, adviser index, quality (0-1)
+  ['Kape Kultura', 'BA-3A', 0, 0.91],
+  ['Banig & Co.', 'BA-3A', 0, 0.86],
+  ['Sari-Sari Smart', 'BA-3B', 1, 0.83],
+  ['Halo-Halo Hub', 'BA-3B', 1, 0.78],
+  ['Bayong Bags', 'BA-3C', 2, 0.88],
+  ['Kalamansi Glow', 'BA-3C', 2, 0.74],
+  ['Pandesal Plus', 'BA-3D', 3, 0.81],
+  ['Abaca Threads', 'BA-3D', 3, 0.69],
 ];
 const ADVISERS = ['Prof. Maria Lourdes Santos', 'Prof. Ramon Villareal', 'Prof. Teresita Uy', 'Prof. Danilo Ocampo'];
 /** Sample adviser codes, typed to open an adviser's private link. */
@@ -146,7 +146,7 @@ export async function seedIfEmpty(db: Db) {
     students.push({ id: sid, section, group });
     n++;
   };
-  GROUPS.forEach(([, , section], gi) => {
+  GROUPS.forEach(([, section], gi) => {
     const size = 5 + (gi % 3);
     for (let k = 0; k < size; k++) addStudent(section, gi);
   });
@@ -159,8 +159,8 @@ export async function seedIfEmpty(db: Db) {
   s.push(
     ...insertMany(
       'tgroup',
-      ['id', 'event_id', 'code', 'name', 'name_key', 'section', 'adviser_id'],
-      GROUPS.map(([code, name, section, adv], gi) => [groupIds[gi], eventId, code, name, nameKey(name), section, adviserIds[adv]]),
+      ['id', 'event_id', 'name', 'name_key', 'section', 'adviser_id'],
+      GROUPS.map(([name, section, adv], gi) => [groupIds[gi], eventId, name, nameKey(name), section, adviserIds[adv]]),
     ),
   );
   s.push(...insertMany('group_member', ['event_id', 'group_id', 'student_id'], students.filter((x) => x.group >= 0).map((x) => [eventId, groupIds[x.group], x.id])));
@@ -177,7 +177,7 @@ export async function seedIfEmpty(db: Db) {
     for (const [gi, done] of targets) {
       const sheetId = id('sht');
       sheetRows.push([sheetId, eventId, groupIds[gi], half, judgeIds[ji], done ? 'complete' : 'in_progress', done ? new Date().toISOString() : null]);
-      const q = GROUPS[gi][4] + (ji - 1) * 0.02;
+      const q = GROUPS[gi][3] + (ji - 1) * 0.02;
       const crits = criteriaOf(DEFAULT_RUBRIC, half);
       crits.forEach((c, ci) => {
         if (!done && ci >= Math.floor(crits.length * 0.55)) return;

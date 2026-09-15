@@ -14,7 +14,6 @@ export async function eventProfileSheets(event: EventRow): Promise<ProfileSheet[
       judgeId: s.judge_id,
       judgeName: s.judge_name,
       groupId: s.group_id,
-      groupCode: byId.get(s.group_id)!.code,
       groupName: byId.get(s.group_id)!.name,
       half: s.half,
       values: scores.sheetValues.get(s.id)!,

@@ -27,7 +27,7 @@ Groups, a group's members, Class roll, Advisers, Judges, a group's scores, Grade
 - **To add a row, type in the empty last row.** It saves once its required cells are filled; until then the label says what it still needs.
 - **To paste from Excel:** copy the cells in Excel, click the cell where the top-left one should go, and press **Ctrl+V** (⌘V on a Mac). A yellow bar says how many cells will change and how many rows will be added, and the new values are highlighted in the table. Press **Enter** to apply or **Esc** to cancel. Rows past the end become new rows.
 - **Shift** with the arrow keys selects several cells. **Ctrl+C** copies them to paste into Excel; **Delete** empties them; one value pasted over a selection fills all of it.
-- A cell with a list (an adviser, a student, a group, Present or Absent) completes what you type, as Excel does. The rest of the best match appears in the cell, highlighted, so you can read what will be saved before you press a key: type `G5` and the cell shows G5**0**. A student found by name follows an arrow, for example `reyes → 2021-00101 · REYES, Ana · BSA-1A`. Keep typing to narrow it. **Down** shows the next match in the cell and **Up** the one before; the list under the cell shows the matches. **Enter** or **Tab** saves exactly what the cell shows, and only Enter or Tab accept a completion: clicking away or switching to another window or tab never saves one. While you are in another window or tab, nothing is saved: the cell stays open showing what it showed (what you typed, or a match you showed with **Down**), and when you come back **Enter** or **Tab** saves what the cell shows. Clicking elsewhere saves only when the cell shows exactly what would be saved, for example a whole group code or the only student matching what you typed. A match you showed with **Down** is saved only by Enter or Tab: clicking away keeps the cell open, unsaved, still showing that match, and the line under the table says so. Press **Enter** or **Tab** to save what the cell shows, or **Esc** to keep only what you typed (and **Esc** again to leave the cell). If a search, filter or sort hides the row of a cell left open this way, the cell closes without saving. While you type, the cell widens over its neighbours so the whole completion can be read. **Esc** or **Backspace** removes the completion and keeps only what you typed (press **Esc** again to leave the cell unchanged). Something not on the list, or text that matches several entries with nothing completed, is refused with a message saying which column; only a new adviser's name typed on the Groups table is taken as it is.
+- A cell with a list (an adviser, a student, a group, Present or Absent) completes what you type, as Excel does. The rest of the best match appears in the cell, highlighted, so you can read what will be saved before you press a key: type `Kape` and the cell shows Kape** Kultura**. A student found by name follows an arrow, for example `reyes → 2021-00101 · REYES, Ana · BSA-1A`. Keep typing to narrow it. **Down** shows the next match in the cell and **Up** the one before; the list under the cell shows the matches. **Enter** or **Tab** saves exactly what the cell shows, and only Enter or Tab accept a completion: clicking away or switching to another window or tab never saves one. While you are in another window or tab, nothing is saved: the cell stays open showing what it showed (what you typed, or a match you showed with **Down**), and when you come back **Enter** or **Tab** saves what the cell shows. Clicking elsewhere saves only when the cell shows exactly what would be saved, for example a whole group name or the only student matching what you typed. A match you showed with **Down** is saved only by Enter or Tab: clicking away keeps the cell open, unsaved, still showing that match, and the line under the table says so. Press **Enter** or **Tab** to save what the cell shows, or **Esc** to keep only what you typed (and **Esc** again to leave the cell). If a search, filter or sort hides the row of a cell left open this way, the cell closes without saving. While you type, the cell widens over its neighbours so the whole completion can be read. **Esc** or **Backspace** removes the completion and keeps only what you typed (press **Esc** again to leave the cell unchanged). Something not on the list, or text that matches several entries with nothing completed, is refused with a message saying which column; only a new adviser's name typed on the Groups table is taken as it is.
 - **Ctrl+Delete** removes the selected row, after you press **Enter** to confirm. **Ctrl+Enter** opens the row's own page, for example a group's.
 - **Ctrl+F** goes to the table's **Search** box, which finds any word in any column. The lists beside it filter by a column, for example Section or Adviser. Click a column heading to sort by it, again to reverse, a third time to go back.
 - **There is no Save button.** Every change saves by itself. The label at the top right of the table says **All changes saved**, **Saving…**, or in red how many cells were not saved. A red cell was refused: select it and the reason shows under the table. Fix it by typing again.
@@ -85,7 +85,7 @@ If students are added or dropped later, import the new file again. Importing the
 
 The roll is one table: Student No., Surname, First name, Middle name, Section, Email, Group, Status and Left out because. Type over a name, section or email to correct it. A student missing from the registrar's file can be typed into the empty last row (Student No., names, section and email are all needed).
 
-**Placing students in groups from the roll.** Type a group code (for example `G03`) in a student's **Group** cell to place them, type another code to move them, or empty the cell to take them out of their group. To place many at once, copy a column of group codes from Excel in the same order as the table, click the first **Group** cell and press **Ctrl+V**, then **Enter**. Moving a student out of a group means their scores from that group no longer count.
+**Placing students in groups from the roll.** Type the first letters of the group's business name (for example `Sari`) in a student's **Group** cell and press **Enter** when the cell shows the right group, type another group's name to move them, or empty the cell to take them out of their group. To place many at once, copy a column of group names from Excel, spelled as on the **Groups** table, in the same order as the table, click the first **Group** cell and press **Ctrl+V**, then **Enter**. Moving a student out of a group means their scores from that group no longer count.
 
 **A student who dropped the course** stays on the roll file but should not be in a group. Judging cannot close while anyone on the roll is in no group, so leave them out on purpose:
 
@@ -106,7 +106,7 @@ Choose **one** of these.
 **With an adviser file**
 
 1. Press the **Advisers** tab.
-2. Press **Choose File** and pick the adviser `.xlsx` file. (No file yet? Press **Download template** for an Excel file with the right columns and one invented example row to type over.) It needs an **Adviser** column. An **Email** column is optional. A **Group Code** or **Group Name** column sets each group's adviser in one go (do this after Part D if you use it).
+2. Press **Choose File** and pick the adviser `.xlsx` file. (No file yet? Press **Download template** for an Excel file with the right columns and one invented example row to type over.) It needs an **Adviser** column. An **Email** column is optional. A **Group Name** column sets each group's adviser in one go: one row per group, the business name spelled as on the **Groups** table (capitals, spaces and punctuation do not matter). Do this after Part D if you use it. An older file with a **Group Code** column still imports, but the code is ignored: the message says how many rows had a code and no name.
 3. Press **Import**.
 4. Read the green message.
 
@@ -131,18 +131,18 @@ An adviser without an email or without a code gets no link.
 
 ## Part D. Create the groups and add their members
 
-**The groups.** The **Groups** tab is one table: Code, Business name, Section, Adviser and Members.
+**The groups.** The **Groups** tab is one table: Business name, Section, Adviser and Members. A group is known by its business name alone; there is no group number.
 
 1. Press the **Groups** tab.
 2. Click the empty last row under **Business name** (it says *Add a group here*) and type the business name, for example `Kape Kultura`. Press **Tab**.
 3. Type the **Section**, for example `BA-3A`. Press **Tab**.
 4. Type the first letters of the adviser's name and press **Enter** to take the suggestion. An adviser not on the list is added as a new adviser when you press Enter.
-5. The row saves by itself. Leave **Code** empty and the app gives the next one, such as `G09`; or type your own code.
+5. The row saves by itself.
 6. Carry on in the next empty row.
 
-**Many groups at once:** in Excel, put the columns in the table's order (Code, Business name, Section, Adviser), copy the rows, click the first empty **Code** cell and press **Ctrl+V**. Check the yellow bar and press **Enter**. Leave the Code column out and paste into **Business name** instead to have codes given for you.
+**Many groups at once:** in Excel, put the columns in the table's order (Business name, Section, Adviser), copy the rows, click the first empty **Business name** cell and press **Ctrl+V**. Check the yellow bar and press **Enter**.
 
-To change a group, type over its cell. Every change to a group's code, name, section or adviser is listed at the bottom of the group's page under **Changes to this group's details**, with who made it and when. To delete a group that no judge has scored, select its row and press **Ctrl+Delete**, then **Enter**.
+To change a group, type over its cell. Every change to a group's name, section or adviser is listed at the bottom of the group's page under **Changes to this group's details**, with who made it and when. To delete a group that no judge has scored, select its row and press **Ctrl+Delete**, then **Enter**.
 
 **The members.** Do this for every group.
 
@@ -155,7 +155,7 @@ To change a group, type over its cell. Every change to a group's code, name, sec
 Rules the app enforces for you:
 
 - A student can belong to only one group. If you type someone already in another group, their cell turns red and says which group; nobody is added.
-- Two groups cannot share a code, or a name that differs only in spaces or punctuation ("PAYONG PALAY" and "PayongPalay" count as the same).
+- Two groups cannot share a name, and names that differ only in capitals, spaces or punctuation count as the same ("PAYONG PALAY" and "PayongPalay"). The red cell names the group it clashes with, for example *“PayongPalay” counts as the same name as the group PAYONG PALAY*.
 - Members are always chosen from the roll. A student number that is not on the roll is refused.
 
 **Final check**
@@ -270,9 +270,9 @@ Judging can close only when nothing is left unsettled. The **Close judging** sec
 
 1. Press the **Progress** tab and scroll to **Close judging**.
 2. Settle each **Needs you** item:
-   - **"G07 Pandesal Plus: no completed Booth sheet"** (or "a criterion nobody has scored"). Ask the judge to finish and tap **Mark group complete**. If the group genuinely cannot be fully judged, for example it never ran a booth, press **Close judging for this group with the scores it has…**, type the reason, and press **Accept with this reason**. Its missing half stays out of its score; it is not counted as zero.
+   - **"Pandesal Plus: no completed Booth sheet"** (or "a criterion nobody has scored"). Ask the judge to finish and tap **Mark group complete**. If the group genuinely cannot be fully judged, for example it never ran a booth, press **Close judging for this group with the scores it has…**, type the reason, and press **Accept with this reason**. Its missing half stays out of its score; it is not counted as zero.
    - **"Carlo Lacson (BA-3A) is on the roll but in no group."** Place them in a group (Part D), or press **Leave this student out with a reason…** (see Part B).
-   - **"Andrea Dela Cruz (G01) has incomplete member scores."** Ask the defense judges to score them, correct the scores yourself, or, if the student missed the defense, press **Mark absent from the defense**.
+   - **"Andrea Dela Cruz (Kape Kultura) has incomplete member scores."** Ask the defense judges to score them, correct the scores yourself, or, if the student missed the defense, press **Mark absent from the defense**.
 3. Read the gold **Check** items. They do not block closing: a half with only one completed sheet, and sheets a judge has not marked complete. **Scores on a sheet that was not marked complete do not count**, so ask that judge to submit it before you close judging, or accept that it is left out.
 4. **Already decided by you** lists accepted groups, absent students and students left out, each with **Undo**.
 5. Tick **I have checked the progress above**.
@@ -354,7 +354,7 @@ How a link works:
 
 Before you start: judging is closed (Part I), every adviser has a code (Part C), and you have checked the grades (Part J). **After release, scores can no longer be corrected or cleared, judging cannot be reopened, and a group cannot be deleted.**
 
-After release you can still correct a mistake in a group's **code**, **name** or **adviser**, by typing over it on the **Groups** table or with the adviser import. The app says what the change affects the moment you make it: a new code or name shows on the members' and adviser's pages; a new adviser changes both advisers' pages and the adviser ranking, and the mailing sheet already sent no longer matches (give an adviser who had no link one with **Download links for the people with none yet**). Every change is recorded with your name and the time on the group's page, so nothing changes out of sight.
+After release you can still correct a mistake in a group's **name** or **adviser**, by typing over it on the **Groups** table or with the adviser import. The app says what the change affects the moment you make it: a new name shows on the members' and adviser's pages; a new adviser changes both advisers' pages and the adviser ranking, and the mailing sheet already sent no longer matches (give an adviser who had no link one with **Download links for the people with none yet**). Every change is recorded with your name and the time on the group's page, so nothing changes out of sight.
 
 1. Press the **Release** tab. If something was changed after judging closed so that an item **Needs you** again (for example you pressed **Undo** on an accepted group, cleared a group's only score, or removed a student from a group), the tab says how many items need you instead of showing the release button. They are listed under **Close judging** on the **Progress** tab; settle them as in Part I, then come back.
 2. Read **Check before sending**. It lists students with no email, advisers with no email or code, and any email that contains the person's student number or code. Fix what you can on the Class roll and Advisers tabs.
@@ -415,7 +415,7 @@ Be aware of these gaps.
 - **Change history screen.** Score corrections are listed on each group's scores page and changes to a group's details on the group's page, but other changes (imports, members, status) are recorded in the database with no screen to read them.
 - **First sign-in password change.** Judges are not forced to change the temporary password; they can do it under **Account**.
 - **More on links.** Wrong tries are counted per link only, not also per network. A link's 30 days cannot be extended on its own; reissue it instead. A mailing sheet cannot be downloaded again: if it is lost, reissue the links.
-- **Corrections after release.** Once results are released, only a group's code, name or adviser can be corrected (Part L); scores cannot, and there is no "issue corrected results" step.
+- **Corrections after release.** Once results are released, only a group's name or adviser can be corrected (Part L); scores cannot, and there is no "issue corrected results" step.
 
 ## If something goes wrong
 

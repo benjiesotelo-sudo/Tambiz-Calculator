@@ -4,7 +4,7 @@ import { DataGrid } from '@/components/DataGrid';
 import { EventHeader } from '@/components/EventNav';
 import { requireAdmin } from '@/lib/auth';
 import type { GridColumn } from '@/lib/grid';
-import { eventReport, getEvent } from '@/lib/repo';
+import { byGroupName, eventReport, getEvent } from '@/lib/repo';
 import { adviserRanking, fmtPct } from '@/lib/scoring';
 import { resultGridRow } from '@/lib/tables';
 
@@ -28,7 +28,7 @@ export default async function ResultsPage({ params }: { params: Promise<{ id: st
   // One row per group, every group, in overall order; groups without an overall rank last.
   const rows = report.groups
     .map((g) => ({ g, r: report.resultById.get(g.id)! }))
-    .sort((a, b) => (a.r.overallRank ?? 1e9) - (b.r.overallRank ?? 1e9) || a.g.code.localeCompare(b.g.code, undefined, { numeric: true }))
+    .sort((a, b) => (a.r.overallRank ?? 1e9) - (b.r.overallRank ?? 1e9) || byGroupName(a.g.name, b.g.name))
     .map(({ g, r }) => resultGridRow(event, g, r));
   const categories = report.results.groups[0]?.categories ?? [];
   const columns: GridColumn[] = [

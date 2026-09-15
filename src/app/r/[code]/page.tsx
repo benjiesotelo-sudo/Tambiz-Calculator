@@ -159,9 +159,7 @@ function StudentResult({ link, code, report }: { link: LinkRow; code: string; re
       <h1 className="page-title">
         {g.student.first_name} {g.student.surname}
       </h1>
-      <p className="lead">
-        {g.group.code} {g.group.name}
-      </p>
+      <p className="lead">{g.group.name}</p>
 
       <div className="card result-hero">
         {g.absent ? (
@@ -207,9 +205,7 @@ function StudentResult({ link, code, report }: { link: LinkRow; code: string; re
       {result ? (
         <div className="card">
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'baseline', flexWrap: 'wrap' }}>
-            <h3 style={{ margin: 0 }}>
-              {g.group.code} {g.group.name}
-            </h3>
+            <h3 style={{ margin: 0 }}>{g.group.name}</h3>
             <span className="bignum">{result.complete || result.accepted ? fmtPct(result.overall) : 'Incomplete'}</span>
           </div>
           <div className="sub">Overall = Defense × {report.event.rubric.halves.defense.weight} + Booth × {report.event.rubric.halves.booth.weight}</div>
@@ -250,9 +246,7 @@ async function AdviserResult({ link, code, report }: { link: LinkRow; code: stri
         return (
           <div className="card" key={g.id}>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'baseline', flexWrap: 'wrap' }}>
-              <h3 style={{ margin: 0 }}>
-                {g.code} {g.name}
-              </h3>
+              <h3 style={{ margin: 0 }}>{g.name}</h3>
               <span className="bignum">{r.complete || r.accepted ? fmtPct(r.overall) : 'Incomplete'}</span>
             </div>
             <GroupPercentages result={r} />

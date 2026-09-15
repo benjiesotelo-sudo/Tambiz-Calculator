@@ -16,6 +16,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - All database access goes through `src/lib/db.ts`: Neon when `DATABASE_URL` is set, PGlite in `.local-db/` otherwise; Vercel previews ignore `DATABASE_URL` unless `TAMBIZ_PREVIEW_DATABASE=1`. Schema changes go in `src/lib/schema.ts`, must stay idempotent (it runs on every cold start) and additive, because the live database may get them before the code that uses them.
 - `.env.local` in a worktree can hold the live Neon `DATABASE_URL`, and `next dev`/`next build` load it. Run locally with `DATABASE_URL= DATABASE_URL_POOLED= npx next dev` (an empty value is never overridden) and never against Neon without the captain's say-so.
 - Every page, server action and API route checks the caller's role itself (`requireAdmin` / `requireJudge` in `src/lib/auth.ts`); do not rely on middleware.
+- Groups are known by name alone (captain's decision, 15 September 2026): uniqueness is `tgroup.name_key` per event, and messages name the clashing group. `tgroup.code` is a legacy nullable column kept only for stored values; never read, write or show it.
 - Scores above a criterion's maximum are refused (client `checkScore`, server `refuseReason` in `src/lib/sheet.ts`), never clamped.
 - Real student data must never be committed; `.gitignore` blocks `.xlsx`, `.csv` and `data/` directories, so do not name source folders `data`.
 - Coordinator how-to: `docs/how-to-run-an-event.md`. Deployment: `README.md`.

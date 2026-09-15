@@ -13,6 +13,8 @@ export interface ColumnSpec {
   required: boolean;
   /** The value in the download template's example row. Invented. */
   example: string;
+  /** Recognised in a file only so the import can say it is no longer used; never in the download template. */
+  ignored?: true;
 }
 
 export const ROLL_COLUMNS: ColumnSpec[] = [
@@ -31,9 +33,10 @@ export const ROLL_COLUMNS: ColumnSpec[] = [
 export const ADVISER_COLUMNS: ColumnSpec[] = [
   { field: 'name', header: 'Adviser', aliases: ['adviser', 'advisername', 'advisor', 'advisorname', 'name', 'facultyname'], required: true, example: 'Prof. Maria Santos' },
   { field: 'email', header: 'Email', aliases: ['email', 'adviseremail', 'advisoremail', 'emailaddress'], required: false, example: 'msantos@feu.edu.ph' },
-  { field: 'group_code', header: 'Group Code', aliases: ['groupcode', 'code', 'groupno', 'groupnumber'], required: false, example: 'G01' },
   { field: 'group_name', header: 'Group Name', aliases: ['groupname', 'group', 'businessname'], required: false, example: 'Kape Kultura' },
   { field: 'link_code', header: 'Adviser Code', aliases: ['advisercode', 'linkcode', 'accesscode', 'checkcode'], required: false, example: 'K7Q-4MP' },
+  // Groups are matched by name. A Group Code column from an older file is accepted and ignored, and the import says so.
+  { field: 'group_code', header: 'Group Code', aliases: ['groupcode', 'groupno', 'groupnumber'], required: false, example: '', ignored: true },
 ];
 
 export interface Template {
@@ -53,6 +56,9 @@ export const TEMPLATES: Record<'roll' | 'advisers', Template> = {
   advisers: { columns: ADVISER_COLUMNS, sheet: 'Advisers', file: 'Tambiz adviser list template.xlsx', row: 'adviser (one more row for each further group they advise)', tab: 'Advisers' },
 };
 
+/** The columns a template asks for: every column the importer reads, less the ones it only accepts and ignores. */
+export const templateColumns = (t: Template) => t.columns.filter((c) => !c.ignored);
+
 /**
  * A spreadsheet to fill in and import: its headings are the importer's own column list, so the template can never ask
  * for a column the importer does not read. One example row, and a second sheet saying what to do.
@@ -60,14 +66,15 @@ export const TEMPLATES: Record<'roll' | 'advisers', Template> = {
 export async function buildTemplate(t: Template): Promise<Buffer> {
   const wb = new ExcelJS.Workbook();
   wb.creator = 'Tambiz';
+  const columns = templateColumns(t);
   const ws = wb.addWorksheet(t.sheet);
-  ws.columns = t.columns.map((c) => ({ header: c.header, width: Math.max(12, c.header.length + 4, c.example.length + 3) }));
+  ws.columns = columns.map((c) => ({ header: c.header, width: Math.max(12, c.header.length + 4, c.example.length + 3) }));
   ws.getRow(1).font = { bold: true };
-  ws.addRow(t.columns.map((c) => c.example));
+  ws.addRow(columns.map((c) => c.example));
   ws.views = [{ state: 'frozen', ySplit: 1 }];
   const help = wb.addWorksheet('How to fill this in');
   help.getColumn(1).width = 110;
-  const list = (required: boolean) => t.columns.filter((c) => c.required === required).map((c) => c.header).join(', ');
+  const list = (required: boolean) => columns.filter((c) => c.required === required).map((c) => c.header).join(', ');
   [
     `One row per ${t.row}. The second row is an invented example: type over it or delete it before importing.`,
     `These columns must be filled in on every row: ${list(true)}.`,

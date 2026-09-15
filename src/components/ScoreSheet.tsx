@@ -24,7 +24,7 @@ interface Props {
   closed: boolean;
   half: Half;
   rubric: Rubric;
-  group: { id: string; code: string; name: string; section: string; adviser: string };
+  group: { id: string; name: string; section: string; adviser: string };
   members: Member[];
   initial: Record<string, number>;
   initialComplete: boolean;
@@ -634,7 +634,7 @@ export function ScoreSheet(props: Props) {
               </Link>
               <div className="gtitle">
                 <div className="gmeta">
-                  <b>{group.code}</b> · {group.section} · {group.adviser}
+                  {group.section} · {group.adviser}
                 </div>
                 <h1>{group.name}</h1>
               </div>

@@ -18,7 +18,6 @@ export interface ProfileSheet {
   judgeId: string;
   judgeName: string;
   groupId: string;
-  groupCode: string;
   groupName: string;
   half: Half;
   values: SheetValues;
@@ -29,7 +28,6 @@ export type Agreement = 'high' | 'medium' | 'low';
 
 export interface GroupComparison {
   groupId: string;
-  groupCode: string;
   groupName: string;
   their: number;
   others: number;
@@ -48,7 +46,7 @@ export interface HalfProfile {
   groupsScored: number;
   rows: GroupComparison[];
   /** Flags on groups with no co-judge to compare against (blanks and repeated marks still show). */
-  uncompared: { groupId: string; groupCode: string; groupName: string; flags: string[] }[];
+  uncompared: { groupId: string; groupName: string; flags: string[] }[];
   marksAt: number | null;
   spread: { sd: number; ratio: number | null; level: Level | null; low: number; high: number; middleLow: number; middleHigh: number } | null;
   agreement: { rho: number; level: Agreement } | null;
@@ -150,7 +148,7 @@ function halfProfile(judgeId: string, half: Half, sheets: ProfileSheet[], rubric
     const same = new Set([...myKeys].filter((k) => coKeys.has(k)));
     const flags = sheetFlags(s.values, cats);
     if (!same.size) {
-      uncompared.push({ groupId: s.groupId, groupCode: s.groupCode, groupName: s.groupName, flags });
+      uncompared.push({ groupId: s.groupId, groupName: s.groupName, flags });
       continue;
     }
     const their = halfPct([masked(s.values, cats, same)], cats)!;
@@ -162,10 +160,10 @@ function halfProfile(judgeId: string, half: Half, sheets: ProfileSheet[], rubric
       const list = coScores.map((c) => round2(c.score).toFixed(2)).join(', ');
       flags.unshift(`Far from ${coScores.length === 1 ? 'the co-judge' : coScores.length === 2 ? 'both co-judges' : 'all co-judges'} (${list})`);
     }
-    rows.push({ groupId: s.groupId, groupCode: s.groupCode, groupName: s.groupName, their, others, gap: their - others, coScores, theirOrder: 0, panelOrder: 0, flags });
+    rows.push({ groupId: s.groupId, groupName: s.groupName, their, others, gap: their - others, coScores, theirOrder: 0, panelOrder: 0, flags });
   }
 
-  rows.sort((a, b) => a.groupCode.localeCompare(b.groupCode, undefined, { numeric: true }));
+  rows.sort((a, b) => a.groupName.localeCompare(b.groupName, undefined, { numeric: true, sensitivity: 'base' }));
   const theirOrder = orderOf(rows.map((r) => r.their));
   const panelOrder = orderOf(rows.map((r) => r.others));
   rows.forEach((r, i) => {

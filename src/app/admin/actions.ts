@@ -88,10 +88,10 @@ export async function acceptGroup(fd: FormData) {
   if (event.released_at) back(path, { error: 'Results have been released; nothing can change now.' });
   const reason = reasonOf(fd);
   if (reason.length < 3) back(path, { error: 'Type a short reason, for example “Did not run a booth”.' });
-  const g = await one<{ code: string }>('UPDATE tgroup SET accept_reason = $3, accepted_at = now() WHERE id = $1 AND event_id = $2 RETURNING code', [s(fd, 'groupId'), event.id, reason]);
+  const g = await one<{ name: string }>('UPDATE tgroup SET accept_reason = $3, accepted_at = now() WHERE id = $1 AND event_id = $2 RETURNING name', [s(fd, 'groupId'), event.id, reason]);
   if (!g) back(path, { error: 'Group not found.' });
   await log(event.id, acc.id, 'group.accept', { groupId: s(fd, 'groupId'), reason });
-  back(path, { ok: `${g.code} will be finalised with the scores it has. Reason recorded.` });
+  back(path, { ok: `${g.name} will be finalised with the scores it has. Reason recorded.` });
 }
 
 export async function clearAcceptance(fd: FormData) {
@@ -182,7 +182,7 @@ export async function saveGroup(fd: FormData) {
   const path = groupId ? `/admin/events/${event.id}/groups/${groupId}` : `/admin/events/${event.id}/groups`;
   const before = groupId ? await getGroup(event.id, groupId) : null;
   if (groupId && !before) back(`/admin/events/${event.id}/groups`, { error: 'Group not found.' });
-  const res = await editGroup(event, acc.id, before, { code: s(fd, 'code'), name: s(fd, 'name'), section: s(fd, 'section'), adviser: s(fd, 'adviserName') || s(fd, 'adviserId') });
+  const res = await editGroup(event, acc.id, before, { name: s(fd, 'name'), section: s(fd, 'section'), adviser: s(fd, 'adviserName') || s(fd, 'adviserId') });
   if (!res.ok) back(path, { error: res.error });
   back(res.created ? `/admin/events/${event.id}/groups/${res.group.id}` : path, { ok: res.message });
 }
@@ -204,12 +204,12 @@ export async function addMembers(fd: FormData) {
   if (event.released_at) back(path, { error: 'Results have been released; nothing can change now.' });
   const ids = fd.getAll('studentId').map(String).filter(Boolean);
   if (!ids.length) back(path, { error: 'Tick at least one student to add.' });
-  const taken = await query<{ first_name: string; surname: string; code: string }>(
-    `SELECT s.first_name, s.surname, g.code FROM group_member m JOIN student s ON s.id = m.student_id JOIN tgroup g ON g.id = m.group_id
+  const taken = await query<{ first_name: string; surname: string; group_name: string }>(
+    `SELECT s.first_name, s.surname, g.name AS group_name FROM group_member m JOIN student s ON s.id = m.student_id JOIN tgroup g ON g.id = m.group_id
      WHERE m.event_id = $1 AND m.student_id = ANY($2::text[]) AND m.group_id <> $3`,
     [event.id, ids, groupId],
   );
-  if (taken.length) back(path, { error: `Already in another group: ${taken.map((t) => `${t.first_name} ${t.surname} (${t.code})`).join(', ')}. A student can belong to only one group.` });
+  if (taken.length) back(path, { error: `Already in another group: ${taken.map((t) => `${t.first_name} ${t.surname} (${t.group_name})`).join(', ')}. A student can belong to only one group.` });
   const valid = await query<{ id: string }>('SELECT id FROM student WHERE event_id = $1 AND id = ANY($2::text[])', [event.id, ids]);
   await transaction([
     ...valid.map((v) => ({ text: 'INSERT INTO group_member (event_id, group_id, student_id) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING', params: [event.id, groupId, v.id] })),
@@ -302,7 +302,7 @@ export async function importAdvisers(fd: FormData) {
     if (e instanceof ImportError) back(path, { error: e.message });
     throw e;
   }
-  const groups = await query<{ id: string; code: string; name_key: string; adviser_id: string | null }>('SELECT id, code, name_key, adviser_id FROM tgroup WHERE event_id = $1', [event.id]);
+  const groups = await query<{ id: string; name: string; name_key: string; adviser_id: string | null }>('SELECT id, name, name_key, adviser_id FROM tgroup WHERE event_id = $1', [event.id]);
   const existing = await query<{ id: string; name: string; name_key: string }>('SELECT id, name, name_key FROM adviser WHERE event_id = $1', [event.id]);
   const idByKey = new Map(existing.map((a) => [a.name_key, a.id]));
   const nameById = new Map(existing.map((a) => [a.id, a.name]));
@@ -312,6 +312,8 @@ export async function importAdvisers(fd: FormData) {
   const released = !!event.released_at;
   let added = 0;
   let linked = 0;
+  // Groups are matched by name. A Group Code column from an older file is read only to say it no longer sets anything.
+  let codeOnly = 0;
   const seen = new Set<string>();
   for (const r of parsed.rows) {
     const key = nameKey(r.values.name);
@@ -328,21 +330,26 @@ export async function importAdvisers(fd: FormData) {
     }
     if (adviserCode && !seen.has(key)) statements.push({ text: 'UPDATE adviser SET link_code = $2 WHERE id = $1', params: [id, adviserCode] });
     seen.add(key);
-    const code = r.values.group_code.toUpperCase();
     const gkey = nameKey(r.values.group_name);
-    if (code || gkey) {
-      const g = groups.find((x) => (code && x.code === code) || (gkey && x.name_key === gkey));
+    if (!gkey && r.values.group_code) codeOnly++;
+    if (gkey) {
+      const g = groups.find((x) => x.name_key === gkey);
       if (g) {
         statements.push({ text: 'UPDATE tgroup SET adviser_id = $2 WHERE id = $1', params: [g.id, id] });
         linked++;
         if (g.adviser_id !== id) {
           const change = `Adviser ${adviserWord(g.adviser_id ? nameById.get(g.adviser_id) : null)} → ${adviserWord(nameById.get(id))}`;
-          reassigned.push(`${g.code} (${change.slice('Adviser '.length)})`);
+          reassigned.push(`${g.name} (${change.slice('Adviser '.length)})`);
           statements.push(logStatement(event.id, acc.id, 'group.update', { groupId: g.id, adviserId: id, from: { adviserId: g.adviser_id }, changes: [change], released, file: name }));
           g.adviser_id = id;
         }
-      } else problems.push(`Row ${r.rowNumber}: no group ${code || r.values.group_name} in this event.`);
+      } else problems.push(`Row ${r.rowNumber}: no group called ${r.values.group_name} in this event.`);
     }
+  }
+  if (codeOnly) {
+    problems.unshift(
+      `${codeOnly} row${codeOnly === 1 ? ' has' : 's have'} a Group Code but no Group Name. Groups are matched by their name now, so add a Group Name column to set ${codeOnly === 1 ? 'that group’s' : 'those groups’'} adviser.`,
+    );
   }
   statements.push({
     text: 'INSERT INTO roll_import (id, event_id, kind, file_name, row_count, added, updated) VALUES ($1, $2, $3, $4, $5, $6, $7)',

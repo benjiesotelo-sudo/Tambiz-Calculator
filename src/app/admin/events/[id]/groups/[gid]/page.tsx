@@ -52,9 +52,7 @@ export default async function GroupPage({ params, searchParams }: { params: Prom
         <div className="crumbs">
           <Link href={`/admin/events/${id}/groups`}>‹ Groups</Link>
         </div>
-        <div className="eyebrow">
-          {event.title} · {group.code}
-        </div>
+        <div className="eyebrow">{event.title} · Group</div>
         <h1 className="page-title">{group.name}</h1>
         <p className="lead">
           {group.section || 'No section'} · {group.adviser_name ?? 'No adviser'} · change these on the <Link href={`/admin/events/${id}/groups`}>Groups</Link> table.

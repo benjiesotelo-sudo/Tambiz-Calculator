@@ -7,7 +7,7 @@ import { requireAdmin } from '@/lib/auth';
 import { logStatement } from '@/lib/change-log';
 import { newId, one, query, transaction, type Statement } from '@/lib/db';
 import { changesByRow, isNewRow, type CellChange, type GridResult, type SavedRow } from '@/lib/grid';
-import { editGroup, nextGroupCode, removeGroup } from '@/lib/group-edit';
+import { editGroup, removeGroup } from '@/lib/group-edit';
 import { emailGivesAway, normaliseCheck } from '@/lib/link-rules';
 import { generatePassword, hashPassword } from '@/lib/passwords';
 import { eventReport, getEvent, getGroup, groupMembers, groupScoreDetail, type StudentRow } from '@/lib/repo';
@@ -35,8 +35,6 @@ export async function saveGroupsTable(eventId: string, changes: CellChange[]): P
       continue;
     }
     const res = await editGroup(event, acc.id, before, {
-      // A new group typed without a code gets the next free one.
-      code: before ? (patch.code ?? before.code) : patch.code || (await nextGroupCode(event.id)),
       name: patch.name ?? before?.name ?? '',
       section: patch.section ?? before?.section ?? '',
       adviser: 'adviser' in patch ? patch.adviser : (before?.adviser_id ?? ''),
@@ -84,8 +82,8 @@ export async function saveMembersTable(eventId: string, groupId: string, changes
         continue;
       }
       const typed = (patch.student ?? '').trim();
-      const st = await one<StudentRow & { in_group: string | null; in_code: string | null }>(
-        `SELECT s.*, g.id AS in_group, g.code AS in_code FROM student s LEFT JOIN group_member m ON m.student_id = s.id LEFT JOIN tgroup g ON g.id = m.group_id
+      const st = await one<StudentRow & { in_group: string | null; in_group_name: string | null }>(
+        `SELECT s.*, g.id AS in_group, g.name AS in_group_name FROM student s LEFT JOIN group_member m ON m.student_id = s.id LEFT JOIN tgroup g ON g.id = m.group_id
          WHERE s.event_id = $1 AND (s.id = $2 OR s.student_number = $3)`,
         [event.id, typed, typed.replace(/\s+/g, '')],
       );
@@ -94,7 +92,7 @@ export async function saveMembersTable(eventId: string, groupId: string, changes
         continue;
       }
       if (st.in_group) {
-        const where = st.in_group === group.id ? 'this group already' : `${st.in_code} already. A student can belong to only one group: change their group on the Class roll to move them`;
+        const where = st.in_group === group.id ? 'this group already' : `${st.in_group_name} already. A student can belong to only one group: change their group on the Class roll to move them`;
         rows.push({ rowId, errors: { student: `${st.first_name} ${st.surname} is in ${where}.` } });
         continue;
       }
@@ -137,8 +135,8 @@ export async function saveMembersTable(eventId: string, groupId: string, changes
 // A paste can touch every student at once, so the whole save is checked against data loaded once and written in one
 // transaction, rather than a round trip per row.
 
-type RollStudent = StudentRow & { group_id: string | null; group_code: string | null };
-const ROLL_SELECT = `SELECT s.*, g.id AS group_id, g.code AS group_code, g.name AS group_name FROM student s
+type RollStudent = StudentRow & { group_id: string | null; group_name: string | null };
+const ROLL_SELECT = `SELECT s.*, g.id AS group_id, g.name AS group_name FROM student s
   LEFT JOIN group_member m ON m.student_id = s.id LEFT JOIN tgroup g ON g.id = m.group_id`;
 const ROLL_REQUIRED = { student: 'Student No.', surname: 'Surname', first: 'First name', section: 'Section', email: 'Email' } as const;
 const ROLL_FIELDS = [
@@ -159,7 +157,7 @@ export async function saveRollTable(eventId: string, changes: CellChange[]): Pro
   const ids = [...byRow.keys()].filter((id) => !isNewRow(id));
   const numbers = [...byRow.entries()].filter(([id]) => isNewRow(id)).map(([, p]) => (p.student ?? '').replace(/\s+/g, ''));
   const [groups, current, taken] = await Promise.all([
-    query<{ id: string; code: string }>('SELECT id, code FROM tgroup WHERE event_id = $1', [event.id]),
+    query<{ id: string; name_key: string }>('SELECT id, name_key FROM tgroup WHERE event_id = $1', [event.id]),
     query<RollStudent>(`${ROLL_SELECT} WHERE s.event_id = $1 AND s.id = ANY($2::text[])`, [event.id, ids]),
     query<{ student_number: string; surname: string; first_name: string }>('SELECT student_number, surname, first_name FROM student WHERE event_id = $1 AND student_number = ANY($2::text[])', [
       event.id,
@@ -167,7 +165,7 @@ export async function saveRollTable(eventId: string, changes: CellChange[]): Pro
     ]),
   ]);
   const groupById = new Map(groups.map((g) => [g.id, g]));
-  const groupByCode = new Map(groups.map((g) => [g.code.toUpperCase(), g]));
+  const groupByName = new Map(groups.map((g) => [g.name_key, g]));
   const studentById = new Map(current.map((s) => [s.id, s]));
   const takenNumbers = new Map(taken.map((t) => [t.student_number, `${t.surname}, ${t.first_name}`]));
 
@@ -198,7 +196,8 @@ export async function saveRollTable(eventId: string, changes: CellChange[]): Pro
     let groupChange: { from: string | null; to: string | null } | null = null;
     if ('group' in patch) {
       const typed = patch.group.trim();
-      const g = typed ? (groupById.get(typed) ?? groupByCode.get(typed.toUpperCase())) : null;
+      // The table sends the group it picked by id; a name typed whole is found the way names are compared.
+      const g = typed ? (groupById.get(typed) ?? groupByName.get(nameKey(typed))) : null;
       if (typed && !g) errors.group = `There is no group ${typed}.`;
       else if ((g?.id ?? null) !== groupId) {
         if (released) errors.group = 'Results have been released, so a student cannot change group now.';

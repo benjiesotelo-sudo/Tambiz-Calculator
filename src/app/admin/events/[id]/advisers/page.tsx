@@ -45,8 +45,8 @@ export default async function AdvisersPage({ params, searchParams }: { params: P
           <h3>Import the adviser list</h3>
           <input type="hidden" name="eventId" value={id} />
           <p className="sub" style={{ margin: 0 }}>
-            An Excel file (.xlsx) with an <b>Adviser</b> column. Add <b>Email</b> if you have it, a <b>Group Code</b> or <b>Group Name</b> column to set each group’s adviser in
-            one go, and an <b>Adviser Code</b> column if you have already chosen codes. Importing again updates, it never duplicates.
+            An Excel file (.xlsx) with an <b>Adviser</b> column. Add <b>Email</b> if you have it, a <b>Group Name</b> column to set each group’s adviser in one go (one row per
+            group, the name spelled as on the Groups table), and an <b>Adviser Code</b> column if you have already chosen codes. Importing again updates, it never duplicates.
           </p>
           <input className="input" type="file" name="file" accept=".xlsx" required />
           <button className="btn" type="submit">

@@ -33,7 +33,7 @@ export default async function JudgeHome() {
       const sh = sheets.find((s) => s.group_id === g.id && s.half === half);
       return { filled: sh?.values ?? 0, total: criteriaOf(event.rubric, half).length, complete: sh?.status === 'complete' };
     };
-    return { id: g.id, code: g.code, name: g.name, section: g.section, adviser: g.adviser_name ?? 'No adviser', defense: status('defense'), booth: status('booth') };
+    return { id: g.id, name: g.name, section: g.section, adviser: g.adviser_name ?? 'No adviser', defense: status('defense'), booth: status('booth') };
   });
 
   return (
