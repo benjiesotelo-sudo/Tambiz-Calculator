@@ -113,7 +113,8 @@ DATABASE_URL="postgresql://…" npm run reset-password -- admin@tambiz.demo "a n
 | `src/lib/repo.ts` | Shared reads, and the whole-event report used by results, grades and export |
 | `src/lib/excel-import.ts`, `src/lib/excel-export.ts` | Class roll and adviser import; the workbook export (ExcelJS) |
 | `src/components/ScoreSheet.tsx` | The judge scoring screen |
-| `src/app/admin/actions.ts` | Every coordinator change, each checking the caller is the coordinator |
+| `src/app/admin/actions.ts`, `src/app/admin/table-actions.ts` | Every coordinator change (forms, and the spreadsheet tables' saves), each checking the caller is the coordinator |
+| `src/components/DataGrid.tsx` | The spreadsheet table used by every coordinator list |
 | `src/app/api/judge/sheet/route.ts` | Where judges' scores arrive; refuses anything above a maximum |
 
 ## Real student data

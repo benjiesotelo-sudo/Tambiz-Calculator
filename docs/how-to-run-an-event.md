@@ -77,7 +77,7 @@ The event page's **Scoring sheet** section says how many of the 39 criteria have
 4. Press **Import**.
 5. Read the green message. It says how many students were imported, how many are new and how many were already there.
 6. If a red message says the file "does not fit the class roll", it names the missing column. Open the file in Excel, check that column's heading is spelled as shown (for example `Student No.` or `Section`), save, and repeat from step 2.
-7. Check the **On the roll** number matches the number of students you expect.
+7. Check the line above the table says as many students **on the roll** as you expect.
 
 The file must have these columns: **Student No.**, **Student Email**, **Surname**, **First Name**, **Section**. Any other columns are ignored. The headings do not have to be in the first row. If your file is in another shape, press **Download template** under **Import**: it gives an Excel file with exactly the columns the import reads and one invented example row. Type over the example row (or delete it), fill in your students, save, and import it.
 
@@ -161,8 +161,8 @@ Rules the app enforces for you:
 **Final check**
 
 1. Press the **Class roll** tab.
-2. Look at **Not in any group**. It should be 0.
-3. If it is not 0, the list below shows who is left. Place each one in a group, or leave them out only if they have dropped the course.
+2. The line above the table says how many students are **not in any group**. It should be 0.
+3. If it is not 0, choose **Not in a group** in the **Status** list to see who is left. Place each one in a group, or leave them out only if they have dropped the course.
 
 ☐ Done: every group has its members and adviser, and no enrolled student is left out.
 
@@ -410,7 +410,7 @@ Worth remembering, as the page says:
 Be aware of these gaps.
 - **Changing points, weights or letter bands.** Only the criterion wording can be changed on screen (Part A2). Maximums, weights and letter bands cannot. Each event keeps the copy it was created with. A developer can change the default in `src/lib/rubric.ts` before creating next year's event.
 - **Full offline mode.** Scores typed while offline are kept on the phone and sent later, but a phone that has never opened the app cannot load it offline, and reloading the page with no connection shows the browser's offline page.
-- **Deleting scores.** There is no button to delete a whole judge's sheet (for example after a rehearsal); you can only remove scores one at a time with **Correct**. A group with scores cannot be deleted.
+- **Deleting scores.** There is no button to delete a whole judge's sheet (for example after a rehearsal); you can only remove scores one at a time, by emptying their cells on the group's scores table (Part H). A group with scores cannot be deleted.
 - **Frozen results.** Closing judging locks the scores, but results are recalculated each time you open them; there is no stored snapshot or file history.
 - **Change history screen.** Score corrections are listed on each group's scores page and changes to a group's details on the group's page, but other changes (imports, members, status) are recorded in the database with no screen to read them.
 - **First sign-in password change.** Judges are not forced to change the temporary password; they can do it under **Account**.
