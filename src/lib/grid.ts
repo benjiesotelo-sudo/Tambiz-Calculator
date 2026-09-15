@@ -271,17 +271,23 @@ export function resolveCompletion(column: GridColumn, c: Completion, options: Gr
 export type Leaving = { save: Completion } | { keep: Completion; reason?: string };
 
 /**
- * What leaving a cell without Enter or Tab does. Only Enter and Tab accept a completion, so the cell keeps just what
- * was typed. That is saved when it can mean one thing only (an exact or single match, a new value where the column
- * takes one, or a blank). Otherwise, and always while the person is away in another window or tab, the cell stays
- * open with the typed text unsaved.
+ * What leaving a cell without Enter or Tab does. Nothing is saved that the cell was not showing: what was typed is
+ * saved only when it means exactly the entry on screen (an exact or single match shown in the cell, a new value where
+ * the column takes one, or a blank). A choice made with Down is saved only by Enter or Tab. Otherwise, and always
+ * while the person is away in another window or tab, the cell stays open with only the typed text, unsaved.
  */
 export function leaveCompletion(column: GridColumn, c: Completion, away: boolean, options: GridOption[] = column.options ?? [], rowMax?: number): Leaving {
   const typed = plainCompletion(c.typed);
   if (away) return { keep: typed };
   if (column.type !== 'choice') return { save: typed };
   const resolved = resolveCell(column, c.typed, options, rowMax);
-  return 'error' in resolved ? { keep: typed, reason: resolved.error } : { save: typed };
+  if ('error' in resolved) return { keep: typed, reason: resolved.error };
+  if (c.option) {
+    return resolved.value === c.option.value ? { save: c } : { keep: typed, reason: `${column.label}: not saved. Only Enter or Tab save a choice from the list.` };
+  }
+  return norm(resolved.label) === norm(c.typed)
+    ? { save: typed }
+    : { keep: typed, reason: `${column.label}: not saved, because the cell did not show “${resolved.label}”. Press Down to show it, then Enter.` };
 }
 
 // ── column widths ───────────────────────────────────────────────────

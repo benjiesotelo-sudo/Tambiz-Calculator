@@ -525,6 +525,13 @@ export function DataGrid(props: DataGridProps) {
     [columns, colIndex, optionsFor, endEdit],
   );
 
+  useEffect(() => {
+    if (!editing || keys.includes(editing.key)) return;
+    editingRef.current = null;
+    setEditing(null);
+    setHint(null);
+  }, [editing, keys]);
+
   // When the blank row becomes a new row, the next blank row is below it; keep the cursor on the new row.
   useEffect(() => {
     if (active && active.key !== BLANK && !byKey.has(active.key)) setActive(null);
@@ -758,6 +765,10 @@ export function DataGrid(props: DataGridProps) {
         startEdit(active.key, active.col, null, 'edit');
         return;
       case 'Escape':
+        if (editingRef.current) {
+          endEdit('cancel');
+          return;
+        }
         setAnchor(active);
         setNotice(null);
         return;
@@ -851,6 +862,7 @@ export function DataGrid(props: DataGridProps) {
     const text = e.clipboardData.getData('text/plain');
     if (!/[\t\n\r]/.test(text.replace(/[\r\n]+$/, ''))) return;
     e.preventDefault();
+    editingRef.current = null;
     setEditing(null);
     focusGrid();
     beginPaste(text);
@@ -872,7 +884,10 @@ export function DataGrid(props: DataGridProps) {
     if (editing && editing.key === key && editing.col === col) return;
     if ((e.target as HTMLElement).closest('a')) return;
     e.preventDefault();
-    if (editing && !leaveEdit()) return;
+    if (editing && !leaveEdit()) {
+      gridRef.current?.querySelector<HTMLInputElement>('.dg-input')?.focus({ preventScroll: true });
+      return;
+    }
     tabStart.current = null;
     moveTo(key, col, e.shiftKey && !!active);
     focusGrid();
