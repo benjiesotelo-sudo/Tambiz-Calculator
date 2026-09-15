@@ -276,8 +276,9 @@ export type Leaving = { save: Completion } | { keep: Completion; reason?: string
  * What leaving a cell without Enter or Tab does. Nothing is saved that the cell was not showing: what was typed is
  * saved only when it means exactly the entry on screen (an exact or single match shown in the cell, a new value where
  * the column takes one, or a blank). A choice shown with Down or Up stays in the open cell, unsaved, until Enter or
- * Tab saves it. Otherwise, and always while the person is away in another window or tab, the cell stays open with
- * only the typed text, unsaved.
+ * Tab saves it. Otherwise the cell stays open with only the typed text, unsaved. While the person is away in another
+ * window or tab nothing is saved: the cell stays open showing the typed text, or the Down choice if one was on screen,
+ * and Enter or Tab saves what it shows.
  */
 export function leaveCompletion(column: GridColumn, c: Completion, away: boolean, options: GridOption[] = column.options ?? [], rowMax?: number): Leaving {
   const typed = plainCompletion(c.typed);

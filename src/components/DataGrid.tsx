@@ -812,6 +812,7 @@ export function DataGrid(props: DataGridProps) {
       case 'Escape':
         e.preventDefault();
         // The first Esc takes the completion away, keeping what was typed; the next leaves the cell as it was.
+        setHint(null);
         if (editing.option) setEditing({ ...editing, ...plainCompletion(editing.typed) });
         else endEdit('cancel');
         return;
@@ -819,6 +820,7 @@ export function DataGrid(props: DataGridProps) {
       case 'ArrowUp':
         if (matches.length) {
           e.preventDefault();
+          setHint(null);
           setEditing({ ...editing, ...stepCompletion(editing, matches, e.key === 'ArrowDown' ? 1 : -1) });
           return;
         }
@@ -897,6 +899,7 @@ export function DataGrid(props: DataGridProps) {
   api.current.setText = (text, completes) => {
     if (!editing) return;
     const column = columns[colIndex.get(editing.col) ?? 0];
+    setHint(null);
     setEditing({ ...editing, ...(column.type === 'choice' ? typeCompletion(text, optionsFor(column, editing.key), completes) : plainCompletion(text)) });
   };
   api.current.editorKey = onEditorKey;
