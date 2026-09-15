@@ -866,6 +866,7 @@ export function DataGrid(props: DataGridProps) {
     e.preventDefault();
     editingRef.current = null;
     setEditing(null);
+    setHint(null);
     focusGrid();
     beginPaste(text);
   };
