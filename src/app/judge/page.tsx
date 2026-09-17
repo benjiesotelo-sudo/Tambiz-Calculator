@@ -1,4 +1,5 @@
 import { AppBar } from '@/components/AppBar';
+import { PracticeBanner } from '@/components/EventNav';
 import { GroupList, type JudgeGroup } from '@/components/GroupList';
 import { requireJudge } from '@/lib/auth';
 import { query } from '@/lib/db';
@@ -33,12 +34,17 @@ export default async function JudgeHome() {
       const sh = sheets.find((s) => s.group_id === g.id && s.half === half);
       return { filled: sh?.values ?? 0, total: criteriaOf(event.rubric, half).length, complete: sh?.status === 'complete' };
     };
-    return { id: g.id, name: g.name, section: g.section, adviser: g.adviser_name ?? 'No adviser', defense: status('defense'), booth: status('booth') };
+    return { id: g.id, name: g.name, adviser: g.adviser_name ?? 'No adviser', defense: status('defense'), booth: status('booth') };
   });
 
   return (
     <>
       <AppBar title={event.title} subtitle="Judge scoring" account={acc} home="/judge" />
+      {event.practice ? (
+        <div className="page" style={{ paddingBottom: 0 }}>
+          <PracticeBanner event={event} />
+        </div>
+      ) : null}
       {event.status === 'finalised' ? (
         <div className="page" style={{ paddingBottom: 0 }}>
           <div className="notice warn">Judging is closed. You can still look at your scores, but changes are no longer accepted.</div>

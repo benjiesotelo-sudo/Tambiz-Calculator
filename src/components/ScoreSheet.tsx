@@ -24,7 +24,7 @@ interface Props {
   closed: boolean;
   half: Half;
   rubric: Rubric;
-  group: { id: string; name: string; section: string; adviser: string };
+  group: { id: string; name: string; adviser: string };
   members: Member[];
   initial: Record<string, number>;
   initialComplete: boolean;
@@ -443,7 +443,7 @@ export function ScoreSheet(props: Props) {
             <div className="sub">fully scored</div>
           </div>
         </div>
-        {!members.length ? <div className="banner offline">This group has no members yet. The coordinator adds them from the class roll.</div> : null}
+        {!members.length ? <div className="banner offline">This group has no members yet. The coordinator adds them on the Data tab.</div> : null}
         {members.map((m) => {
           const absent = rawRef.current[absentKey(m.id)] === '1';
           const absentButton = (
@@ -458,7 +458,7 @@ export function ScoreSheet(props: Props) {
                   <span className="avatar">{m.initials}</span>
                   <div style={{ minWidth: 0 }}>
                     <div className="mname">{m.name}</div>
-                    <div className="sub">Absent from the defense. No scores needed; the coordinator gives their grade.</div>
+                    <div className="sub">Absent from the defense. No scores needed: their individual scores count as zero.</div>
                   </div>
                   <div className="mtotal">{absentButton}</div>
                 </div>
@@ -480,7 +480,7 @@ export function ScoreSheet(props: Props) {
                 <span className="avatar">{m.initials}</span>
                 <div style={{ minWidth: 0 }}>
                   <div className="mname">{m.name}</div>
-                  <div className="sub">Class roll · {m.section}</div>
+                  <div className="sub">{m.section || 'Group member'}</div>
                 </div>
                 <div className="mtotal">
                   <b>{any ? fmtScore(tot) : '–'}</b>
@@ -634,7 +634,7 @@ export function ScoreSheet(props: Props) {
               </Link>
               <div className="gtitle">
                 <div className="gmeta">
-                  {group.section} · {group.adviser}
+                  {group.adviser}
                 </div>
                 <h1>{group.name}</h1>
               </div>

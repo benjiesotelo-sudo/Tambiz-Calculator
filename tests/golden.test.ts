@@ -240,6 +240,14 @@ describe('golden case D: member total and final grade', () => {
     expect(memberScore([{ presentation: 17.5, communication: null, qa: null }, { presentation: 16 }])).toEqual({ total: null, complete: false });
   });
   it('a member with no scores at all has no total', () => expect(memberScore([{}, { presentation: null }])).toEqual({ total: null, complete: false }));
+  // Rule 6, the department's rule of 17 September 2026: absent means individual scores of zero, and the grade is worked
+  // out as usual. The app before it gave an absent member no total and no grade (index.html had no absence at all).
+  it('an absent member with no scores has a total of 0 and a grade from the group alone (was: no total, no grade)', () => {
+    expect(memberScore([{}, { presentation: null }], undefined, true)).toEqual({ total: 0, complete: true });
+    expect(r4(finalGrade(memberScore([], undefined, true).total, ov(fullG)))).toBe(42.5);
+  });
+  it('a score entered for an absent member, such as a correction, counts; only the fields nobody scored are zero', () =>
+    expect(memberScore([{ presentation: 12 }, { presentation: null, qa: 20 }], undefined, true)).toEqual({ total: 32, complete: true }));
 });
 
 describe('decision 2: one rounding rule, two decimals, for screens and the workbook', () => {

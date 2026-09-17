@@ -7,6 +7,7 @@
 
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { SignInSlips, type SignInSlip } from './SignInSlips';
 import {
   canEditCell,
   columnTracks,
@@ -78,6 +79,8 @@ export interface DataGridProps {
   searchPlaceholder?: string;
   emptyText?: string;
   initialSort?: { key: string; dir: 'asc' | 'desc' };
+  /** The heading printed on judges' sign-in slips, when a save returns any. */
+  slipsTitle?: string;
 }
 
 export function DataGrid(props: DataGridProps) {
@@ -102,7 +105,7 @@ export function DataGrid(props: DataGridProps) {
   const [plan, setPlan] = useState<(PastePlan & { byCell: Map<string, Record<string, string>> }) | null>(null);
   const [confirm, setConfirm] = useState<{ text: string; run: () => void } | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [secret, setSecret] = useState<string | null>(null);
+  const [signIns, setSignIns] = useState<SignInSlip[]>([]);
   const [busy, setBusy] = useState(false);
   const [waiting, setWaiting] = useState(0);
   const [netError, setNetError] = useState<string | null>(null);
@@ -236,7 +239,7 @@ export function DataGrid(props: DataGridProps) {
         return next;
       });
       if (res.notice) setNotice(res.notice);
-      if (res.secret) setSecret(res.secret);
+      if (res.signIns?.length) setSignIns((old) => [...old.filter((o) => !res.signIns!.some((n) => n.login === o.login)), ...res.signIns!]);
       if (res.refresh) router.refresh();
     },
     [router, updateLocal],
@@ -1039,14 +1042,7 @@ export function DataGrid(props: DataGridProps) {
         </label>
       ) : null}
 
-      {secret ? (
-        <div className="notice warn" role="alert">
-          <b>Write this down now.</b> It is shown only here, once: <span className="secret">{secret}</span>{' '}
-          <button className="btn small secondary" type="button" onClick={() => setSecret(null)}>
-            I have written it down
-          </button>
-        </div>
-      ) : null}
+      <SignInSlips slips={signIns} eventTitle={props.slipsTitle ?? label} onDone={() => setSignIns([])} />
       {notice ? (
         <div className="notice ok dg-notice" role="status">
           {notice}{' '}

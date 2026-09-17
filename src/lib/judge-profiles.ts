@@ -277,3 +277,9 @@ export function halfSummary(h: HalfProfile): string {
     agreement: h.agreement?.level ?? null,
   });
 }
+
+/** "1st", "2nd", "3rd", "4th", "11th", "22nd". */
+export function ordinal(n: number): string {
+  const s = n % 100 >= 11 && n % 100 <= 13 ? 'th' : ({ 1: 'st', 2: 'nd', 3: 'rd' } as Record<number, string>)[n % 10] ?? 'th';
+  return `${n}${s}`;
+}

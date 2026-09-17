@@ -1,377 +1,286 @@
 'use server';
 
 // Saves from the coordinator's spreadsheet tables. Each action checks the caller itself, applies the same rules as the
-// forms, and returns only the rows it changed, so a page never reloads everything to change one cell.
+// workbook upload, and returns only the rows it changed, so a page never reloads everything to change one cell.
 
 import { requireAdmin } from '@/lib/auth';
 import { logStatement } from '@/lib/change-log';
+import { looksLikeEmail } from '@/lib/data-workbook';
 import { newId, one, query, transaction, type Statement } from '@/lib/db';
 import { changesByRow, isNewRow, type CellChange, type GridResult, type SavedRow } from '@/lib/grid';
-import { editGroup, removeGroup } from '@/lib/group-edit';
-import { emailGivesAway, normaliseCheck } from '@/lib/link-rules';
+import { LOCKED_CLOSED, LOCKED_SENT, rosterLock } from '@/lib/locks';
 import { generatePassword, hashPassword } from '@/lib/passwords';
-import { eventReport, getEvent, getGroup, groupMembers, groupScoreDetail, type StudentRow } from '@/lib/repo';
+import { DATA_SELECT, eventReport, getEvent, getGroup, groupMembers, groupScoreDetail, type DataRow } from '@/lib/repo';
 import type { Half } from '@/lib/rubric';
 import { applyCorrection } from '@/lib/score-correct';
 import { nameKey } from '@/lib/seed';
 import { fmtScore } from '@/lib/sheet';
-import { adviserGridRow, gradeGridRow, groupGridRow, judgeGridRow, memberGridRow, rollGridRow, scoreGridRow, type AdviserListRow } from '@/lib/tables';
+import { dataGridRow, gradeGridRow, judgeGridRow, scoreGridRow } from '@/lib/tables';
 
 const GONE: GridResult = { rows: [], notice: 'This event or group no longer exists. Reload the page.' };
 const isUnique = (e: unknown) => (e as { code?: string })?.code === '23505';
 
-// ── groups ────────────────────────────────────────────────────
+/** Deletes groups left with no members, never one with a score sheet (that would delete the sheet). */
+const tidyEmptyGroups = (eventId: string, groupIds: string[]): Statement => ({
+  text: `DELETE FROM tgroup g WHERE g.event_id = $1 AND g.id = ANY($2::text[])
+         AND NOT EXISTS (SELECT 1 FROM group_member m WHERE m.group_id = g.id) AND NOT EXISTS (SELECT 1 FROM score_sheet s WHERE s.group_id = g.id)`,
+  params: [eventId, groupIds],
+});
 
-export async function saveGroupsTable(eventId: string, changes: CellChange[]): Promise<GridResult> {
-  const acc = await requireAdmin();
-  const event = await getEvent(eventId);
-  if (!event) return GONE;
-  const rows: SavedRow[] = [];
-  const notices: string[] = [];
-  for (const [rowId, patch] of changesByRow(changes)) {
-    const before = isNewRow(rowId) ? null : await getGroup(event.id, rowId);
-    if (!isNewRow(rowId) && !before) {
-      rows.push({ rowId, error: 'This group was deleted. Reload the page.' });
-      continue;
-    }
-    const res = await editGroup(event, acc.id, before, {
-      name: patch.name ?? before?.name ?? '',
-      section: patch.section ?? before?.section ?? '',
-      adviser: 'adviser' in patch ? patch.adviser : (before?.adviser_id ?? ''),
-    });
-    if (!res.ok) {
-      rows.push(res.field ? { rowId, errors: { [res.field]: res.error } } : { rowId, error: res.error });
-      continue;
-    }
-    rows.push({ rowId, row: groupGridRow(event, res.group) });
-    if (event.released_at && res.changes.length) notices.push(res.message);
-  }
-  return { rows, notice: notices.join(' ') || undefined };
-}
-
-export async function removeGroupsTable(eventId: string, ids: string[]): Promise<GridResult> {
-  const acc = await requireAdmin();
-  const event = await getEvent(eventId);
-  if (!event) return GONE;
-  const rows: SavedRow[] = [];
-  for (const id of ids) {
-    const refused = await removeGroup(event, acc.id, id);
-    rows.push(refused ? { rowId: id, error: refused } : { rowId: id, removed: true });
-  }
-  const refused = rows.find((r) => r.error)?.error;
-  return { rows, notice: refused ?? 'Group deleted.' };
-}
-
-// ── members of a group ────────────────────────────────────────
-
-const memberRow = (groupId: string, studentId: string) =>
-  one<StudentRow>('SELECT s.*, m.absent_at FROM group_member m JOIN student s ON s.id = m.student_id WHERE m.group_id = $1 AND m.student_id = $2', [groupId, studentId]);
-
-export async function saveMembersTable(eventId: string, groupId: string, changes: CellChange[]): Promise<GridResult> {
-  const acc = await requireAdmin();
-  const event = await getEvent(eventId);
-  const group = event ? await getGroup(event.id, groupId) : null;
-  if (!event || !group) return GONE;
-  const released = !!event.released_at;
-  const rows: SavedRow[] = [];
-  for (const [rowId, patch] of changesByRow(changes)) {
-    let studentId = rowId;
-    if (isNewRow(rowId)) {
-      if (released) {
-        rows.push({ rowId, error: 'Results have been released, so no member can be added.' });
-        continue;
-      }
-      const typed = (patch.student ?? '').trim();
-      const st = await one<StudentRow & { in_group: string | null; in_group_name: string | null }>(
-        `SELECT s.*, g.id AS in_group, g.name AS in_group_name FROM student s LEFT JOIN group_member m ON m.student_id = s.id LEFT JOIN tgroup g ON g.id = m.group_id
-         WHERE s.event_id = $1 AND (s.id = $2 OR s.student_number = $3)`,
-        [event.id, typed, typed.replace(/\s+/g, '')],
-      );
-      if (!st) {
-        rows.push({ rowId, errors: { student: `No student ${typed} on the class roll. Members are chosen from the roll, never typed in.` } });
-        continue;
-      }
-      if (st.in_group) {
-        const where = st.in_group === group.id ? 'this group already' : `${st.in_group_name} already. A student can belong to only one group: change their group on the Class roll to move them`;
-        rows.push({ rowId, errors: { student: `${st.first_name} ${st.surname} is in ${where}.` } });
-        continue;
-      }
-      try {
-        await transaction([
-          { text: 'INSERT INTO group_member (event_id, group_id, student_id) VALUES ($1, $2, $3)', params: [event.id, group.id, st.id] },
-          // A student placed in a group is no longer left out.
-          { text: 'UPDATE student SET excluded_reason = NULL, excluded_at = NULL WHERE id = $1', params: [st.id] },
-          logStatement(event.id, acc.id, 'member.add', { groupId: group.id, students: [st.id] }),
-        ]);
-      } catch (e) {
-        if (!isUnique(e)) throw e;
-        rows.push({ rowId, errors: { student: `${st.first_name} ${st.surname} was just placed in another group.` } });
-        continue;
-      }
-      studentId = st.id;
-    }
-    if ('absent' in patch && (patch.absent || !isNewRow(rowId))) {
-      if (released) {
-        rows.push({ rowId, errors: { absent: 'Results have been released; nothing can change now.' } });
-        continue;
-      }
-      const absent = patch.absent === 'absent';
-      await transaction([
-        {
-          text: `UPDATE group_member SET absent_at = CASE WHEN $3::boolean THEN coalesce(absent_at, now()) ELSE NULL END, absent_by = CASE WHEN $3::boolean THEN $4 ELSE NULL END
-                 WHERE group_id = $1 AND student_id = $2`,
-          params: [group.id, studentId, absent, acc.id],
-        },
-        logStatement(event.id, acc.id, absent ? 'member.absent' : 'member.present', { groupId: group.id, studentId }),
-      ]);
-    }
-    const m = await memberRow(group.id, studentId);
-    rows.push(m ? { rowId, row: memberGridRow(event, m) } : { rowId, error: 'This student is no longer in the group. Reload the page.' });
-  }
-  return { rows };
-}
-
-// ── class roll ────────────────────────────────────────────────
+// ── the Data table: every student with their group and its adviser ──
 // A paste can touch every student at once, so the whole save is checked against data loaded once and written in one
-// transaction, rather than a round trip per row.
+// transaction. A group has one adviser, so a student's Adviser or Adviser email is the group's: changing it on one row
+// changes it for every member, and those rows come back too.
 
-type RollStudent = StudentRow & { group_id: string | null; group_name: string | null };
-const ROLL_SELECT = `SELECT s.*, g.id AS group_id, g.name AS group_name FROM student s
-  LEFT JOIN group_member m ON m.student_id = s.id LEFT JOIN tgroup g ON g.id = m.group_id`;
-const ROLL_REQUIRED = { student: 'Student No.', surname: 'Surname', first: 'First name', section: 'Section', email: 'Email' } as const;
-const ROLL_FIELDS = [
+const REQUIRED = { student: 'Student No.', surname: 'Surname', first: 'First name', email: 'Email' } as const;
+const FIELDS = [
   ['surname', 'surname'],
   ['first', 'first_name'],
   ['middle', 'middle_name'],
   ['section', 'section'],
   ['email', 'email'],
 ] as const;
-const looksLikeEmail = (v: string) => /^[^\s@]+@[^\s@]+$/.test(v);
 
-export async function saveRollTable(eventId: string, changes: CellChange[]): Promise<GridResult> {
+export async function saveDataTable(eventId: string, changes: CellChange[]): Promise<GridResult> {
   const acc = await requireAdmin();
   const event = await getEvent(eventId);
   if (!event) return GONE;
-  const released = !!event.released_at;
   const byRow = changesByRow(changes);
+  if (event.released_at) return { rows: [...byRow.keys()].map((rowId) => ({ rowId, error: LOCKED_SENT })) };
+  const closed = event.status === 'finalised';
   const ids = [...byRow.keys()].filter((id) => !isNewRow(id));
   const numbers = [...byRow.entries()].filter(([id]) => isNewRow(id)).map(([, p]) => (p.student ?? '').replace(/\s+/g, ''));
-  const [groups, current, taken] = await Promise.all([
-    query<{ id: string; name_key: string }>('SELECT id, name_key FROM tgroup WHERE event_id = $1', [event.id]),
-    query<RollStudent>(`${ROLL_SELECT} WHERE s.event_id = $1 AND s.id = ANY($2::text[])`, [event.id, ids]),
+  const [groups, advisers, current, taken] = await Promise.all([
+    query<{ id: string; name: string; name_key: string; adviser_id: string | null }>('SELECT id, name, name_key, adviser_id FROM tgroup WHERE event_id = $1', [event.id]),
+    query<{ id: string; name: string; name_key: string; email: string }>('SELECT id, name, name_key, email FROM adviser WHERE event_id = $1', [event.id]),
+    query<DataRow>(`${DATA_SELECT} WHERE s.event_id = $1 AND s.id = ANY($2::text[])`, [event.id, ids]),
     query<{ student_number: string; surname: string; first_name: string }>('SELECT student_number, surname, first_name FROM student WHERE event_id = $1 AND student_number = ANY($2::text[])', [
       event.id,
       numbers,
     ]),
   ]);
-  const groupById = new Map(groups.map((g) => [g.id, g]));
-  const groupByName = new Map(groups.map((g) => [g.name_key, g]));
+  const groupFor = (typed: string) => groups.find((g) => g.id === typed) ?? groups.find((g) => g.name_key === nameKey(typed));
+  const adviserFor = (typed: string) => advisers.find((a) => a.id === typed) ?? advisers.find((a) => a.name_key === nameKey(typed));
+  const adviserName = (id: string | null) => advisers.find((a) => a.id === id)?.name ?? 'no adviser';
   const studentById = new Map(current.map((s) => [s.id, s]));
   const takenNumbers = new Map(taken.map((t) => [t.student_number, `${t.surname}, ${t.first_name}`]));
 
   const statements: Statement[] = [];
   const rows: SavedRow[] = [];
   const touched: { rowId: string; id: string; errors: Record<string, string> }[] = [];
+  const emptied = new Set<string>();
+  const regrouped = new Set<string>();
+  const readvised = new Set<string>();
+  let created = false;
   let moved = 0;
+
   for (const [rowId, patch] of byRow) {
     const before = isNewRow(rowId) ? null : studentById.get(rowId);
     if (!isNewRow(rowId) && !before) {
-      rows.push({ rowId, error: 'This student is no longer on the roll. Reload the page.' });
+      rows.push({ rowId, error: 'This student is no longer in the app. Reload the page.' });
+      continue;
+    }
+    if (!before && closed) {
+      rows.push({ rowId, error: LOCKED_CLOSED });
       continue;
     }
     const errors: Record<string, string> = {};
-    const next: Record<keyof typeof ROLL_REQUIRED | 'middle', string> = {
+    const next: Record<keyof typeof REQUIRED | 'middle' | 'section', string> = {
       student: (patch.student ?? before?.student_number ?? '').replace(/\s+/g, ''),
       surname: (patch.surname ?? before?.surname ?? '').trim(),
       first: (patch.first ?? before?.first_name ?? '').trim(),
       middle: (patch.middle ?? before?.middle_name ?? '').trim(),
-      section: (patch.section ?? before?.section ?? '').trim().toUpperCase(),
+      section: (patch.section ?? before?.section ?? '').trim(),
       email: (patch.email ?? before?.email ?? '').trim(),
     };
-    for (const [key, label] of Object.entries(ROLL_REQUIRED)) if (!next[key as keyof typeof ROLL_REQUIRED]) errors[key] = `${label} cannot be empty.`;
+    for (const [key, label] of Object.entries(REQUIRED)) if (!next[key as keyof typeof REQUIRED]) errors[key] = `${label} cannot be empty.`;
     if (next.email && !looksLikeEmail(next.email)) errors.email = `“${next.email}” is not an email address.`;
-    if (!before && next.student && takenNumbers.has(next.student)) errors.student = `Student No. ${next.student} is already on the roll (${takenNumbers.get(next.student)}).`;
+    if (!before && next.student && takenNumbers.has(next.student)) errors.student = `Student No. ${next.student} is already in the app (${takenNumbers.get(next.student)}).`;
 
-    let groupId = before?.group_id ?? null;
-    let groupChange: { from: string | null; to: string | null } | null = null;
-    if ('group' in patch) {
-      const typed = patch.group.trim();
-      // The table sends the group it picked by id; a name typed whole is found the way names are compared.
-      const g = typed ? (groupById.get(typed) ?? groupByName.get(nameKey(typed))) : null;
-      if (typed && !g) errors.group = `There is no group ${typed}.`;
-      else if ((g?.id ?? null) !== groupId) {
-        if (released) errors.group = 'Results have been released, so a student cannot change group now.';
-        else {
-          groupChange = { from: groupId, to: g?.id ?? null };
-          groupId = g?.id ?? null;
+    // The group: an existing one picked or typed (spacing, punctuation and capitals ignored), or a new one.
+    let group = before?.group_id ? groups.find((g) => g.id === before.group_id) : undefined;
+    let newGroup: { id: string; name: string; name_key: string; adviser_id: string | null } | null = null;
+    if ('group' in patch || !before) {
+      const typed = (patch.group ?? '').replace(/\s+/g, ' ').trim();
+      const found = typed ? groupFor(typed) : undefined;
+      if (closed && found?.id !== group?.id) errors.group = LOCKED_CLOSED;
+      else if (!typed) errors.group = 'Every student needs a group.';
+      else if (!nameKey(typed)) errors.group = 'A group name needs at least one letter or number.';
+      else if (found) group = found;
+      else newGroup = group = { id: newId(), name: typed, name_key: nameKey(typed), adviser_id: null };
+    }
+
+    // The adviser typed on this row, if any: an existing one, or a new one.
+    let adviser: { id: string; name: string; name_key: string; email: string } | undefined;
+    let newAdviser = false;
+    if ('adviser' in patch || !before) {
+      const typed = (patch.adviser ?? '').replace(/\s+/g, ' ').trim();
+      if (closed && 'adviser' in patch) errors.adviser = LOCKED_CLOSED;
+      else if (!typed) {
+        // A new student joining an existing group takes that group's adviser.
+        const groupAdviser = !before && group && !newGroup ? advisers.find((a) => a.id === group!.adviser_id) : undefined;
+        if (groupAdviser) adviser = groupAdviser;
+        else errors.adviser = 'Every group needs an adviser.';
+      }
+      else if (!nameKey(typed)) errors.adviser = 'An adviser’s name needs at least one letter or number.';
+      else {
+        adviser = adviserFor(typed);
+        if (!adviser) {
+          adviser = { id: newId(), name: typed, name_key: nameKey(typed), email: '' };
+          newAdviser = true;
         }
       }
     }
-    let excluded: string | null = before?.excluded_reason ?? null;
-    let excludeChange = false;
-    if ('leftout' in patch) {
-      const reason = patch.leftout.replace(/\s+/g, ' ').trim().slice(0, 200) || null;
-      if (reason !== (groupId ? null : excluded)) {
-        if (released) errors.leftout = 'Results have been released; nothing can change now.';
-        else if (reason && groupId) errors.leftout = 'This student is in a group. Clear their Group first, then give the reason.';
-        else if (reason && reason.length < 3) errors.leftout = 'Type a short reason, for example “Dropped the course”.';
-        else {
-          excluded = reason;
-          excludeChange = true;
-        }
-      }
+    if (newGroup && !adviser && !errors.adviser) {
+      const inherited = before?.adviser_id ? advisers.find((a) => a.id === before.adviser_id) : undefined;
+      if (inherited) adviser = inherited;
+      else errors.adviser = `${newGroup.name} is a new group, so it needs an adviser. Type it in Adviser.`;
+    }
+    // A new student joining an existing group joins its adviser; naming a different one is refused, not applied.
+    if (!before && group && !newGroup && adviser && group.adviser_id && group.adviser_id !== adviser.id) {
+      errors.adviser = `${group.name}’s adviser is ${adviserName(group.adviser_id)}. To change it for the whole group, change Adviser on any of its rows.`;
+    }
+
+    let adviserEmail: string | null = null;
+    if ('adviserEmail' in patch) {
+      const typed = patch.adviserEmail.trim();
+      if (typed && !looksLikeEmail(typed)) errors.adviserEmail = `“${typed}” is not an email address.`;
+      else adviserEmail = typed;
+    }
+
+    if (!before && Object.keys(errors).length) {
+      rows.push({ rowId, errors });
+      continue;
+    }
+    const groupError = !!errors.group;
+    const adviserError = !!errors.adviser;
+
+    if (adviser && newAdviser && !adviserError && (newGroup || 'adviser' in patch || !before)) {
+      statements.push({ text: 'INSERT INTO adviser (id, event_id, name, name_key, email) VALUES ($1, $2, $3, $4, $5)', params: [adviser.id, event.id, adviser.name, adviser.name_key, ''] });
+      advisers.push(adviser);
+      created = true;
+    }
+    if (newGroup && !groupError) {
+      newGroup.adviser_id = adviser?.id ?? null;
+      statements.push(
+        { text: 'INSERT INTO tgroup (id, event_id, name, name_key, adviser_id) VALUES ($1, $2, $3, $4, $5)', params: [newGroup.id, event.id, newGroup.name, newGroup.name_key, newGroup.adviser_id] },
+        logStatement(event.id, acc.id, 'group.create', { id: newGroup.id, name: newGroup.name }),
+      );
+      groups.push(newGroup);
+      created = true;
     }
 
     const id = before?.id ?? newId();
     if (!before) {
-      if (Object.keys(errors).length) {
-        rows.push({ rowId, errors });
-        continue;
-      }
       statements.push(
         {
           text: 'INSERT INTO student (id, event_id, student_number, email, surname, first_name, middle_name, section) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
           params: [id, event.id, next.student, next.email, next.surname, next.first, next.middle, next.section],
         },
-        logStatement(event.id, acc.id, 'roll.add', { studentId: id, studentNumber: next.student }),
+        { text: 'INSERT INTO group_member (event_id, group_id, student_id) VALUES ($1, $2, $3)', params: [event.id, group!.id, id] },
+        logStatement(event.id, acc.id, 'roll.add', { studentId: id, studentNumber: next.student, groupId: group!.id }),
       );
       takenNumbers.set(next.student, `${next.surname}, ${next.first}`);
     } else {
-      const set = ROLL_FIELDS.filter(([key, col]) => key in patch && !errors[key] && next[key] !== before[col]);
+      const set = FIELDS.filter(([key, col]) => key in patch && !errors[key] && next[key] !== before[col]);
       if (set.length) {
         statements.push(
           { text: `UPDATE student SET ${set.map(([, col], i) => `${col} = $${i + 2}`).join(', ')} WHERE id = $1`, params: [id, ...set.map(([key]) => next[key])] },
           logStatement(event.id, acc.id, 'roll.edit', { studentId: id, changes: set.map(([key, col]) => `${col}: ${before[col]} → ${next[key]}`) }),
         );
       }
-    }
-    if (groupChange) {
-      statements.push({ text: 'DELETE FROM group_member WHERE event_id = $1 AND student_id = $2', params: [event.id, id] });
-      if (groupChange.to) {
+      if (!groupError && group && group.id !== before.group_id) {
         statements.push(
-          { text: 'INSERT INTO group_member (event_id, group_id, student_id) VALUES ($1, $2, $3)', params: [event.id, groupChange.to, id] },
-          // A student placed in a group is no longer left out.
-          { text: 'UPDATE student SET excluded_reason = NULL, excluded_at = NULL WHERE id = $1', params: [id] },
+          { text: 'DELETE FROM group_member WHERE event_id = $1 AND student_id = $2', params: [event.id, id] },
+          { text: 'INSERT INTO group_member (event_id, group_id, student_id) VALUES ($1, $2, $3)', params: [event.id, group.id, id] },
+          logStatement(event.id, acc.id, before.group_id ? 'member.move' : 'member.add', { studentId: id, groupId: group.id, from: before.group_id }),
         );
+        if (before.group_id) {
+          moved++;
+          emptied.add(before.group_id);
+        }
       }
-      const action = groupChange.to ? (groupChange.from ? 'member.move' : 'member.add') : 'member.remove';
-      statements.push(logStatement(event.id, acc.id, action, { studentId: id, groupId: groupChange.to ?? groupChange.from, from: groupChange.from }));
-      if (groupChange.from) moved++;
     }
-    if (excludeChange) {
+
+    // Changing the adviser on an existing student's row changes it for their whole group.
+    if (before && !adviserError && adviser && group && !newGroup && 'adviser' in patch && group.adviser_id !== adviser.id) {
       statements.push(
-        { text: 'UPDATE student SET excluded_reason = $2::text, excluded_at = CASE WHEN $2::text IS NULL THEN NULL ELSE now() END WHERE id = $1', params: [id, excluded] },
-        logStatement(event.id, acc.id, excluded ? 'student.exclude' : 'student.include', { studentId: id, reason: excluded }),
+        { text: 'UPDATE tgroup SET adviser_id = $2 WHERE id = $1', params: [group.id, adviser.id] },
+        logStatement(event.id, acc.id, 'group.update', { groupId: group.id, from: { adviserId: group.adviser_id }, to: { adviserId: adviser.id } }),
       );
+      group.adviser_id = adviser.id;
+      regrouped.add(group.id);
+    }
+    if (adviserEmail !== null) {
+      const target = advisers.find((a) => a.id === (groupError ? before?.adviser_id : group?.adviser_id));
+      if (!target) errors.adviserEmail = 'This student’s group has no adviser yet, so there is no adviser to give an email.';
+      else if (target.email !== adviserEmail) {
+        statements.push(
+          { text: 'UPDATE adviser SET email = $2 WHERE id = $1', params: [target.id, adviserEmail] },
+          logStatement(event.id, acc.id, 'adviser.edit', { adviserId: target.id, from: { email: target.email }, to: { email: adviserEmail } }),
+        );
+        target.email = adviserEmail;
+        readvised.add(target.id);
+      }
     }
     touched.push({ rowId, id, errors });
   }
 
+  if (emptied.size) statements.push(tidyEmptyGroups(event.id, [...emptied]));
   try {
     await transaction(statements);
   } catch (e) {
     if (!isUnique(e)) throw e;
-    const error = 'Not saved: someone changed the roll at the same moment (a student number or a place in a group was taken). Reload the page and try again.';
+    const error = 'Not saved: someone changed the same student or group at the same moment. Reload the page and try again.';
     return { rows: [...rows, ...touched.map((t) => ({ rowId: t.rowId, error }))] };
   }
-  const fresh = new Map((await query<RollStudent>(`${ROLL_SELECT} WHERE s.id = ANY($1::text[])`, [touched.map((t) => t.id)])).map((s) => [s.id, s]));
+  const fresh = await query<DataRow>(
+    `${DATA_SELECT} WHERE s.event_id = $1 AND (s.id = ANY($2::text[]) OR g.id = ANY($3::text[]) OR a.id = ANY($4::text[]))`,
+    [event.id, touched.map((t) => t.id), [...regrouped], [...readvised]],
+  );
+  const byId = new Map(fresh.map((s) => [s.id, s]));
   for (const t of touched) {
-    const s = fresh.get(t.id);
-    rows.push(s ? { rowId: t.rowId, row: rollGridRow(event, s), errors: Object.keys(t.errors).length ? t.errors : undefined } : { rowId: t.rowId, error: 'Not found after saving. Reload the page.' });
+    const s = byId.get(t.id);
+    rows.push(s ? { rowId: t.rowId, row: dataGridRow(event, s), errors: Object.keys(t.errors).length ? t.errors : undefined } : { rowId: t.rowId, error: 'Not found after saving. Reload the page.' });
   }
+  const mine = new Set(touched.map((t) => t.id));
+  for (const s of fresh) if (!mine.has(s.id)) rows.push({ rowId: s.id, row: dataGridRow(event, s) });
   return {
     rows,
-    notice: moved ? `Moved ${moved} student${moved === 1 ? '' : 's'} out of another group. Their scores from the old group no longer count.` : undefined,
+    notice: moved ? `Moved ${moved} student${moved === 1 ? '' : 's'} to another group. Individual scores from the old group stay stored but no longer count.` : undefined,
+    // A new group or adviser joins the choices offered while typing.
+    refresh: created || undefined,
   };
 }
 
-// ── advisers ──────────────────────────────────────────────────
-
-const ADVISER_SELECT = 'SELECT a.*, (SELECT count(*)::int FROM tgroup g WHERE g.adviser_id = a.id) AS group_count FROM adviser a';
-/** An adviser code as stored: capitals, spaces removed. Checking ignores dashes and case anyway. */
-const cleanCode = (v: string) => v.toUpperCase().replace(/\s+/g, '').slice(0, 20);
-
-export async function saveAdvisersTable(eventId: string, changes: CellChange[]): Promise<GridResult> {
+/** Removes students on purpose. A student with individual scores cannot be removed, because that would delete the scores. */
+export async function removeStudentsTable(eventId: string, ids: string[]): Promise<GridResult> {
   const acc = await requireAdmin();
   const event = await getEvent(eventId);
   if (!event) return GONE;
-  const all = await query<AdviserListRow>(`${ADVISER_SELECT} WHERE a.event_id = $1`, [event.id]);
+  const locked = rosterLock(event);
+  if (locked) return { rows: ids.map((rowId) => ({ rowId, error: locked })), notice: locked };
+  const found = await query<{ id: string; surname: string; first_name: string; group_id: string | null; scores: number }>(
+    `SELECT s.id, s.surname, s.first_name, m.group_id, (SELECT count(*)::int FROM member_score x WHERE x.student_id = s.id) AS scores
+     FROM student s LEFT JOIN group_member m ON m.student_id = s.id WHERE s.event_id = $1 AND s.id = ANY($2::text[])`,
+    [event.id, ids],
+  );
   const rows: SavedRow[] = [];
-  const notices: string[] = [];
-  for (const [rowId, patch] of changesByRow(changes)) {
-    const before = isNewRow(rowId) ? null : all.find((a) => a.id === rowId);
-    if (!isNewRow(rowId) && !before) {
-      rows.push({ rowId, error: 'This adviser was removed. Reload the page.' });
-      continue;
-    }
-    const errors: Record<string, string> = {};
-    const name = (patch.name ?? before?.name ?? '').replace(/\s+/g, ' ').trim();
-    const email = (patch.email ?? before?.email ?? '').trim();
-    const code = cleanCode(patch.code ?? before?.link_code ?? '');
-    const key = nameKey(name);
-    const twin = all.find((a) => a.id !== before?.id && a.name_key === key);
-    if (!key) errors.name = 'An adviser needs a name.';
-    else if (twin) errors.name = `${twin.name} is already on the list (spacing and punctuation are ignored).`;
-    if (email && !looksLikeEmail(email)) errors.email = `“${email}” is not an email address.`;
-    if (code && normaliseCheck(code).length < 4) errors.code = 'Use at least four letters or numbers, for example K7Q-4MP.';
-    else if (code && all.some((a) => a.id !== before?.id && a.link_code && normaliseCheck(a.link_code) === normaliseCheck(code))) errors.code = 'Another adviser already has that code.';
-    else if (code && email && emailGivesAway(email, code)) errors['code' in patch ? 'code' : 'email'] = 'The email contains the adviser code, so the code would not protect the link. Choose another code.';
-
-    if (!before) {
-      if (Object.keys(errors).length) {
-        rows.push({ rowId, errors });
-        continue;
-      }
-      const id = newId();
-      try {
-        await transaction([
-          { text: 'INSERT INTO adviser (id, event_id, name, name_key, email, link_code) VALUES ($1, $2, $3, $4, $5, $6)', params: [id, event.id, name, key, email, code] },
-          logStatement(event.id, acc.id, 'adviser.add', { adviserId: id, name }),
-        ]);
-      } catch (e) {
-        if (!isUnique(e)) throw e;
-        rows.push({ rowId, errors: { name: `${name} was just added by someone else. Reload the page.` } });
-        continue;
-      }
-      const added = { id, name, name_key: key, email, link_code: code, group_count: 0 };
-      all.push(added);
-      rows.push({ rowId, row: adviserGridRow(added) });
-      continue;
-    }
-    const final = { name: errors.name ? before.name : name, email: errors.email ? before.email : email, link_code: errors.code ? before.link_code : code };
-    const changed = (['name', 'email', 'link_code'] as const).filter((k) => final[k] !== before[k]);
-    if (changed.length) {
-      await transaction([
-        { text: 'UPDATE adviser SET name = $2, name_key = $3, email = $4, link_code = $5 WHERE id = $1', params: [before.id, final.name, nameKey(final.name), final.email, final.link_code] },
-        // The code itself is not written to the history: it is what opens the adviser's results.
-        logStatement(event.id, acc.id, 'adviser.edit', { adviserId: before.id, changes: changed.map((k) => (k === 'link_code' ? 'Adviser code changed' : `${k}: ${before[k]} → ${final[k]}`)) }),
-      ]);
-      Object.assign(before, final, { name_key: nameKey(final.name) });
-      if (event.released_at && changed.includes('link_code')) notices.push(`Results were already released, so ${final.name} now opens their link with the new code. Give them the new code.`);
-      if (event.released_at && changed.includes('email')) notices.push(`Results were already released: the mailing sheet already sent still has ${final.name}’s old email.`);
-    }
-    rows.push({ rowId, row: adviserGridRow(before), errors: Object.keys(errors).length ? errors : undefined });
-  }
-  return { rows, notice: notices.join(' ') || undefined };
-}
-
-export async function removeAdvisersTable(eventId: string, ids: string[]): Promise<GridResult> {
-  const acc = await requireAdmin();
-  const event = await getEvent(eventId);
-  if (!event) return GONE;
-  const all = await query<AdviserListRow>(`${ADVISER_SELECT} WHERE a.event_id = $1 AND a.id = ANY($2::text[])`, [event.id, ids]);
-  const rows: SavedRow[] = [];
+  const statements: Statement[] = [];
+  const groups: string[] = [];
   for (const id of ids) {
-    const a = all.find((x) => x.id === id);
-    if (!a) rows.push({ rowId: id, removed: true });
-    else if (event.released_at) rows.push({ rowId: id, error: 'Results have been released, so an adviser cannot be removed.' });
-    else if (a.group_count) rows.push({ rowId: id, error: `${a.name} advises ${a.group_count} group${a.group_count === 1 ? '' : 's'}. Give ${a.group_count === 1 ? 'it' : 'them'} another adviser on the Groups table first.` });
+    const st = found.find((f) => f.id === id);
+    if (!st) rows.push({ rowId: id, removed: true });
+    else if (st.scores) rows.push({ rowId: id, error: `${st.first_name} ${st.surname} has individual scores from the judges, so cannot be removed: removing would delete those scores.` });
     else {
-      await transaction([{ text: 'DELETE FROM adviser WHERE id = $1 AND event_id = $2', params: [id, event.id] }, logStatement(event.id, acc.id, 'adviser.remove', { adviserId: id, name: a.name })]);
+      statements.push({ text: 'DELETE FROM student WHERE id = $1 AND event_id = $2', params: [id, event.id] }, logStatement(event.id, acc.id, 'roll.remove', { studentId: id, name: `${st.surname}, ${st.first_name}` }));
+      if (st.group_id) groups.push(st.group_id);
       rows.push({ rowId: id, removed: true });
     }
   }
-  return { rows, notice: rows.find((r) => r.error)?.error ?? 'Adviser removed.' };
+  if (groups.length) statements.push(tidyEmptyGroups(event.id, groups));
+  await transaction(statements);
+  return { rows, notice: rows.find((r) => r.error)?.error ?? 'Removed.' };
 }
 
 // ── judges ────────────────────────────────────────────────────
@@ -381,7 +290,7 @@ export async function saveJudgesTable(eventId: string, changes: CellChange[]): P
   const event = await getEvent(eventId);
   if (!event) return GONE;
   const rows: SavedRow[] = [];
-  const secrets: string[] = [];
+  const signIns: NonNullable<GridResult['signIns']> = [];
   const notices: string[] = [];
   for (const [rowId, patch] of changesByRow(changes)) {
     const errors: Record<string, string> = {};
@@ -413,7 +322,7 @@ export async function saveJudgesTable(eventId: string, changes: CellChange[]): P
           { text: 'UPDATE account SET disabled_at = NULL WHERE id = $1', params: [existing.id] },
           logStatement(event.id, acc.id, 'judge.add', { id: existing.id }),
         ]);
-        notices.push(`${existing.email} already had an account, as ${existing.display_name}, and is now a judge for ${event.title}. Their password is unchanged; use Reset password if they have forgotten it.`);
+        notices.push(`${existing.email} already had an account, as ${existing.display_name}, and is now a judge for ${event.title}. Their password is unchanged; select them and press Reset password if they have forgotten it.`);
         rows.push({ rowId, row: judgeGridRow(event.id, existing) });
         continue;
       }
@@ -424,7 +333,7 @@ export async function saveJudgesTable(eventId: string, changes: CellChange[]): P
         { text: 'INSERT INTO event_judge (event_id, account_id) VALUES ($1, $2)', params: [event.id, id] },
         logStatement(event.id, acc.id, 'judge.create', { id, email: login }),
       ]);
-      secrets.push(`${name} signs in with ${login} and password ${password}`);
+      signIns.push({ name, login, password });
       rows.push({ rowId, row: judgeGridRow(event.id, { id, email: login, display_name: name }) });
       continue;
     }
@@ -454,7 +363,7 @@ export async function saveJudgesTable(eventId: string, changes: CellChange[]): P
     }
     rows.push({ rowId, row: judgeGridRow(event.id, { id: before.id, ...final }), errors: Object.keys(errors).length ? errors : undefined });
   }
-  return { rows, secret: secrets.join(' · ') || undefined, notice: notices.join(' ') || undefined };
+  return { rows, signIns, notice: notices.join(' ') || undefined };
 }
 
 export async function removeJudgesTable(eventId: string, ids: string[]): Promise<GridResult> {
@@ -485,26 +394,7 @@ export async function resetJudgeTable(eventId: string, accountId: string): Promi
     { text: 'DELETE FROM session WHERE account_id = $1', params: [judge.id] },
     logStatement(event.id, acc.id, 'judge.reset', { id: judge.id }),
   ]);
-  return { rows: [], secret: `${judge.display_name} signs in with ${judge.email} and password ${password}`, notice: 'Password reset. The judge is signed out everywhere.' };
-}
-
-/** Picks a judge from the department's standing list for this event; their record in Judge profiles carries on. */
-export async function addDepartmentJudgeTable(eventId: string, accountId: string): Promise<GridResult> {
-  const acc = await requireAdmin();
-  const event = await getEvent(eventId);
-  if (!event) return GONE;
-  const judge = await one<{ id: string; display_name: string }>(`SELECT id, display_name FROM account WHERE id = $1 AND role = 'judge'`, [accountId]);
-  if (!judge) return { rows: [{ rowId: accountId, error: 'Judge not found.' }] };
-  await transaction([
-    { text: 'INSERT INTO event_judge (event_id, account_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', params: [event.id, judge.id] },
-    { text: 'UPDATE account SET disabled_at = NULL WHERE id = $1', params: [judge.id] },
-    logStatement(event.id, acc.id, 'judge.add', { id: judge.id }),
-  ]);
-  return {
-    rows: [{ rowId: judge.id, removed: true }],
-    notice: `${judge.display_name} is now a judge for ${event.title}. Their password is unchanged; use Reset password if they have forgotten it.`,
-    refresh: true,
-  };
+  return { rows: [], signIns: [{ name: judge.display_name, login: judge.email, password }], notice: 'Password reset. The judge is signed out everywhere; the old password no longer works.' };
 }
 
 // ── a group's scores (corrections, decision 7) ────────────────
@@ -543,7 +433,7 @@ export async function saveGradesTable(eventId: string, changes: CellChange[]): P
   for (const [rowId, patch] of changesByRow(changes)) {
     if (!('absent' in patch)) continue;
     if (event.released_at) {
-      rows.push({ rowId, errors: { absent: 'Results have been released; nothing can change now.' } });
+      rows.push({ rowId, errors: { absent: LOCKED_SENT } });
       continue;
     }
     const absent = patch.absent === 'absent';
@@ -569,16 +459,3 @@ export async function saveGradesTable(eventId: string, changes: CellChange[]): P
   return { rows };
 }
 
-export async function removeMembersTable(eventId: string, groupId: string, ids: string[]): Promise<GridResult> {
-  const acc = await requireAdmin();
-  const event = await getEvent(eventId);
-  if (!event) return GONE;
-  if (event.released_at) return { rows: ids.map((rowId) => ({ rowId, error: 'Results have been released; nothing can change now.' })), notice: 'Results have been released, so members cannot be removed.' };
-  await transaction(
-    ids.flatMap((id) => [
-      { text: 'DELETE FROM group_member WHERE event_id = $1 AND group_id = $2 AND student_id = $3', params: [event.id, groupId, id] },
-      logStatement(event.id, acc.id, 'member.remove', { groupId, studentId: id }),
-    ]),
-  );
-  return { rows: ids.map((rowId) => ({ rowId, removed: true })), notice: 'Removed from the group. Their scores from this group no longer count.' };
-}

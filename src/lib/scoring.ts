@@ -11,8 +11,12 @@
 //  5. Only a submitted sheet counts (countingSheets). A sheet a judge started and never marked complete is left out
 //     of every percentage, rank, grade, export and judge profile. index.html had no sheet status; the first app
 //     counted every value typed, so an abandoned half-filled sheet fed the averages.
+//  6. A member absent from the defense has individual scores of zero: a member field no judge scored counts as 0
+//     (the department's rule, 17 September 2026), so their grade is worked out as usual. A score entered for them, for
+//     example the coordinator's correction, counts as normal. index.html had no absence; the app before this left an
+//     absent member's grade blank for the coordinator to enter by hand.
 //
-// Pure functions only: the live screens, results, student and adviser pages, and the Excel export all call these.
+// Pure functions only: the live screens, results, the email file and the Excel export all call these.
 // tests/golden.test.ts holds the rules; tests/crosscheck.test.ts holds them to index.html wherever nothing is blank.
 
 import { DEFAULT_RUBRIC, HALVES, type Category, type GradeBand, type Half, type MemberField, type MemberFieldKey, type Rubric } from './rubric';
@@ -203,11 +207,14 @@ export interface MemberResult {
  * A member's total: for each field, the average across the judges who filled it in; then those averages added up.
  * Until every field has at least one score there is no total (a dash), never a partial sum scaled up to 100.
  * index.html (808-820) added up each judge's fields with that judge's blanks counted as zero, then averaged.
+ * An absent member (rule 6) always has a total: fields nobody scored count as zero.
  */
-export function memberScore(sets: MemberSet[], fields: MemberField[] = DEFAULT_RUBRIC.memberFields): MemberResult {
+export function memberScore(sets: MemberSet[], fields: MemberField[] = DEFAULT_RUBRIC.memberFields, absent = false): MemberResult {
   let sum = 0;
   for (const f of fields) {
     const vals = sets.map((s) => s[f.key]).filter(has);
+    // Rule 6: for a member absent from the defense, a field nobody scored is a zero.
+    if (!vals.length && absent) continue;
     if (!vals.length) return { total: null, complete: false };
     sum += vals.reduce((a, b) => a + b, 0) / vals.length;
   }
@@ -287,8 +294,8 @@ export interface AdviserStanding {
 export const TOP_PLACES = 10;
 
 /**
- * What a student's or adviser's private page may say about a group's placing: the categories, then "Overall", in
- * which it placed in the top 10, never which place. Places are revealed at the awarding, so no number is shown there.
+ * What an adviser's email may say about a group's placing: the categories, then "Overall", in which it placed in the
+ * top 10, never which place. Places are revealed at the awarding, so no number is shown there.
  */
 export function topTenPlacings(result: GroupResult): string[] {
   const inTop = (rank: number | null) => rank !== null && rank <= TOP_PLACES;

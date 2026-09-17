@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation';
 import { AppBar } from '@/components/AppBar';
 import { DataGrid } from '@/components/DataGrid';
-import { EventHeader } from '@/components/EventNav';
+import { EventHeader, ResultsViews } from '@/components/EventNav';
 import { requireAdmin } from '@/lib/auth';
 import type { GridColumn } from '@/lib/grid';
 import { byGroupName, eventReport, getEvent } from '@/lib/repo';
@@ -33,7 +33,6 @@ export default async function ResultsPage({ params }: { params: Promise<{ id: st
   const categories = report.results.groups[0]?.categories ?? [];
   const columns: GridColumn[] = [
     { key: 'group', label: 'Group', width: 'minmax(9rem, 1.6fr)' },
-    { key: 'section', label: 'Sec', filter: true, width: '4.6rem' },
     { key: 'adviser', label: 'Adviser', filter: true, width: 'minmax(6.5rem, 1fr)' },
     ...categories.map((c): GridColumn => ({ key: `c:${c.key}`, label: c.name, type: 'number', align: 'right', width: 'minmax(6.2rem, .8fr)' })),
     { key: 'overall', label: 'Overall', type: 'number', align: 'right', width: '5.4rem' },
@@ -46,16 +45,15 @@ export default async function ResultsPage({ params }: { params: Promise<{ id: st
       <AppBar subtitle="Coordinator" account={acc} home="/admin" />
       <main className="page wide">
         <EventHeader event={event} tab="results" title="Results" />
+        <ResultsViews eventId={id} view="groups" />
         <p className="lead">
           {event.status === 'finalised' ? 'Final results.' : 'Live preview: these change as judges submit.'} Overall = Defense × {event.rubric.halves.defense.weight} + Booth ×{' '}
           {event.rubric.halves.booth.weight}. Only submitted sheets count, a blank is never a zero, and a group is ranked once every criterion in both halves has a score.
           {incomplete ? ` ${incomplete} group${incomplete === 1 ? ' is' : 's are'} incomplete right now.` : ''}
         </p>
-        <div className="actions" style={{ marginTop: 0 }}>
-          <a className="btn small secondary" href={`/api/admin/events/${id}/export`}>
-            Download Excel workbook
-          </a>
-        </div>
+        <p className="sub">
+          To look up one student’s grade, open <b>Individual grades</b> above. The workbook and the email file are on the <b>Close the event</b> tab.
+        </p>
 
         <div className="section-title">Top 10 for the awarding</div>
         <div className="lb-grid compact">
@@ -83,15 +81,15 @@ export default async function ResultsPage({ params }: { params: Promise<{ id: st
 
         <div className="section-title">Every group</div>
         <p className="sub" style={{ marginTop: 0 }}>
-          Each category shows the percentage and, after the dot, its rank. Click a heading (or use Sort on a phone) to sort by any column; search or filter by section, adviser or
-          whether the group is fully judged.
+          Each category shows the percentage and, after the dot, its rank. Click a heading (or use Sort on a phone) to sort by any column; search, or filter by adviser or by
+          whether the group is fully judged. Press a group’s name to see its scores.
         </p>
-        <DataGrid label="Results" columns={columns} rows={rows} rowName="group" searchPlaceholder="Search groups, sections and advisers" emptyText="No groups yet." />
+        <DataGrid label="Results" columns={columns} rows={rows} rowName="group" searchPlaceholder="Search groups and advisers" emptyText="No groups yet." />
 
         <div className="section-title">Adviser ranking</div>
         <p className="sub" style={{ marginTop: 0 }}>
-          The average of the overall percentages of each adviser’s ranked groups; advisers with the same average share a position. Only you see this table: each adviser sees just
-          their own groups’ average overall, never a position.
+          The average of the overall percentages of each adviser’s ranked groups; advisers with the same average share a position. Only you see this: an adviser’s email lists
+          their own groups’ percentages, never a position.
         </p>
         <ul className="list">
           {advisers.map((a) => (

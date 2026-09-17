@@ -77,10 +77,10 @@ export interface SavedRow {
 
 export interface GridResult {
   rows: SavedRow[];
-  /** One message for the whole table, for example what a change after release affects. */
+  /** One message for the whole table, for example how many students were moved to another group. */
   notice?: string;
-  /** Shown once to be written down, for example a temporary password. */
-  secret?: string;
+  /** Judges' sign-in details, shown once to print or write down (a new judge, or a reset password); never stored readable. */
+  signIns?: { name: string; login: string; password: string }[];
   /** Something else on the page changed, so the page reloads its data. */
   refresh?: boolean;
 }
