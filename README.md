@@ -81,7 +81,7 @@ Running the app locally: this folder's `.env.local` may hold the real `DATABASE_
 
    **Preview deployments never use `DATABASE_URL`.** A pull request's preview runs on its own throwaway sample data (in-memory PGlite), so reviewing a change can never alter live data or apply its schema early. To let previews use the real database anyway, set `TAMBIZ_PREVIEW_DATABASE=1` in the Preview environment.
 5. **Deploy.** Press Deploy, open the address Vercel gives you, and sign in as the coordinator.
-6. **Before real data:** change the coordinator password, remove or reset the sample judges, and create the real event. The sample event is marked as practice on every screen; leave it for rehearsals.
+6. **Before real data:** change the coordinator password, remove or reset the sample judges, and create the real event. The sample event is marked as practice on every screen; leave it for rehearsals. A database set up by an older version keeps its old, unmarked sample event until you replace it (see the start of `docs/how-to-run-an-event.md`).
 
 ### Changing the sample account passwords
 

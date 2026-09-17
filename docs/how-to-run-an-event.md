@@ -146,7 +146,7 @@ The Data tab lists every student with their section, email, group, adviser and a
 - **Move a student to another group:** type the group's name in their **Group** cell and press **Enter**. To start a new group, type its new name, remove the completion, and press **Enter**; the new group gets the student's adviser.
 - **Change a group's adviser:** type the new adviser in **Adviser** on **any** row of that group. It changes for every member of the group, because a group has one adviser.
 - **Give an adviser an email:** type it in **Adviser email** on any row of one of their groups. It changes on every row of that adviser.
-- **Add a student:** type in the empty last row. Student No., Surname, First name, Email, Group and Adviser are needed; Section and Middle name are not. A new student joining an existing group must name that group's adviser.
+- **Add a student:** type in the empty last row. Student No., Surname, First name, Email, Group and Adviser are needed; Section and Middle name are not. A new student joining an existing group can leave Adviser empty and takes that group's adviser; a different adviser is refused.
 - **Remove a student:** select their row and press **Remove student** (or **Ctrl+Delete**, then **Enter**). A student the judges have already scored cannot be removed, because that would delete their scores.
 - **Search and filter** by Section, Group or Adviser. Press a group's name to see its scores.
 
