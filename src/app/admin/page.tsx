@@ -18,7 +18,7 @@ export default async function AdminHome({ searchParams }: { searchParams: Promis
       <main className="page">
         <div className="eyebrow">Coordinator</div>
         <h1 className="page-title">Events</h1>
-        <p className="lead">Each year’s Tambiz is one event. Groups, judges, scores and the scoring sheet all belong to it.</p>
+        <p className="lead">Each year’s Tambiz is one event. Its students, groups, judges and scores all belong to it. A practice event is for trying the app out.</p>
         <Notice ok={sp.ok} error={sp.error} />
         <ul className="list">
           {events.map((e) => (
@@ -28,9 +28,11 @@ export default async function AdminHome({ searchParams }: { searchParams: Promis
                   <span className="title">{e.title}</span>
                   <span className="sub" style={{ display: 'block' }}>
                     {e.year}
+                    {e.practice ? ' · Practice: invented data, not a real event' : ''}
                   </span>
                 </span>
-                <span className={`pill ${e.status === 'judging' ? 'part' : e.status === 'finalised' ? 'done' : 'none'}`}>{statusLabel(e)}</span>
+                {e.practice ? <span className="pill part">Practice</span> : null}
+                <span className={`pill ${e.status === 'finalised' ? 'done' : 'none'}`}>{statusLabel(e)}</span>
               </Link>
             </li>
           ))}

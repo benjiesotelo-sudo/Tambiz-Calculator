@@ -19,8 +19,8 @@ describe('schema', () => {
     await db.transaction(SCHEMA.map((text) => ({ text })));
     await db.transaction(SCHEMA.map((text) => ({ text })));
     await seedIfEmpty(db);
-    const [row] = await db.query('SELECT (SELECT count(*)::int FROM event) AS events, (SELECT count(*)::int FROM access_link) AS links');
-    expect(row).toEqual({ events: 1, links: 0 });
+    const [row] = await db.query('SELECT count(*)::int AS events, bool_and(practice) AS practice FROM event');
+    expect(row).toEqual({ events: 1, practice: true });
 
     // Groups are known by name alone (15 September 2026): the sample groups have no code, a group needs none, and a
     // code already stored by an earlier version survives the schema running again.

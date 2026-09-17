@@ -1,30 +1,21 @@
 // Rows of the coordinator's spreadsheet tables (components/DataGrid.tsx). A page's first load and every save build
 // rows with the same functions, so a saved row always reads exactly like a freshly loaded one.
 
+import { LOCKED_CLOSED, LOCKED_SENT } from './locks';
 import type { GridRow } from './grid';
-import { rollName, type EventRow, type GradeRow, type groupScoreDetail, type GroupRow, type StudentRow } from './repo';
+import { rollName, type DataRow, type EventRow, type GradeRow, type groupScoreDetail, type GroupRow, type StudentRow } from './repo';
 import { criterionLabel, type Half } from './rubric';
 import { fmt2, round2, type GroupResult } from './scoring';
 import { fmtScore } from './sheet';
 
-type EventLike = Pick<EventRow, 'id' | 'released_at'>;
+type EventLike = Pick<EventRow, 'id' | 'released_at' | 'status'>;
 
-export const RELEASED_NOTHING = 'Results have been released; this can no longer change.';
-
-export function groupGridRow(event: EventLike, g: GroupRow): GridRow {
-  const href = `/admin/events/${event.id}/groups/${g.id}`;
-  return {
-    id: g.id,
-    cells: { name: g.name, section: g.section, adviser: g.adviser_name ?? '', members: String(g.member_count) },
-    links: { name: href, members: href },
-    tones: g.member_count ? undefined : { members: 'err' },
-    locked: event.released_at ? { section: 'Results have been released, so the section cannot change now. The name and adviser can still be corrected.' } : undefined,
-  };
-}
+/** Where a group's scores are seen and corrected. */
+export const scoresHref = (eventId: string, groupId: string, half = 'defense') => `/admin/events/${eventId}/scores/${groupId}?half=${half}`;
 
 /** A group's line in the Results table: each category's percentage with its rank, then the overall and its rank. */
 export function resultGridRow(event: EventLike, g: GroupRow, r: GroupResult): GridRow {
-  const cells: Record<string, string> = { group: g.name, section: g.section, adviser: g.adviser_name ?? '' };
+  const cells: Record<string, string> = { group: g.name, adviser: g.adviser_name ?? '' };
   const sort: Record<string, number | null> = {};
   const tones: GridRow['tones'] = {};
   for (const c of r.categories) {
@@ -45,55 +36,8 @@ export function resultGridRow(event: EventLike, g: GroupRow, r: GroupResult): Gr
     cells,
     sort,
     tones,
-    links: { group: `/admin/events/${event.id}/groups/${g.id}` },
+    links: { group: scoresHref(event.id, g.id) },
     notes: r.accepted ? { judged: `Finalised without every score, with your reason: ${g.accept_reason}` } : !ranked ? { overall: 'Incomplete: from what is scored so far, so it has no rank.' } : undefined,
-  };
-}
-
-/** A student on the Class roll table, with their group and whether they were left out. */
-export function rollGridRow(event: EventLike, s: StudentRow): GridRow {
-  const inGroup = !!s.group_id;
-  const status = inGroup ? 'In a group' : s.excluded_reason ? 'Left out' : 'Not in a group';
-  const locked: Record<string, string> = {};
-  if (event.released_at) {
-    locked.group = 'Results have been released, so a student cannot change group now.';
-    locked.leftout = RELEASED_NOTHING;
-  } else if (inGroup) locked.leftout = 'This student is in a group. Clear their Group first to leave them out.';
-  return {
-    id: s.id,
-    cells: {
-      student: s.student_number,
-      surname: s.surname,
-      first: s.first_name,
-      middle: s.middle_name,
-      section: s.section,
-      email: s.email,
-      group: s.group_name ?? '',
-      status,
-      leftout: inGroup ? '' : (s.excluded_reason ?? ''),
-    },
-    links: s.group_id ? { group: `/admin/events/${event.id}/groups/${s.group_id}` } : undefined,
-    tones: { status: inGroup ? 'ok' : s.excluded_reason ? 'muted' : 'err' },
-    locked: Object.keys(locked).length ? locked : undefined,
-    notes: !inGroup && !s.excluded_reason ? { status: 'Judging cannot close until this student is in a group or left out with a reason.' } : undefined,
-  };
-}
-
-export interface AdviserListRow {
-  id: string;
-  name: string;
-  name_key: string;
-  email: string;
-  link_code: string;
-  group_count: number;
-}
-
-export function adviserGridRow(a: AdviserListRow): GridRow {
-  return {
-    id: a.id,
-    cells: { name: a.name, email: a.email, code: a.link_code, groups: String(a.group_count) },
-    tones: a.group_count ? undefined : { groups: 'muted' },
-    notes: { code: a.link_code ? 'The adviser types this to open their link. Hand it to them yourself; it is never in the email.' : 'No code yet, so this adviser gets no link.' },
   };
 }
 
@@ -106,9 +50,39 @@ export function judgeGridRow(eventId: string, j: { id: string; email: string; di
   };
 }
 
-export function departmentGridRow(j: { id: string; email: string; display_name: string; events: number }): GridRow {
-  return { id: j.id, cells: { name: j.display_name, login: j.email, events: String(j.events) } };
+/**
+ * A student on the Data table, with their group and its adviser. Changing a student's Adviser or Adviser email changes
+ * it for the whole group (a group has one adviser), so those rows come back too.
+ */
+export function dataGridRow(event: EventLike, s: DataRow): GridRow {
+  const locked: Record<string, string> = {};
+  if (event.released_at) for (const k of DATA_KEYS) locked[k] = LOCKED_SENT;
+  else if (event.status === 'finalised') for (const k of ['group', 'adviser']) locked[k] = LOCKED_CLOSED;
+  const notes: Record<string, string> = {};
+  if (s.adviser_name && !s.adviser_email) notes.adviserEmail = `${s.adviser_name} has no email, so gets no results email.`;
+  if (!s.section) notes.section = 'No section. Judging does not need it, but the For Encoding grade sheet cannot be organised by section without it.';
+  if (!s.group_id) notes.group = 'In no group, so this student gets no grade. Type their group.';
+  return {
+    id: s.id,
+    cells: {
+      student: s.student_number,
+      surname: s.surname,
+      first: s.first_name,
+      middle: s.middle_name,
+      section: s.section,
+      email: s.email,
+      group: s.group_name ?? '',
+      adviser: s.adviser_name ?? '',
+      adviserEmail: s.adviser_email ?? '',
+    },
+    tones: { ...(s.group_id ? {} : { group: 'err' as const }), ...(s.adviser_name && !s.adviser_email ? { adviserEmail: 'warn' as const } : {}) },
+    links: s.group_id ? { group: scoresHref(event.id, s.group_id) } : undefined,
+    locked: Object.keys(locked).length ? locked : undefined,
+    notes: Object.keys(notes).length ? notes : undefined,
+  };
 }
+
+export const DATA_KEYS = ['student', 'surname', 'first', 'middle', 'section', 'email', 'group', 'adviser', 'adviserEmail'];
 
 type ScoreDetail = Awaited<ReturnType<typeof groupScoreDetail>>;
 const showScore = (v: number | null) => (v === null ? 'no score' : fmtScore(v));
@@ -159,8 +133,8 @@ export function scoreGridRow(event: EventRow, half: Half, detail: ScoreDetail, m
     } else if (status) {
       tones[sh.id] = 'muted';
       notes[sh.id] = status.trim();
-    } else if (absent) notes[sh.id] = 'Absent from the defense: needs no member scores.';
-    if (event.released_at) locked[sh.id] = 'Results have been released, so scores can no longer be corrected.';
+    } else if (absent) notes[sh.id] = 'Absent from the defense: a score left blank counts as zero. Type a score to give them one.';
+    if (event.released_at) locked[sh.id] = LOCKED_SENT;
   }
   cells.avg = counted.length ? fmt2(counted.reduce((x, y) => x + y, 0) / counted.length) : '';
   return { id: key, cells, tones, notes, locked: Object.keys(locked).length ? locked : undefined, max };
@@ -177,10 +151,8 @@ export function scoreGridRows(event: EventRow, half: Half, detail: ScoreDetail, 
 
 /** A student on the Grades table. */
 export function gradeGridRow(event: EventLike, g: GradeRow): GridRow {
-  const why = g.absent
-    ? 'Absent from the defense: the app gives no grade; enter it yourself. The workbook leaves it blank with a note.'
-    : [!g.memberComplete ? 'member scores incomplete' : '', !g.groupReady ? 'group not fully judged' : ''].filter(Boolean).join(' and ');
-  const status = g.letter ? 'Graded' : g.absent ? 'Absent' : 'No grade yet';
+  const why = [!g.memberComplete ? 'individual scores incomplete' : '', !g.groupReady ? 'group not fully judged' : ''].filter(Boolean).join(' and ');
+  const status = g.letter ? 'Graded' : 'No grade yet';
   return {
     id: g.student.id,
     cells: {
@@ -198,19 +170,20 @@ export function gradeGridRow(event: EventLike, g: GradeRow): GridRow {
       absent: g.absent ? 'Absent' : 'Present',
       status,
     },
-    links: { group: `/admin/events/${event.id}/groups/${g.group.id}` },
+    links: { group: scoresHref(event.id, g.group.id) },
     tones: {
-      status: g.letter ? 'ok' : g.absent ? 'warn' : 'err',
+      status: g.letter ? 'ok' : 'err',
       ...(g.total !== null && !g.memberComplete ? { total: 'muted' as const } : {}),
       ...(g.overall !== null && !g.groupReady ? { overall: 'muted' as const } : {}),
       ...(g.absent ? { absent: 'warn' as const } : {}),
       ...(g.letter === 'F' ? { letter: 'err' as const } : {}),
     },
     notes: {
-      ...(g.letter ? {} : { status: g.absent ? why : `No grade because: ${why}.` }),
+      ...(g.letter ? {} : { status: `No grade because: ${why}.` }),
+      ...(g.absent ? { absent: 'Absent from the defense: individual scores nobody gave count as zero. To change the grade, correct their individual scores on the group’s scores page.' } : {}),
       ...(g.perJudge.length ? { total: g.perJudge.map((p) => `${p.judge}: ${[p.set.presentation, p.set.communication, p.set.qa].map((v) => v ?? '–').join(' / ')}`).join(' · ') } : {}),
     },
-    locked: event.released_at ? { absent: RELEASED_NOTHING } : undefined,
+    locked: event.released_at ? { absent: LOCKED_SENT } : undefined,
   };
 }
 
@@ -218,13 +191,3 @@ export const PRESENCE = [
   { value: 'present', label: 'Present' },
   { value: 'absent', label: 'Absent' },
 ];
-
-export function memberGridRow(event: EventLike, m: StudentRow): GridRow {
-  return {
-    id: m.id,
-    cells: { student: m.student_number, name: rollName(m), section: m.section, email: m.email, absent: m.absent_at ? 'Absent' : 'Present' },
-    tones: m.absent_at ? { absent: 'warn' } : undefined,
-    notes: m.absent_at ? { absent: 'Absent from the defense: no grade from the app; you enter it yourself.' } : undefined,
-    locked: event.released_at ? { absent: RELEASED_NOTHING } : undefined,
-  };
-}

@@ -6,6 +6,7 @@ import { logStatement } from './change-log';
 import { one, transaction } from './db';
 import { removedScores, type EventRow } from './repo';
 import { criterionLabel, findCriterion, type Half } from './rubric';
+import { LOCKED_SENT } from './locks';
 import { checkScore } from './sheet';
 
 export type CorrectionResult =
@@ -29,7 +30,7 @@ export async function applyCorrection(
   if (!sheet) return { ok: false, error: 'Score sheet not found.' };
   const where = { group: sheet.group_id, half: sheet.half };
   if (expected && (expected.group !== sheet.group_id || expected.half !== sheet.half)) return { ok: false, ...where, error: 'That score belongs to another group.' };
-  if (event.released_at) return { ok: false, ...where, error: 'Results have been released, so scores can no longer be corrected.' };
+  if (event.released_at) return { ok: false, ...where, error: LOCKED_SENT };
   const reason = reasonText.replace(/\s+/g, ' ').trim().slice(0, 200);
   if (reason.length < 3) return { ok: false, ...where, error: 'Type a short reason for the correction, for example “Judge confirmed 18, typed 13”.' };
 

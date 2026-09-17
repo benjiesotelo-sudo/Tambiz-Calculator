@@ -4,11 +4,12 @@ import { AppBar, Notice } from '@/components/AppBar';
 import { DataGrid } from '@/components/DataGrid';
 import { requireAdmin } from '@/lib/auth';
 import type { GridColumn } from '@/lib/grid';
+import { LOCKED_SENT } from '@/lib/locks';
 import { getEvent, getGroup, groupMembers, groupScoreDetail } from '@/lib/repo';
 import type { Half } from '@/lib/rubric';
 import { fmtScore } from '@/lib/sheet';
 import { scoreGridRows } from '@/lib/tables';
-import { saveScoresTable } from '../../../../../table-actions';
+import { saveScoresTable } from '../../../../table-actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -32,7 +33,7 @@ export default async function GroupScoresPage({
   const [detail, members] = await Promise.all([groupScoreDetail(event, gid, half), half === 'defense' ? groupMembers(gid) : Promise.resolve([])]);
   const halfDef = event.rubric.halves[half];
   const locked = !!event.released_at;
-  const base = `/admin/events/${id}/groups/${gid}`;
+  const base = `/admin/events/${id}/scores/${gid}`;
 
   const columns: GridColumn[] = [
     { key: 'category', label: half === 'defense' ? 'Category or member' : 'Category', filter: true, width: 'minmax(8rem, 1.1fr)' },
@@ -56,7 +57,7 @@ export default async function GroupScoresPage({
       <AppBar subtitle="Coordinator" account={acc} home="/admin" />
       <main className={`page wide half-${half}`}>
         <div className="crumbs">
-          <Link href={base}>‹ {group.name}</Link>
+          <Link href={`/admin/events/${id}/progress`}>‹ Progress</Link>
         </div>
         <div className="eyebrow">{event.title} · Scores and corrections</div>
         <h1 className="page-title">
@@ -64,17 +65,23 @@ export default async function GroupScoresPage({
         </h1>
         <nav className="tabs" aria-label="Half">
           {(['defense', 'booth'] as Half[]).map((h) => (
-            <Link key={h} href={`${base}/scores?half=${h}`} className={h === half ? 'on' : ''}>
+            <Link key={h} href={`${base}?half=${h}`} className={h === half ? 'on' : ''}>
               {event.rubric.halves[h].label} scores
             </Link>
           ))}
         </nav>
         <Notice ok={sp.ok} error={sp.error} />
         <p className="lead">
-          Every judge’s scores for this group, one column per judge. To correct a score, type the reason first, then type the new score over the old one (empty it to remove
+          {group.adviser_name ?? 'No adviser'} · {group.member_count} member{group.member_count === 1 ? '' : 's'}. Every judge’s scores for this group, one column per judge. To correct a score, type the reason first, then type the new score over the old one (empty it to remove
           the score). The judge’s own score is kept, the cell turns yellow, and selecting it shows what the judge gave and why it changed. Only submitted sheets count.
         </p>
-        {locked ? <div className="notice warn">Results have been released, so scores can no longer be corrected.</div> : null}
+        {half === 'defense' ? (
+          <p className="sub">
+            A member marked absent from the defense has individual scores of zero wherever no judge gave one. To give an absent member a different grade, type their
+            individual scores here with a reason; the workbook and the email file both follow.
+          </p>
+        ) : null}
+        {locked ? <div className="notice warn">{LOCKED_SENT}</div> : null}
         {!detail.sheets.length ? (
           <div className="notice warn">No judge has scored this group’s {halfDef.label.toLowerCase()} yet.</div>
         ) : (

@@ -1,5 +1,7 @@
-// Sample data so the app can be opened and presented straight after it deploys.
-// Every business, person, student number and email here is invented. Runs only when there are no accounts.
+// Sample data so the app can be opened and presented straight after it deploys, as a practice event that says so on
+// every screen, so nobody scores a real group by mistake. It looks like the coordinator's real event: sections written
+// "Sec - 1" to "Sec - 12" as the registrar writes them, advisers written "SURNAME, FIRST NAME", and group names from the
+// real event. Every student, adviser, judge, student number, email and score is invented. Runs only when there are no accounts.
 
 import { DEFAULT_RUBRIC, criteriaOf, type Half } from './rubric';
 import { hashPassword, verifyPassword } from './passwords';
@@ -37,20 +39,26 @@ const SURNAMES = ['Dela Cruz', 'Santos', 'Reyes', 'Garcia', 'Mendoza', 'Bautista
 const FIRST = ['Andrea', 'Miguel', 'Bea', 'Joshua', 'Kristine', 'Paolo', 'Nicole', 'Carlo', 'Patricia', 'Rafael', 'Angelica', 'Mark', 'Jasmine', 'Gabriel', 'Camille', 'Joaquin', 'Denise', 'Enzo', 'Trisha', 'Luis', 'Bianca', 'Nathan', 'Sofia', 'Adrian', 'Maxine', 'Ivan', 'Alyssa', 'Kyle', 'Janelle', 'Marco'];
 const MIDDLE = ['Cruz', 'Lim', 'Tan', 'Uy', 'Sy', 'Ong', 'Chua', 'Go', 'Yu', 'Co'];
 
-const GROUPS: [string, string, number, number][] = [
-  // name, section, adviser index, quality (0-1)
-  ['Kape Kultura', 'BA-3A', 0, 0.91],
-  ['Banig & Co.', 'BA-3A', 0, 0.86],
-  ['Sari-Sari Smart', 'BA-3B', 1, 0.83],
-  ['Halo-Halo Hub', 'BA-3B', 1, 0.78],
-  ['Bayong Bags', 'BA-3C', 2, 0.88],
-  ['Kalamansi Glow', 'BA-3C', 2, 0.74],
-  ['Pandesal Plus', 'BA-3D', 3, 0.81],
-  ['Abaca Threads', 'BA-3D', 3, 0.69],
+export const PRACTICE_TITLE = 'PRACTICE · Tambiz 2027';
+
+// name, adviser index, quality (0-1). The first five names are from the coordinator's real event.
+const GROUPS: [string, number, number][] = [
+  ['PAYONG PALAY', 0, 0.91],
+  ['PINILI', 0, 0.86],
+  ['BUGA', 1, 0.83],
+  ['AMIHAN CHARCOAL', 1, 0.78],
+  ['WEAVE WALKS', 2, 0.88],
+  ['SALAKOT SUPPLY', 2, 0.74],
+  ['TAHANAN TILES', 3, 0.81],
+  ['LIWANAG LAMPS', 3, 0.69],
 ];
-const ADVISERS = ['Prof. Maria Lourdes Santos', 'Prof. Ramon Villareal', 'Prof. Teresita Uy', 'Prof. Danilo Ocampo'];
-/** Sample adviser codes, typed to open an adviser's private link. */
-const ADVISER_CODES = ['K7Q-4MP', 'R3V-8XD', 'T9U-2HW', 'D5C-6NA'];
+/** Invented advisers, written as the registrar writes names. The last has no email, to show who gets no results email. */
+const ADVISERS: [string, string][] = [
+  ['SANTOS, MARIA LOURDES', 'adviser1@tambiz.demo'],
+  ['VILLAREAL, RAMON', 'adviser2@tambiz.demo'],
+  ['UY, TERESITA', 'adviser3@tambiz.demo'],
+  ['OCAMPO, DANILO', ''],
+];
 const JUDGES = [
   ['judge1@tambiz.demo', 'Dr. Liza Manalo'],
   ['judge2@tambiz.demo', 'Mr. Paolo Dizon'],
@@ -119,51 +127,50 @@ export async function seedIfEmpty(db: Db) {
   );
 
   const eventId = id('evt');
-  s.push({ text: `INSERT INTO event (id, year, title, status, rubric) VALUES ($1, 2027, 'Tambiz 2027', 'judging', $2::jsonb)`, params: [eventId, JSON.stringify(DEFAULT_RUBRIC)] });
+  s.push({
+    text: `INSERT INTO event (id, year, title, status, rubric, practice) VALUES ($1, 2027, $2, 'judging', $3::jsonb, true)`,
+    params: [eventId, PRACTICE_TITLE, JSON.stringify(DEFAULT_RUBRIC)],
+  });
   s.push(...insertMany('event_judge', ['event_id', 'account_id'], judgeIds.map((j) => [eventId, j])));
 
   const adviserIds = ADVISERS.map(() => id('adv'));
   s.push(
     ...insertMany(
       'adviser',
-      ['id', 'event_id', 'name', 'name_key', 'email', 'link_code'],
-      ADVISERS.map((n, i) => [adviserIds[i], eventId, n, nameKey(n), `adviser${i + 1}@tambiz.demo`, ADVISER_CODES[i]]),
+      ['id', 'event_id', 'name', 'name_key', 'email'],
+      ADVISERS.map(([n, email], i) => [adviserIds[i], eventId, n, nameKey(n), email]),
     ),
   );
 
-  // Class roll: 6 students per group, plus 3 not yet in any group so the roster check has something to show.
-  const students: { id: string; section: string; group: number }[] = [];
+  // 5 to 7 students per group. Groups draw from neighbouring sections, and two students have no section, which is optional.
+  const students: { id: string; group: number }[] = [];
   const studentRows: unknown[][] = [];
   let n = 0;
-  const addStudent = (section: string, group: number) => {
-    const sid = id('stu');
-    const surname = SURNAMES[(n * 7) % SURNAMES.length];
-    const first = FIRST[(n * 11) % FIRST.length];
-    const num = `2023${(10457 + n * 37).toString().padStart(6, '0')}`;
-    // The email must not contain the student number, which is what a student types to open their private link.
-    const email = `${first}.${surname}.${n + 1}@tambiz.demo`.toLowerCase().replace(/\s+/g, '');
-    studentRows.push([sid, eventId, num, email, surname, first, MIDDLE[n % MIDDLE.length], section, n % 2 ? 'M' : 'F', 'BSBA-MM', 'MGT1114']);
-    students.push({ id: sid, section, group });
-    n++;
-  };
-  GROUPS.forEach(([, section], gi) => {
+  GROUPS.forEach((_, gi) => {
     const size = 5 + (gi % 3);
-    for (let k = 0; k < size; k++) addStudent(section, gi);
+    for (let k = 0; k < size; k++) {
+      const sid = id('stu');
+      const surname = SURNAMES[(n * 7) % SURNAMES.length];
+      const first = FIRST[(n * 11) % FIRST.length];
+      const num = `2023${(10457 + n * 37).toString().padStart(6, '0')}`;
+      const email = `${first}.${surname}.${n + 1}@tambiz.demo`.toLowerCase().replace(/\s+/g, '');
+      const section = n === 3 || n === 20 ? '' : `Sec - ${((gi + k) % 12) + 1}`;
+      studentRows.push([sid, eventId, num, email, surname, first, MIDDLE[n % MIDDLE.length], section]);
+      students.push({ id: sid, group: gi });
+      n++;
+    }
   });
-  addStudent('BA-3A', -1);
-  addStudent('BA-3C', -1);
-  addStudent('BA-3D', -1);
-  s.push(...insertMany('student', ['id', 'event_id', 'student_number', 'email', 'surname', 'first_name', 'middle_name', 'section', 'sex', 'program_code', 'course_code'], studentRows));
+  s.push(...insertMany('student', ['id', 'event_id', 'student_number', 'email', 'surname', 'first_name', 'middle_name', 'section'], studentRows));
 
   const groupIds = GROUPS.map(() => id('grp'));
   s.push(
     ...insertMany(
       'tgroup',
-      ['id', 'event_id', 'name', 'name_key', 'section', 'adviser_id'],
-      GROUPS.map(([name, section, adv], gi) => [groupIds[gi], eventId, name, nameKey(name), section, adviserIds[adv]]),
+      ['id', 'event_id', 'name', 'name_key', 'adviser_id'],
+      GROUPS.map(([name, adv], gi) => [groupIds[gi], eventId, name, nameKey(name), adviserIds[adv]]),
     ),
   );
-  s.push(...insertMany('group_member', ['event_id', 'group_id', 'student_id'], students.filter((x) => x.group >= 0).map((x) => [eventId, groupIds[x.group], x.id])));
+  s.push(...insertMany('group_member', ['event_id', 'group_id', 'student_id'], students.map((x) => [eventId, groupIds[x.group], x.id])));
 
   const sheetRows: unknown[][] = [];
   const valueRows: unknown[][] = [];
@@ -177,7 +184,7 @@ export async function seedIfEmpty(db: Db) {
     for (const [gi, done] of targets) {
       const sheetId = id('sht');
       sheetRows.push([sheetId, eventId, groupIds[gi], half, judgeIds[ji], done ? 'complete' : 'in_progress', done ? new Date().toISOString() : null]);
-      const q = GROUPS[gi][3] + (ji - 1) * 0.02;
+      const q = GROUPS[gi][2] + (ji - 1) * 0.02;
       const crits = criteriaOf(DEFAULT_RUBRIC, half);
       crits.forEach((c, ci) => {
         if (!done && ci >= Math.floor(crits.length * 0.55)) return;

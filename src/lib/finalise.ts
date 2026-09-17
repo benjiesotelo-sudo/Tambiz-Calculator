@@ -1,11 +1,11 @@
-// What stands between an event and finalising (decisions 5 and 6). Pure, so the Progress page shows exactly
-// the checks that the finalise action enforces.
+// What stands between an event and closing it (decisions 5 and 6). Pure, so the Close screen shows exactly the checks
+// that the close action enforces.
 //
 // Blocking: a group without a completed sheet in each half, or with a criterion nobody scored, unless the coordinator
-// accepted it with a reason; a student on the roll in no group and not left out with a reason; a group member whose
-// member scores are incomplete and who is not marked absent.
-// Not blocking, but shown: a half with only one completed sheet, sheets still in progress (which count for nothing), accepted groups, absent
-// members and students left out.
+// accepted it with a reason; a group member whose individual scores are incomplete and who is not marked absent.
+// Not blocking, but shown: a half with only one completed sheet, sheets still in progress (which count for nothing),
+// accepted groups and absent members.
+// Every student is in a group (the workbook's Group column is required), so no student can be left out of one.
 
 import { HALVES, type Half } from './rubric';
 
@@ -14,11 +14,10 @@ export interface FinaliseInput {
   groups: { id: string; name: string; acceptReason: string | null; complete: boolean }[];
   sheets: { groupId: string; half: Half; status: 'in_progress' | 'complete'; judgeName: string; filled: number }[];
   members: { studentId: string; name: string; groupId: string; absent: boolean; memberComplete: boolean }[];
-  unplaced: { studentId: string; name: string; section: string; excludedReason: string | null }[];
 }
 
 export interface Check {
-  kind: 'group' | 'student' | 'member';
+  kind: 'group' | 'member';
   /** Group id for 'group', student id otherwise. */
   id: string;
   text: string;
@@ -27,19 +26,12 @@ export interface Check {
 export interface FinaliseChecks {
   blockers: Check[];
   warnings: Check[];
-  /** Plain facts the coordinator has already decided: accepted groups, absences, students left out. */
+  /** Plain facts the coordinator has already decided: accepted groups and absences. */
   decided: Check[];
 }
 
 /** "1 item needs" / "3 items need". */
 export const itemsNeedYou = (n: number) => `${n} item${n === 1 ? ' needs' : 's need'}`;
-
-/** Why results cannot be released while the finalise checks have blockers (something undone after judging closed), or null. */
-export function releaseRefusal(checks: FinaliseChecks): string | null {
-  const n = checks.blockers.length;
-  if (!n) return null;
-  return `Results cannot be released yet: ${itemsNeedYou(n)} you first. They are listed under Close judging on the Progress tab.`;
-}
 
 export function finaliseChecks(input: FinaliseInput): FinaliseChecks {
   const blockers: Check[] = [];
@@ -69,16 +61,11 @@ export function finaliseChecks(input: FinaliseInput): FinaliseChecks {
     else blockers.push({ kind: 'group', id: g.id, text: `${label}: ${why}.` });
   }
 
-  for (const s of input.unplaced) {
-    if (s.excludedReason) decided.push({ kind: 'student', id: s.studentId, text: `${s.name} (${s.section}) is left out of every group. Your reason: ${s.excludedReason}` });
-    else blockers.push({ kind: 'student', id: s.studentId, text: `${s.name} (${s.section}) is on the roll but in no group.` });
-  }
-
   for (const m of input.members) {
     const group = groupById.get(m.groupId);
     const where = group ? ` (${group.name})` : '';
-    if (m.absent) decided.push({ kind: 'member', id: m.studentId, text: `${m.name}${where} is marked absent from the defense. Their grade is left blank for you to enter.` });
-    else if (!m.memberComplete) blockers.push({ kind: 'member', id: m.studentId, text: `${m.name}${where} has incomplete member scores.` });
+    if (m.absent) decided.push({ kind: 'member', id: m.studentId, text: `${m.name}${where} is marked absent from the defense, so their individual scores count as zero.` });
+    else if (!m.memberComplete) blockers.push({ kind: 'member', id: m.studentId, text: `${m.name}${where} has incomplete individual scores.` });
   }
 
   return { blockers, warnings, decided };

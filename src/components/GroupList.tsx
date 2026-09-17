@@ -8,7 +8,6 @@ import { readDraft } from './draft';
 export interface JudgeGroup {
   id: string;
   name: string;
-  section: string;
   adviser: string;
   defense: { filled: number; total: number; complete: boolean };
   booth: { filled: number; total: number; complete: boolean };
@@ -70,7 +69,7 @@ export function GroupList({ judgeId, groups }: { judgeId: string; groups: JudgeG
   const shown = rows.filter(
     (r) =>
       (filter === 'all' || r.cls === filter || (filter === 'part' && r.cls === 'err')) &&
-      (!needle || `${r.g.name} ${r.g.section} ${r.g.adviser}`.toLowerCase().includes(needle)),
+      (!needle || `${r.g.name} ${r.g.adviser}`.toLowerCase().includes(needle)),
   );
 
   return (
@@ -85,7 +84,7 @@ export function GroupList({ judgeId, groups }: { judgeId: string; groups: JudgeG
               </button>
             ))}
           </div>
-          <input className="search" type="search" placeholder="Search group, section or adviser" value={q} onChange={(e) => setQ(e.target.value)} autoComplete="off" aria-label="Search groups" />
+          <input className="search" type="search" placeholder="Search group or adviser" value={q} onChange={(e) => setQ(e.target.value)} autoComplete="off" aria-label="Search groups" />
           <div className="filters">
             {(
               [
@@ -109,7 +108,7 @@ export function GroupList({ judgeId, groups }: { judgeId: string; groups: JudgeG
               <span style={{ minWidth: 0 }}>
                 <span className="gname">{g.name}</span>
                 <span className="gmeta">
-                  {g.section} · {g.adviser}
+                  {g.adviser}
                   {unsent ? ` · ${unsent} not sent yet` : ''}
                 </span>
               </span>

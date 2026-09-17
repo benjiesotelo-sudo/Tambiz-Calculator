@@ -20,11 +20,12 @@ const twoDecimals = (row: ExcelJS.Row, cols: number[]) =>
   });
 const judged = (g: { complete: boolean; accepted: boolean }) => (g.complete ? 'Complete' : g.accepted ? 'Finalised incomplete' : 'Incomplete');
 const gradeNote = (g: GradeRow) =>
-  g.absent
-    ? 'Absent from the defense: grade to be entered by the coordinator'
-    : g.letter
-      ? ''
-      : [!g.memberComplete ? 'member scores incomplete' : '', !g.groupReady ? 'group not fully judged' : ''].filter(Boolean).join('; ').replace(/^./, (c) => `No grade: ${c}`);
+  [
+    g.absent ? 'Absent from the defense: individual scores nobody gave count as zero' : '',
+    g.letter ? '' : [!g.memberComplete ? 'individual scores incomplete' : '', !g.groupReady ? 'group not fully judged' : ''].filter(Boolean).join('; ').replace(/^./, (c) => `No grade: ${c}`),
+  ]
+    .filter(Boolean)
+    .join('. ');
 
 function header(ws: ExcelJS.Worksheet, row: ExcelJS.Row, fill = GREEN, font = 'FFFFFFFF') {
   row.eachCell((c) => {
@@ -157,7 +158,8 @@ export async function buildWorkbook(report: EventReport): Promise<Buffer> {
     }
   }
 
-  // For Encoding: the official grade sheet, sorted by section.
+  // For Encoding: the official grade sheet, sorted by section. Section is optional, so students without one come first,
+  // and the sheet says so, since it cannot be organised by section for them.
   {
     const ws = wb.addWorksheet('For Encoding');
     const lines = ['FAR EASTERN UNIVERSITY', 'Institute of Accounts, Business and Finance', 'Business Administration Department', `MGT1114 Business Plan 2 · ${event.title}`, 'OFFICIAL GRADE SHEET'];
@@ -175,13 +177,12 @@ export async function buildWorkbook(report: EventReport): Promise<Buffer> {
       (a, b) => a.student.section.localeCompare(b.student.section) || a.student.surname.localeCompare(b.student.surname) || a.student.first_name.localeCompare(b.student.first_name),
     );
     for (const g of sorted) {
-      // An absent member's grade is left blank, with a note, for the coordinator to enter (decision 6).
       const row = ws.addRow([
         fullName(g.student),
         rollName(g.student),
         g.student.student_number,
         g.student.section,
-        g.absent ? '' : n2(g.total),
+        n2(g.total),
         n2(g.overall),
         g.rounded ?? '',
         g.letter ?? '',
@@ -189,11 +190,11 @@ export async function buildWorkbook(report: EventReport): Promise<Buffer> {
       ]);
       twoDecimals(row, [5, 6]);
     }
-    // Students deliberately left out of every group are listed too, so nobody disappears from the grade sheet.
-    for (const st of report.excluded) {
-      ws.addRow([fullName(st), rollName(st), st.student_number, st.section, '', '', '', '', `Not in any group: ${st.excluded_reason}`]);
-    }
     ws.addRow([]);
+    const noSection = grades.filter((g) => !g.student.section.trim()).length;
+    if (noSection) {
+      ws.addRow([`${noSection} student${noSection === 1 ? ' has' : 's have'} no section in the app, so this sheet cannot be organised by section for them; they are listed first.`]);
+    }
     ws.addRow([`Final Grade is (Total Score + Group Overall %) ÷ 2, rounded up to a whole number. Generated ${new Date().toLocaleString('en-PH', { timeZone: 'Asia/Manila' })}.`]);
   }
 

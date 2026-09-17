@@ -1,6 +1,6 @@
-// Decisions 5 and 6: what blocks finalising, and what is only a warning.
+// Decisions 5 and 6: what blocks closing the event, and what is only a warning.
 import { describe, expect, it } from 'vitest';
-import { finaliseChecks, releaseRefusal, type FinaliseInput } from '@/lib/finalise';
+import { finaliseChecks, type FinaliseInput } from '@/lib/finalise';
 
 const base = (): FinaliseInput => ({
   halfLabel: { defense: 'Defense', booth: 'Booth' },
@@ -12,7 +12,6 @@ const base = (): FinaliseInput => ({
     { groupId: 'g1', half: 'booth', status: 'complete', judgeName: 'A', filled: 18 },
   ],
   members: [{ studentId: 's1', name: 'Andrea Dela Cruz', groupId: 'g1', absent: false, memberComplete: true }],
-  unplaced: [],
 });
 
 describe('finalising', () => {
@@ -57,33 +56,13 @@ describe('finalising', () => {
     expect(finaliseChecks(x).blockers.map((b) => b.text)).toEqual(['Kape Kultura: no completed Booth sheet.']);
   });
 
-  it('a student in no group blocks until placed or left out with a reason', () => {
-    const x = base();
-    x.unplaced = [{ studentId: 's9', name: 'Miguel Santos', section: 'BA-3A', excludedReason: null }];
-    expect(finaliseChecks(x).blockers).toHaveLength(1);
-    x.unplaced[0].excludedReason = 'Dropped the course';
-    expect(finaliseChecks(x).blockers).toHaveLength(0);
-  });
-
-  it('release is refused while anything blocks, with the count and where to find the items, and allowed once settled', () => {
-    const x = base();
-    expect(releaseRefusal(finaliseChecks(x))).toBeNull();
-    x.groups[0].complete = false;
-    expect(releaseRefusal(finaliseChecks(x))).toBe('Results cannot be released yet: 1 item needs you first. They are listed under Close judging on the Progress tab.');
-    x.unplaced = [{ studentId: 's9', name: 'Miguel Santos', section: 'BA-3A', excludedReason: null }];
-    expect(releaseRefusal(finaliseChecks(x))).toMatch(/^Results cannot be released yet: 2 items need you first\./);
-    x.groups[0].acceptReason = 'Did not run a booth';
-    x.unplaced[0].excludedReason = 'Dropped the course';
-    expect(releaseRefusal(finaliseChecks(x))).toBeNull();
-  });
-
-  it('a member with incomplete member scores blocks until scored or marked absent', () => {
+  it('a member with incomplete individual scores blocks until scored or marked absent', () => {
     const x = base();
     x.members[0].memberComplete = false;
-    expect(finaliseChecks(x).blockers[0].text).toBe('Andrea Dela Cruz (Kape Kultura) has incomplete member scores.');
+    expect(finaliseChecks(x).blockers[0].text).toBe('Andrea Dela Cruz (Kape Kultura) has incomplete individual scores.');
     x.members[0].absent = true;
     const c = finaliseChecks(x);
     expect(c.blockers).toEqual([]);
-    expect(c.decided[0].text).toMatch(/marked absent/);
+    expect(c.decided[0].text).toMatch(/marked absent from the defense, so their individual scores count as zero/);
   });
 });

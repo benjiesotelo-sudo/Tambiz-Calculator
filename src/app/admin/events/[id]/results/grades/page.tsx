@@ -1,12 +1,12 @@
 import { notFound } from 'next/navigation';
 import { AppBar } from '@/components/AppBar';
 import { DataGrid } from '@/components/DataGrid';
-import { EventHeader } from '@/components/EventNav';
+import { EventHeader, ResultsViews } from '@/components/EventNav';
 import { requireAdmin } from '@/lib/auth';
 import type { GridColumn } from '@/lib/grid';
 import { eventReport, getEvent } from '@/lib/repo';
 import { gradeGridRow, PRESENCE } from '@/lib/tables';
-import { saveGradesTable } from '../../../table-actions';
+import { saveGradesTable } from '../../../../table-actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,7 +20,8 @@ export default async function GradesPage({ params }: { params: Promise<{ id: str
     (a, b) => a.student.section.localeCompare(b.student.section) || a.student.surname.localeCompare(b.student.surname) || a.student.first_name.localeCompare(b.student.first_name),
   );
   const bands = event.rubric.grades;
-  const noGrade = grades.filter((g) => !g.letter && !g.absent).length;
+  const noGrade = grades.filter((g) => !g.letter).length;
+  const noSection = grades.filter((g) => !g.student.section.trim()).length;
 
   const columns: GridColumn[] = [
     { key: 'student', label: 'Student No.', width: '7.6rem' },
@@ -42,21 +43,24 @@ export default async function GradesPage({ params }: { params: Promise<{ id: str
     <>
       <AppBar subtitle="Coordinator" account={acc} home="/admin" />
       <main className="page wide">
-        <EventHeader event={event} tab="grades" title="Individual grades" />
+        <EventHeader event={event} tab="results" title="Results" />
+        <ResultsViews eventId={id} view="grades" />
         <p className="lead">
           Final grade = (member total + group overall %) ÷ 2, worked out from the two-decimal numbers shown, rounded up to a whole number, then given its letter. Member total adds
-          up the average Presentation /20, Communication /40 and Q&amp;A /40 across the defense judges who submitted a sheet.
+          up the average Presentation /20, Communication /40 and Q&amp;A /40 across the defense judges who submitted a sheet. A member marked absent from the defense has zero
+          for every one of these nobody scored, and a grade worked out as usual; to change it, correct their individual scores on their group’s scores page (press the group’s
+          name).
         </p>
         <p className="sub">
           Bands: {bands.map((b) => `${b.min}–${b.max} ${b.letter} (${b.qualityPoints})`).join(' · ')}. A missing score is never counted as zero: a student gets a grade only once
-          their member scores and their group are complete.{' '}
+          their individual scores and their group are complete.{' '}
           {noGrade ? `${noGrade} student${noGrade === 1 ? ' has' : 's have'} no grade yet: choose No grade yet under Status, and select a Status cell to see why.` : ''}
         </p>
-        <div className="actions" style={{ marginTop: 0 }}>
-          <a className="btn small secondary" href={`/api/admin/events/${id}/export`}>
-            Download grade sheet (Excel)
-          </a>
-        </div>
+        {noSection ? (
+          <div className="notice warn">
+            {noSection} student{noSection === 1 ? ' has' : 's have'} no section, so the For Encoding grade sheet in the workbook cannot be organised by section for them. Add sections on the Data tab if it needs them.
+          </div>
+        ) : null}
         <DataGrid
           label="Individual grades"
           columns={columns}

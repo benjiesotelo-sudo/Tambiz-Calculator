@@ -39,7 +39,6 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
           </button>
         </form>
         <p className="note">Judges: use the email and password the coordinator gave you.</p>
-        <p className="note">Students and advisers: open the personal link in your email.</p>
       </main>
     </>
   );

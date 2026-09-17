@@ -1,38 +1,11 @@
-// Decisions 8 and 10: private link rules, the adviser ranking, and keeping previews off the real database.
+// The adviser ranking, what an adviser's email may say about placing, and keeping previews off the real database.
 import { describe, expect, it } from 'vitest';
 import { databaseUrl } from '@/lib/db';
-import { checkMatches, emailGivesAway, linkState, makeAdviserCode, normaliseCheck, ordinal } from '@/lib/link-rules';
+import { ordinal } from '@/lib/judge-profiles';
 import { adviserRanking, computeResults, topTenPlacings, type GroupResult, type ScoredGroup } from '@/lib/scoring';
 import { DEFAULT_RUBRIC } from '@/lib/rubric';
 
-describe('private links', () => {
-  it('the check ignores spaces, dashes and letter case', () => {
-    expect(checkMatches(' 2023-010457 ', '2023010457')).toBe(true);
-    expect(checkMatches('k7q 4mp', 'K7Q-4MP')).toBe(true);
-    expect(checkMatches('2023010458', '2023010457')).toBe(false);
-    expect(checkMatches('', '')).toBe(false);
-  });
-
-  it('a link is closed when withdrawn, locked or past its expiry, and open otherwise', () => {
-    const now = new Date('2027-05-01T00:00:00Z');
-    const base = { revoked_at: null, locked_at: null, expires_at: new Date('2027-05-31T00:00:00Z') };
-    expect(linkState(base, now)).toBe('ok');
-    expect(linkState({ ...base, expires_at: null }, now)).toBe('ok');
-    expect(linkState({ ...base, expires_at: new Date('2027-04-30T00:00:00Z') }, now)).toBe('expired');
-    expect(linkState({ ...base, locked_at: now }, now)).toBe('locked');
-    expect(linkState({ ...base, revoked_at: now, locked_at: now }, now)).toBe('revoked');
-  });
-
-  it('warns when an email address contains the check value', () => {
-    expect(emailGivesAway('2023010457@tambiz.demo', '2023010457')).toBe(true);
-    expect(emailGivesAway('andrea.delacruz@feu.edu.ph', '2023010457')).toBe(false);
-  });
-
-  it('adviser codes are six readable characters', () => {
-    for (let i = 0; i < 50; i++) expect(makeAdviserCode()).toMatch(/^[A-HJKMNP-Z2-9]{3}-[A-HJKMNP-Z2-9]{3}$/);
-    expect(normaliseCheck('K7Q-4MP')).toBe('K7Q4MP');
-  });
-
+describe('ordinals on the judge profile page', () => {
   it('ordinals', () => expect([1, 2, 3, 4, 11, 12, 13, 21, 22, 101].map(ordinal)).toEqual(['1st', '2nd', '3rd', '4th', '11th', '12th', '13th', '21st', '22nd', '101st']));
 });
 
@@ -74,7 +47,7 @@ describe('adviser ranking (decision 10)', () => {
   });
 });
 
-describe('what a student or adviser page says about placing (decision 9, 14 September 2026)', () => {
+describe('what an adviser email says about placing (decision 9, 14 September 2026)', () => {
   const { halves } = DEFAULT_RUBRIC;
   /** Every criterion of every category scored at the same fraction of its maximum. */
   const sheet = (half: 'defense' | 'booth', f: number) => Object.fromEntries(halves[half].categories.map((c) => [c.key, c.maxes.map((m) => m * f)]));

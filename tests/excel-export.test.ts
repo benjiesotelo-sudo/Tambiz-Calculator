@@ -14,7 +14,7 @@ function report(overall: number): EventReport {
   const event = { id: 'e1', year: 2027, title: 'Tambiz 2027', status: 'finalised' as const, rubric: DEFAULT_RUBRIC, created_at: new Date() };
   return {
     event,
-    groups: [{ id: 'g1', event_id: 'e1', name: 'Kape Kultura', section: 'BA-3A', adviser_id: null, adviser_name: null, member_count: 0 }],
+    groups: [{ id: 'g1', event_id: 'e1', name: 'Kape Kultura', section: '', adviser_id: null, adviser_name: null, member_count: 0 }],
     results: { groups: [g], leaderboards: [] },
     resultById: new Map([['g1', g]]),
     grades: [],
@@ -22,7 +22,6 @@ function report(overall: number): EventReport {
     sheetValues: new Map(),
     filled: new Map(),
     corrections: new Map(),
-    excluded: [],
   } as unknown as EventReport;
 }
 

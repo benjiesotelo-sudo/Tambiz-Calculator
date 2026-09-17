@@ -13,8 +13,12 @@ export interface EventRow {
   status: 'setup' | 'judging' | 'finalised';
   rubric: Rubric;
   created_at: Date;
-  /** Results released to students and advisers; only possible once finalised. Nothing can be corrected after. */
+  /** When the event was closed; null while it is open. */
+  finalised_at?: Date | null;
+  /** When the email file was first downloaded; only possible once closed. Nothing can change after, and closing cannot be undone. */
   released_at?: Date | null;
+  /** A practice event, shown with a banner so nobody scores a real group by mistake. */
+  practice?: boolean;
 }
 
 export interface GroupRow {
@@ -39,8 +43,6 @@ export interface StudentRow {
   section: string;
   group_id?: string | null;
   group_name?: string | null;
-  /** Set when the coordinator left this student out of every group, with this reason (decision 6). */
-  excluded_reason?: string | null;
   /** Only from groupMembers: marked absent from the defense. */
   absent_at?: Date | null;
 }
@@ -86,20 +88,6 @@ export async function getGroup(eventId: string, groupId: string) {
   );
 }
 
-/** Every recorded change to a group's name, section or adviser, newest first, with who made it and when. */
-export async function groupDetailChanges(eventId: string, groupId: string) {
-  const rows = await query<{ created_at: Date; who: string | null; detail: { changes: string[]; released?: boolean; file?: string } }>(
-    `SELECT c.created_at, a.display_name AS who, c.detail FROM change_log c LEFT JOIN account a ON a.id = c.account_id
-     WHERE c.event_id = $1 AND c.action = 'group.update' AND c.detail->>'groupId' = $2 AND jsonb_array_length(coalesce(c.detail->'changes', '[]'::jsonb)) > 0
-     ORDER BY c.created_at DESC`,
-    [eventId, groupId],
-  );
-  // Groups once had codes, and an old entry may record a code change. Codes are no longer shown, so those lines are left out.
-  return rows
-    .map((r) => ({ ...r, detail: { ...r.detail, changes: r.detail.changes.filter((line) => !line.startsWith('Code ')) } }))
-    .filter((r) => r.detail.changes.length);
-}
-
 export async function groupMembers(groupId: string) {
   return query<StudentRow>(
     `SELECT s.*, m.absent_at FROM group_member m JOIN student s ON s.id = m.student_id WHERE m.group_id = $1 ORDER BY s.surname, s.first_name`,
@@ -107,17 +95,8 @@ export async function groupMembers(groupId: string) {
   );
 }
 
-export async function listStudents(eventId: string) {
-  return query<StudentRow>(
-    `SELECT s.*, g.id AS group_id, g.name AS group_name FROM student s
-     LEFT JOIN group_member m ON m.student_id = s.id LEFT JOIN tgroup g ON g.id = m.group_id
-     WHERE s.event_id = $1 ORDER BY s.section, s.surname, s.first_name`,
-    [eventId],
-  );
-}
-
 export async function listAdvisers(eventId: string) {
-  return query<{ id: string; name: string; email: string; link_code: string; group_count: number }>(
+  return query<{ id: string; name: string; email: string; group_count: number }>(
     `SELECT a.*, (SELECT count(*)::int FROM tgroup g WHERE g.adviser_id = a.id) AS group_count FROM adviser a WHERE a.event_id = $1 ORDER BY a.name`,
     [eventId],
   );
@@ -130,17 +109,24 @@ export async function eventJudges(eventId: string) {
   );
 }
 
-/** The department's standing list of judges who are not yet judging this event, with how many events each has judged. */
-export async function departmentJudges(eventId: string) {
-  return query<{ id: string; email: string; display_name: string; events: number }>(
-    `SELECT a.id, a.email, a.display_name, (SELECT count(*)::int FROM event_judge j WHERE j.account_id = a.id) AS events
-     FROM account a WHERE a.role = 'judge' AND NOT EXISTS (SELECT 1 FROM event_judge j WHERE j.account_id = a.id AND j.event_id = $1)
-     ORDER BY a.display_name`,
-    [eventId],
-  );
+/** Every student with their group and its adviser, for the Data table and "Download current data". */
+export interface DataRow extends StudentRow {
+  group_id: string | null;
+  group_name: string | null;
+  adviser_id: string | null;
+  adviser_name: string | null;
+  adviser_email: string | null;
 }
 
-export const fullName =(s: Pick<StudentRow, 'first_name' | 'surname'>) => `${s.first_name} ${s.surname}`;
+export const DATA_SELECT = `SELECT s.*, g.id AS group_id, g.name AS group_name, a.id AS adviser_id, a.name AS adviser_name, a.email AS adviser_email
+  FROM student s LEFT JOIN group_member m ON m.student_id = s.id LEFT JOIN tgroup g ON g.id = m.group_id LEFT JOIN adviser a ON a.id = g.adviser_id`;
+
+export async function dataRows(eventId: string) {
+  const rows = await query<DataRow>(`${DATA_SELECT} WHERE s.event_id = $1`, [eventId]);
+  return rows.sort((a, b) => byGroupName(a.group_name ?? '', b.group_name ?? '') || a.surname.localeCompare(b.surname) || a.first_name.localeCompare(b.first_name));
+}
+
+export const fullName = (s: Pick<StudentRow, 'first_name' | 'surname'>) => `${s.first_name} ${s.surname}`;
 export const rollName = (s: Pick<StudentRow, 'first_name' | 'surname' | 'middle_name'>) =>
   `${s.surname.toUpperCase()}, ${s.first_name}${s.middle_name ? ' ' + s.middle_name : ''}`;
 
@@ -242,7 +228,7 @@ export async function loadEventScores(event: EventRow) {
 export interface GradeRow {
   student: StudentRow;
   group: GroupRow;
-  /** Marked absent from the defense: no grade from the app; the coordinator enters it (decision 6). */
+  /** Marked absent from the defense: individual scores nobody entered count as zero (scoring.ts rule 6). */
   absent: boolean;
   perJudge: { judge: string; set: MemberSet }[];
   total: number | null;
@@ -271,20 +257,13 @@ export interface EventReport {
   /** Criteria filled, for every sheet, submitted or not. */
   filled: Map<string, number>;
   corrections: Map<string, Correction[]>;
-  /** Students on the roll deliberately left out of every group, with the coordinator's reason. */
-  excluded: StudentRow[];
 }
 
 /** Results, leaderboards and individual grades for a whole event, computed live from the stored scores. */
 export async function eventReport(event: EventRow): Promise<EventReport> {
-  const [groups, scores, excluded, memberRows] = await Promise.all([
+  const [groups, scores, memberRows] = await Promise.all([
     listGroups(event.id),
     loadEventScores(event),
-    query<StudentRow>(
-      `SELECT s.* FROM student s WHERE s.event_id = $1 AND s.excluded_reason IS NOT NULL AND NOT EXISTS (SELECT 1 FROM group_member m WHERE m.student_id = s.id)
-       ORDER BY s.section, s.surname, s.first_name`,
-      [event.id],
-    ),
     query<StudentRow & { group_id: string; absent_at: Date | null }>(
       `SELECT s.*, m.group_id, m.absent_at FROM group_member m JOIN student s ON s.id = m.student_id WHERE m.event_id = $1 ORDER BY s.surname, s.first_name`,
       [event.id],
@@ -310,14 +289,14 @@ export async function eventReport(event: EventRow): Promise<EventReport> {
       .map(([sheetId, set]) => ({ sheet: sheetById.get(sheetId), set }))
       .filter((x) => x.sheet && x.sheet.group_id === st.group_id && x.sheet.half === 'defense')
       .map((x) => ({ judge: x.sheet!.judge_name, set: x.set }));
-    const member = memberScore(perJudge.map((p) => p.set), event.rubric.memberFields);
+    const absent = !!st.absent_at;
+    // A member absent from the defense has zero for every field nobody scored (scoring.ts rule 6).
+    const member = memberScore(perJudge.map((p) => p.set), event.rubric.memberFields, absent);
     const result = resultById.get(group.id);
     const overall = result?.overall ?? null;
     const groupReady = !!result && (result.complete || result.accepted);
-    const absent = !!st.absent_at;
     // No grade from incomplete scores: a missing member field or an unjudged part of the group is never a zero.
-    // A member absent from the defense gets no grade from the app at all; the coordinator enters it.
-    const final = absent ? null : finalGrade(member.complete ? member.total : null, groupReady ? overall : null);
+    const final = finalGrade(member.complete ? member.total : null, groupReady ? overall : null);
     const lg = letterGrade(final, event.rubric.grades);
     return {
       student: st,
@@ -346,20 +325,17 @@ export async function eventReport(event: EventRow): Promise<EventReport> {
     sheetValues: scores.sheetValues,
     filled: scores.filled,
     corrections: scores.corrections,
-    excluded,
   };
 }
 
-/** The finalise checklist (decisions 5 and 6) for an event's current report. */
-export async function eventFinaliseChecks(report: EventReport) {
+/** The checklist for closing the event (decisions 5 and 6) from its current report. */
+export function eventFinaliseChecks(report: EventReport) {
   const { event } = report;
-  const students = await listStudents(event.id);
   return finaliseChecks({
     halfLabel: { defense: event.rubric.halves.defense.label, booth: event.rubric.halves.booth.label },
     groups: report.groups.map((g) => ({ id: g.id, name: g.name, acceptReason: g.accept_reason ?? null, complete: report.resultById.get(g.id)?.complete ?? false })),
     sheets: [...report.sheets, ...report.openSheets].map((s) => ({ groupId: s.group_id, half: s.half, status: s.status, judgeName: s.judge_name, filled: report.filled.get(s.id) ?? 0 })),
     members: report.grades.map((g) => ({ studentId: g.student.id, name: fullName(g.student), groupId: g.group.id, absent: g.absent, memberComplete: g.memberComplete })),
-    unplaced: students.filter((s) => !s.group_id).map((s) => ({ studentId: s.id, name: fullName(s), section: s.section, excludedReason: s.excluded_reason ?? null })),
   });
 }
 
