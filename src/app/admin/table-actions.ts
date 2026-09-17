@@ -116,7 +116,12 @@ export async function saveDataTable(eventId: string, changes: CellChange[]): Pro
     if ('adviser' in patch || !before) {
       const typed = (patch.adviser ?? '').replace(/\s+/g, ' ').trim();
       if (closed && 'adviser' in patch) errors.adviser = LOCKED_CLOSED;
-      else if (!typed) errors.adviser = 'Every group needs an adviser.';
+      else if (!typed) {
+        // A new student joining an existing group takes that group's adviser.
+        const groupAdviser = !before && group && !newGroup ? advisers.find((a) => a.id === group!.adviser_id) : undefined;
+        if (groupAdviser) adviser = groupAdviser;
+        else errors.adviser = 'Every group needs an adviser.';
+      }
       else if (!nameKey(typed)) errors.adviser = 'An adviser’s name needs at least one letter or number.';
       else {
         adviser = adviserFor(typed);

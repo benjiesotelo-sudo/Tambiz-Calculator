@@ -13,6 +13,8 @@ The whole job, in one line: **you upload one workbook, the judges score on their
 
 **Try it on the practice event first.** The app comes with an event called **PRACTICE · Tambiz 2027**. Every name, group, score and email in it is invented, and every screen of it says **Practice event** in a yellow bar. Try every part of this guide on it, then create the real event. Never score a real group in the practice event.
 
+If the app was set up before this version, its old sample event (called **Tambiz 2027**, with no yellow bar) is still there. On the **Events** page it shows **Sample data** and **Replace with fresh practice data**. Press it once, tick the box, and the old sample event, with its invented students, groups and scores, is replaced by the practice event. It is offered only for the sample event, never for an event you created.
+
 **Words used here**
 
 - **Event**: one year's Tambiz. Everything else belongs to an event.
@@ -103,6 +105,7 @@ Rules:
 - **Every row of one group must name the same adviser.** A group has one adviser; an adviser can have many groups. If the rows of a group name different advisers, **that whole group is not imported**, and the message names the group and which rows say what, for example "Group PINILI was not imported: its rows name different advisers (rows 4 and 5 say REYES, ANA; row 9 says CRUZ, BEN)". Correct the rows and upload again.
 - The same goes for **Adviser Email**: every row of a group that has one must give the same email. A row with it empty is fine.
 - **Why the Adviser Email column is there:** each adviser gets an email with their groups' results, and this column is the only place the app can learn the address. An adviser without one gets no email; the Close the event tab lists them before you send anything.
+- **To remove an adviser's email address**, clear it in the Data table. Emptying the cell in the workbook and uploading it will not remove it.
 - Group names are compared **ignoring spacing, punctuation and capitals**, so `Payong Palay` and `PAYONG PALAY` are the same group. Adviser names are compared the same way.
 - A student number that appears twice: the later row is used, and the message says so.
 

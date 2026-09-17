@@ -48,7 +48,7 @@ export const STUDENT_COLUMNS: ColumnSpec[] = [
     aliases: ['adviseremail', 'advisoremail'],
     required: false,
     example: 'maria.santos@example.edu.ph',
-    note: 'Where the adviser’s results email goes. An adviser with no email gets no email.',
+    note: 'Where the adviser’s results email goes. An adviser with no email gets no email. To remove an adviser’s email, clear it in the Data table; emptying the cell here will not do it.',
   },
 ];
 

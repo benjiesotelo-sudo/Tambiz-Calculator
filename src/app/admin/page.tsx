@@ -2,8 +2,10 @@ import Link from 'next/link';
 import { AppBar, Notice } from '@/components/AppBar';
 import { statusLabel } from '@/components/EventNav';
 import { requireAdmin } from '@/lib/auth';
+import { query } from '@/lib/db';
 import { listEvents } from '@/lib/repo';
-import { createEvent } from './actions';
+import { isSeedEvent, PRACTICE_TITLE, sampleEventSize, type EventSize } from '@/lib/seed';
+import { createEvent, replaceSampleData } from './actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -11,6 +13,10 @@ export default async function AdminHome({ searchParams }: { searchParams: Promis
   const acc = await requireAdmin();
   const sp = await searchParams;
   const events = await listEvents();
+  // An event made from the sample data of an older version, not yet marked practice, can be replaced with the practice event.
+  const replaceable = (await Promise.all(events.filter((e) => isSeedEvent(e.id) && !e.practice).map((e) => sampleEventSize({ query }, e.id)))).filter(
+    (x): x is EventSize => x !== null,
+  );
   const nextYear = (events[0]?.year ?? new Date().getFullYear()) + 1;
   return (
     <>
@@ -34,6 +40,7 @@ export default async function AdminHome({ searchParams }: { searchParams: Promis
                 {e.practice ? <span className="pill part">Practice</span> : null}
                 <span className={`pill ${e.status === 'finalised' ? 'done' : 'none'}`}>{statusLabel(e)}</span>
               </Link>
+              {replaceable.some((r) => r.id === e.id) ? <ReplaceSample size={replaceable.find((r) => r.id === e.id)!} /> : null}
             </li>
           ))}
           {!events.length ? <li className="sub">No events yet. Create the first one below.</li> : null}
@@ -58,5 +65,29 @@ export default async function AdminHome({ searchParams }: { searchParams: Promis
         </form>
       </main>
     </>
+  );
+}
+
+function ReplaceSample({ size }: { size: EventSize }) {
+  const n = (count: number, one: string) => `${count} ${one}${count === 1 ? '' : 's'}`;
+  return (
+    <details className="inline-form" style={{ margin: '4px 0 10px' }}>
+      <summary>
+        <span className="pill none">Sample data</span> Replace with fresh practice data…
+      </summary>
+      <form action={replaceSampleData} className="form">
+        <input type="hidden" name="eventId" value={size.id} />
+        <div className="notice warn" style={{ marginTop: 0 }}>
+          This removes <b>{size.title}</b> and everything in it: {n(size.students, 'student')}, {n(size.groups, 'group')} and {n(size.sheets, 'score sheet')} from the judges. In its
+          place comes the practice event, {PRACTICE_TITLE}, with invented data. Events you created are never touched, and no password changes.
+        </div>
+        <label style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+          <input type="checkbox" name="confirm" value="yes" style={{ width: 22, height: 22, flex: '0 0 auto' }} /> Remove {size.title} and its scores
+        </label>
+        <button className="btn small danger" type="submit">
+          Replace with fresh practice data
+        </button>
+      </form>
+    </details>
   );
 }

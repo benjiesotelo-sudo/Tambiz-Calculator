@@ -179,6 +179,28 @@ describe('the Data table: every student with their group and adviser', () => {
     ]);
     expect(refused.rows[0].errors?.adviser).toMatch(/^PINILI’s adviser is .+\. To change it for the whole group, change Adviser on any of its rows\.$/);
     expect(await one(`SELECT count(*)::int AS n FROM student WHERE student_number = '2099000001'`)).toEqual({ n: 0 });
+
+    // With Adviser left blank, a new student joining an existing group takes its adviser; a new group still needs one.
+    const joined = await saveDataTable(event.id, [
+      { rowId: 'new:4', key: 'student', value: '2099000004' },
+      { rowId: 'new:4', key: 'surname', value: 'Reyes' },
+      { rowId: 'new:4', key: 'first', value: 'Ana' },
+      { rowId: 'new:4', key: 'email', value: 'ana.reyes@tambiz.test' },
+      { rowId: 'new:4', key: 'group', value: 'PINILI' },
+    ]);
+    const pinili = await groupNamed('PINILI');
+    expect(joined.rows[0].errors).toBeUndefined();
+    expect(joined.rows[0].row!.cells).toMatchObject({ group: 'PINILI', adviser: (await one<{ name: string }>('SELECT name FROM adviser WHERE id = $1', [pinili.adviser_id]))!.name });
+    expect((await removeStudentsTable(event.id, [joined.rows[0].row!.id])).rows[0].removed).toBe(true);
+    const lonely = await saveDataTable(event.id, [
+      { rowId: 'new:5', key: 'student', value: '2099000005' },
+      { rowId: 'new:5', key: 'surname', value: 'Reyes' },
+      { rowId: 'new:5', key: 'first', value: 'Ana' },
+      { rowId: 'new:5', key: 'email', value: 'ana.reyes@tambiz.test' },
+      { rowId: 'new:5', key: 'group', value: 'Walang Adviser' },
+    ]);
+    expect(lonely.rows[0].errors?.adviser).toBe('Every group needs an adviser.');
+    expect(await one(`SELECT count(*)::int AS n FROM tgroup WHERE event_id = $1 AND name = 'Walang Adviser'`, [event.id])).toEqual({ n: 0 });
   });
 
   it('adds a student with no section; a student number already in the app is refused', async () => {

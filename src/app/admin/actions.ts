@@ -4,13 +4,14 @@ import { refresh } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { requireAdmin } from '@/lib/auth';
 import { logStatement } from '@/lib/change-log';
-import { newId, one, query } from '@/lib/db';
+import { newId, one, query, transaction } from '@/lib/db';
 import { applyUpload, type UploadResult } from '@/lib/data-upload';
 import { ImportError, parseWorkbook } from '@/lib/data-workbook';
 import { itemsNeedYou } from '@/lib/finalise';
 import { LOCKED_SENT, sentLock } from '@/lib/locks';
 import { eventFinaliseChecks, eventReport, getEvent, listEvents } from '@/lib/repo';
 import { HALVES, rubricForNewEvent, withCriterionWording } from '@/lib/rubric';
+import { isSeedEvent, replaceSampleEvent } from '@/lib/seed';
 
 const s = (fd: FormData, k: string) => String(fd.get(k) ?? '').trim();
 
@@ -46,6 +47,17 @@ export async function createEvent(fd: FormData) {
   await query(`INSERT INTO event (id, year, title, rubric) VALUES ($1, $2, $3, $4::jsonb)`, [id, year, title, JSON.stringify(rubricForNewEvent(latest?.rubric))]);
   await log(id, acc.id, 'event.create', { year, title });
   back(`/admin/events/${id}/students`, { ok: `Created ${title}. Upload its workbook to begin.` });
+}
+
+/** Replaces an event made from the sample data (such as an older version's sample event) with a fresh practice event. */
+export async function replaceSampleData(fd: FormData) {
+  const acc = await requireAdmin();
+  const eventId = s(fd, 'eventId');
+  if (!isSeedEvent(eventId)) back('/admin', { error: 'Only an event made from the sample data can be replaced. Events you created are never replaced.' });
+  if (s(fd, 'confirm') !== 'yes') back('/admin', { error: 'Tick the box to confirm before replacing the sample data.' });
+  const done = await replaceSampleEvent({ query, transaction }, eventId, acc.id);
+  if (!done.ok) back('/admin', { error: done.message });
+  back('/admin', { ok: `Replaced the sample data with ${done.title}.` });
 }
 
 // ── closing the event ─────────────────────────────────────────
