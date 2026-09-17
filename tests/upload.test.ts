@@ -21,7 +21,7 @@ vi.mock('@/lib/auth', () => {
 
 import { uploadWorkbook } from '@/app/admin/actions';
 import { saveScoresTable } from '@/app/admin/table-actions';
-import { GET as currentData } from '@/app/api/admin/events/[id]/data/route';
+import { GET as currentData } from '@/app/api/admin/events/[id]/current-data/route';
 import { GET as template } from '@/app/api/admin/workbook-template/route';
 import { buildDataWorkbook, ImportError, JUDGE_COLUMNS, parseWorkbook, planJudges, planStudents, STUDENT_COLUMNS, type ParsedSheet } from '@/lib/data-workbook';
 import { one, query } from '@/lib/db';

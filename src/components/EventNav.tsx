@@ -3,7 +3,7 @@ import type { EventRow } from '@/lib/repo';
 
 // The coordinator's screens for one event, in the order an event is run.
 const TABS = [
-  ['data', 'Data'],
+  ['students', 'Data'],
   ['judges', 'Judges'],
   ['sheet', 'Scoring sheet'],
   ['progress', 'Progress'],

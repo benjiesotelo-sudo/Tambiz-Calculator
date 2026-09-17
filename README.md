@@ -13,12 +13,14 @@ The coordinator's click-by-click guide is [`docs/how-to-run-an-event.md`](docs/h
 
 ## What the app does
 
-- **Coordinator** (admin): creates the year's event, types or pastes the criterion wording, imports the class roll and adviser list from Excel, creates groups and chooses their members from the roll, picks judges from the department list or creates accounts, watches judging progress, corrects scores with a reason, closes judging once every group, student and member is settled, reads results, grades and judge profiles, downloads the Excel workbook, and releases results with a mailing sheet for Power Automate.
+The judges enter their own scores on their phones, instead of staff typing them in.
+
+- **Coordinator** (admin): uploads one Excel workbook (a Students sheet and a Judges sheet), keeps it up to date in one editable table, prints the judges' sign-in list, pastes the criterion wording, watches judging progress, corrects scores with a reason, reads results, individual grades and judge profiles, and closes the event. Closing hands over two files: the Excel **workbook** (Scores, Booth Scores, Results, Leaderboard, Individual Grades, For Encoding) and the **email file** (Email, Name and a ready HTML Message per student and adviser) for Microsoft Power Automate to send.
 - **Judges**: sign in on a phone, pick Defense or Booth, pick a group, and score one category per screen with the criterion wording and maximum beside every box. A score above the maximum, or with more than two decimals, is refused with a message. Review lists every blank and error with a Go button, and “Mark group complete” stays locked until the sheet is clean. Defense judges also score each member, or mark them absent. Scores are kept on the phone the moment they are typed and sent in the background.
 - **Results**: every category percentage with its rank, the defense and booth halves, the overall score and rank, a top-10 leaderboard per category, the adviser ranking, and each student's member total, final grade and letter grade.
-- **Students and advisers**: a private link, opened with a student number or an adviser code. A student sees their own grade and scores and their group's percentages; an adviser sees their own groups and their groups' average overall. Neither ever sees a place number (the awarding reveals the order); a page may only say a group is in the top 10 of a category or overall. Groups are known by their business name alone. After release a group's name or adviser can still be corrected, with a warning and a recorded trace; deleting a group or clearing a score is refused.
+- **Students and advisers** have no sign-in. Each gets one email from the email file: a student their letter grade and their group's percentage, never a rank; an adviser each of their groups' percentages and which placed in the top 10, never which place.
 
-Scoring began as a port of `index.html` and follows the coordinator's decisions of 14 September 2026; `src/lib/scoring.ts` lists every rule and where it differs. Overall = Defense × 0.7 + Booth × 0.3, every category weighs the same within its half, a blank score is never counted as zero (an incomplete group has no rank), percentages are rounded to two decimals the same way on screen and in Excel, category ties are broken by overall score, and a final grade is rounded **up** to a whole number before its letter is looked up (84.5 → 85 → B+).
+Scoring began as a port of `index.html` and follows the coordinator's decisions of 14 and 17 September 2026; `src/lib/scoring.ts` lists every rule and where it differs. Overall = Defense × 0.7 + Booth × 0.3, every category weighs the same within its half, a blank score is never counted as zero (an incomplete group has no rank), percentages are rounded to two decimals the same way on screen and in Excel, category ties are broken by overall score, a student absent from the defense has individual scores of zero, and a final grade is rounded **up** to a whole number before its letter is looked up (84.5 → 85 → B+).
 
 ## Run it on your computer
 
@@ -29,7 +31,7 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:3000. With no `DATABASE_URL`, the app uses PGlite (a real Postgres compiled to WebAssembly) stored in `.local-db/`, and fills it with a sample event the first time it starts.
+Open http://localhost:3000. With no `DATABASE_URL`, the app uses PGlite (a real Postgres compiled to WebAssembly) stored in `.local-db/`, and fills it with a practice event (invented students, the real event's group names) the first time it starts.
 
 Delete `.local-db/` to start again from the sample data.
 
@@ -42,7 +44,7 @@ The sample data creates one coordinator and three judges. Their passwords come f
 | Coordinator | `admin@tambiz.demo` |
 | Judge | `judge1@tambiz.demo`, `judge2@tambiz.demo`, `judge3@tambiz.demo` |
 
-**Change these passwords (Account → Change password) before any real student data goes in.** The sample event, groups, students and advisers are invented.
+**Change these passwords (Account → Change password) before any real student data goes in.** The practice event, its students, advisers and scores are invented; only its group names come from the real event.
 
 ## Tests
 
@@ -52,7 +54,9 @@ npm test
 
 - `tests/golden.test.ts`: the reference answers from the original `index.html` (design research, `evidence/golden-rules.js`); where a decision changed a rule, the test names the old answer and the decision. Also rounding, decimals and the letter-grade rule.
 - `tests/crosscheck.test.ts`: runs the original scoring functions extracted from `index.html` on 60 random events and checks the new code gives identical percentages and ranks wherever nothing is left blank (the deliberate differences are explained at the top of the file).
-- `tests/finalise.test.ts`, `tests/links.test.ts`, `tests/mailing.test.ts`, `tests/judge-profiles.test.ts`, `tests/rubric.test.ts`, `tests/excel-export.test.ts`, `tests/schema.test.ts`: finalising checks, private links and the adviser ranking, the mailing table, judge profiles, criterion wording and spelling, workbook rounding, and the schema applying twice.
+- `tests/upload.test.ts`: the workbook in: the column list, the template, “Download current data”, a group whose rows disagree about its adviser, and above all that uploading never touches a score and never removes anybody.
+- `tests/app-flows.test.ts`: the coordinator's flows on a real Postgres (PGlite in memory): the Data and Judges tables, absence, corrections, closing, undoing and the email file.
+- `tests/finalise.test.ts`, `tests/ranking.test.ts`, `tests/email-file.test.ts`, `tests/judge-profiles.test.ts`, `tests/rubric.test.ts`, `tests/excel-export.test.ts`, `tests/grid.test.ts`, `tests/schema.test.ts`: closing checks, the adviser ranking and top-10 wording, the email messages, judge profiles, criterion wording, workbook rounding, the table, and the schema applying twice.
 
 Running the app locally: this folder's `.env.local` may hold the real `DATABASE_URL`, and `next dev` reads it. To be sure you are on the local database, start with `DATABASE_URL= npm run dev` (an empty value is never replaced by `.env.local`).
 
@@ -72,13 +76,12 @@ Running the app locally: this folder's `.env.local` may hold the real `DATABASE_
    | `DATABASE_URL` | The Neon connection string | **Yes.** Without it the deployed app runs on a temporary in-memory database that is wiped whenever Vercel restarts it. |
    | `SEED_ADMIN_PASSWORD` | Password for `admin@tambiz.demo` | Recommended. See “Changing the sample account passwords” below. |
    | `SEED_JUDGE_PASSWORD` | Password for the three sample judges (`judge1@`, `judge2@`, `judge3@tambiz.demo`) | Recommended. Same. |
-   | `APP_URL` | The app's address, for example `https://tambiz-calculator-lyart.vercel.app` | Recommended. Students' and advisers' private links are built from it. Without it, the production deployment uses Vercel's production address. |
 
    If you use Vercel's Neon integration instead of pasting the string, it creates `DATABASE_URL` for you. Turn off “create a database branch for every preview deployment”; the free plan allows only 10 branches.
 
    **Preview deployments never use `DATABASE_URL`.** A pull request's preview runs on its own throwaway sample data (in-memory PGlite), so reviewing a change can never alter live data or apply its schema early. To let previews use the real database anyway, set `TAMBIZ_PREVIEW_DATABASE=1` in the Preview environment.
 5. **Deploy.** Press Deploy, open the address Vercel gives you, and sign in as the coordinator.
-6. **Before real data:** change the coordinator password, remove or reset the sample judges, and create the real event.
+6. **Before real data:** change the coordinator password, remove or reset the sample judges, and create the real event. The sample event is marked as practice on every screen; leave it for rehearsals.
 
 ### Changing the sample account passwords
 
@@ -88,7 +91,7 @@ Running the app locally: this folder's `.env.local` may hold the real `DATABASE_
 2. Redeploy (Deployments → the latest one → Redeploy).
 3. On its first request, the app compares each sample account's stored password with the variable. Where they differ, it stores the new password, clears any lockout, and signs that account out everywhere. The server log says which accounts changed.
 
-While a variable is set, it wins: a password someone changed under **Account** is put back to the variable's value on the next server start. If you would rather people keep the passwords they choose, delete the variable and redeploy. Judge accounts created on the Judges tab are never touched by these variables.
+While a variable is set, it wins: a password someone changed under **Account** is put back to the variable's value on the next server start. If you would rather people keep the passwords they choose, delete the variable and redeploy. Judge accounts created by an upload or on the Judges tab are never touched by these variables.
 
 ### Database migrations
 
@@ -110,8 +113,9 @@ DATABASE_URL="postgresql://…" npm run reset-password -- admin@tambiz.demo "a n
 | `src/lib/rubric.ts` | The default scoring sheet (maximums, weights, member fields, letter-grade bands). Each event stores its own copy. |
 | `src/lib/db.ts` | The only module that talks to the database (Neon when `DATABASE_URL` is set, PGlite otherwise) |
 | `src/lib/schema.ts` | Tables |
-| `src/lib/repo.ts` | Shared reads, and the whole-event report used by results, grades and export |
-| `src/lib/excel-import.ts`, `src/lib/excel-export.ts` | Class roll and adviser import; the workbook export (ExcelJS) |
+| `src/lib/repo.ts` | Shared reads, and the whole-event report used by results, grades and both files |
+| `src/lib/data-workbook.ts`, `src/lib/data-upload.ts` | The one workbook in: its column list, template and parsing; applying an upload |
+| `src/lib/excel-export.ts`, `src/lib/email-file.ts`, `src/lib/messages.ts` | The two files out: the workbook, the email file, and every word of the emails |
 | `src/components/ScoreSheet.tsx` | The judge scoring screen |
 | `src/app/admin/actions.ts`, `src/app/admin/table-actions.ts` | Every coordinator change (forms, and the spreadsheet tables' saves), each checking the caller is the coordinator |
 | `src/components/DataGrid.tsx` | The spreadsheet table used by every coordinator list |

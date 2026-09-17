@@ -45,7 +45,7 @@ export async function createEvent(fd: FormData) {
   const id = newId();
   await query(`INSERT INTO event (id, year, title, rubric) VALUES ($1, $2, $3, $4::jsonb)`, [id, year, title, JSON.stringify(rubricForNewEvent(latest?.rubric))]);
   await log(id, acc.id, 'event.create', { year, title });
-  back(`/admin/events/${id}/data`, { ok: `Created ${title}. Upload its workbook to begin.` });
+  back(`/admin/events/${id}/students`, { ok: `Created ${title}. Upload its workbook to begin.` });
 }
 
 // ── closing the event ─────────────────────────────────────────
