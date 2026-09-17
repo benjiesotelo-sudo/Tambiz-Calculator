@@ -204,12 +204,22 @@ export async function applyUpload(event: EventRow, accountId: string, fileName: 
   );
   await transaction(statements);
 
-  const parts = [
-    parsed.students ? `${plural(counts.studentsNew, 'new student')}, ${plural(counts.studentsChanged, 'student')} with changed details, ${plural(counts.moved, 'student')} moved to another group` : '',
-    parsed.students ? `${plural(counts.groupsNew, 'new group')}, ${plural(counts.advisersNew, 'new adviser')}, ${plural(counts.groupAdvisers, 'group')} given a different adviser` : '',
-    parsed.judges ? `${plural(counts.judgesNew, 'new judge')}, ${plural(counts.judgesAdded, 'judge')} from an earlier event added, ${plural(counts.passwords, 'password')} changed` : '',
-  ].filter(Boolean);
+  const done = [
+    [counts.studentsNew, 'new student'],
+    [counts.studentsChanged, 'student with changed details', 'students with changed details'],
+    [counts.moved, 'student moved to another group', 'students moved to another group'],
+    [counts.groupsNew, 'new group'],
+    [counts.advisersNew, 'new adviser'],
+    [counts.groupAdvisers, 'group given a different adviser', 'groups given a different adviser'],
+    [counts.judgesNew, 'new judge'],
+    [counts.judgesAdded, 'judge from an earlier event added', 'judges from an earlier event added'],
+    [counts.passwords, 'judge’s password changed', 'judges’ passwords changed'],
+  ]
+    .filter(([n]) => n)
+    .map(([n, one, many]) => plural(n as number, one as string, many as string | undefined));
   const missing = [!parsed.students ? 'no Students sheet, so no student changed' : '', !parsed.judges ? 'no Judges sheet, so no judge changed' : ''].filter(Boolean);
-  const message = `Uploaded ${fileName}: ${parts.join('; ')}.${missing.length ? ` The file had ${missing.join(', and ')}.` : ''} No one was removed and no score changed.`;
+  const message =
+    `Uploaded ${fileName}: ${done.length ? done.join(', ') : 'nothing needed changing'}.` +
+    `${missing.length ? ` The file had ${missing.join(', and ')}.` : ''} No one was removed and no score changed.`;
   return { ok: true, message, problems, signIns };
 }

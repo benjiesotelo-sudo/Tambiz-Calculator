@@ -151,7 +151,7 @@ export async function seedIfEmpty(db: Db) {
     for (let k = 0; k < size; k++) {
       const sid = id('stu');
       const surname = SURNAMES[(n * 7) % SURNAMES.length];
-      const first = FIRST[(n * 11) % FIRST.length];
+      const first = FIRST[(n * 11 + Math.floor(n / FIRST.length) * 7) % FIRST.length];
       const num = `2023${(10457 + n * 37).toString().padStart(6, '0')}`;
       const email = `${first}.${surname}.${n + 1}@tambiz.demo`.toLowerCase().replace(/\s+/g, '');
       const section = n === 3 || n === 20 ? '' : `Sec - ${((gi + k) % 12) + 1}`;

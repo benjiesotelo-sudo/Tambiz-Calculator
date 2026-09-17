@@ -109,11 +109,6 @@ input[type=file].input { padding: 9px 12px; }
 .rank.r1 { background: #f0b429; color: #3d2800; border-color: transparent; }
 .rank.r2 { background: #b0b8bf; color: #1a1a18; border-color: transparent; }
 .rank.r3 { background: #cd7f32; color: #fff; border-color: transparent; }
-.catgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 150px), 1fr)); gap: 6px; margin-top: 10px; }
-.catcell { border: 1px solid var(--line); border-radius: 8px; padding: 7px 9px; background: var(--surface-2); min-width: 0; }
-.catcell .n { font-size: 11.5px; color: var(--muted); font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.catcell .v { display: flex; justify-content: space-between; align-items: center; gap: 6px; font-weight: 800; font-size: 17px; font-variant-numeric: tabular-nums; }
-.catcell.booth { background: var(--booth-soft); }
 .bignum { font-size: 22px; font-weight: 800; color: var(--dark-green); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .lb-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr)); }
 .lb-card { background: #fff; border-radius: 12px; border: 1px solid var(--line-strong); overflow: hidden; }
@@ -124,14 +119,6 @@ input[type=file].input { padding: 9px 12px; }
 .lb-item .nm { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lb-item .pc { font-weight: 800; color: var(--dark-green); font-variant-numeric: tabular-nums; }
 .lb-empty { padding: 14px; color: #999; font-style: italic; font-size: 13px; }
-.kv { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 90px), 1fr)); gap: 6px; margin-top: 8px; }
-.kv div { background: var(--surface-2); border-radius: 8px; padding: 6px 8px; min-width: 0; }
-.kv span { display: block; font-size: 11px; color: var(--muted); font-weight: 700; }
-.kv b { font-variant-numeric: tabular-nums; }
-.letter { display: inline-grid; place-items: center; min-width: 42px; height: 42px; padding: 0 6px; border-radius: 10px; background: var(--dark-green); color: var(--gold); font-weight: 800; font-size: 18px; }
-.letter.f { background: var(--error); color: #fff; }
-.letter.big { min-width: 76px; height: 76px; font-size: 34px; border-radius: 16px; flex: 0 0 auto; }
-.result-hero { display: flex; gap: 16px; align-items: center; }
 
 /* scoring sheet wording */
 .wording { display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; gap: 10px; align-items: center; margin-top: 10px; }

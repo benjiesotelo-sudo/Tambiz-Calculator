@@ -1,6 +1,6 @@
 // A coordinator's correction of one judge's score (decision 7), shared by the scores table and the older form.
 // The judge's own value is kept from before the first correction, a reason is required, the change is recorded,
-// and nothing can be corrected once results are released.
+// and nothing can be corrected once the email file has been downloaded.
 
 import { logStatement } from './change-log';
 import { one, transaction } from './db';
