@@ -28,7 +28,7 @@ export default async function AdminHome({ searchParams }: { searchParams: Promis
         <Notice ok={sp.ok} error={sp.error} />
         <ul className="list">
           {events.map((e) => (
-            <li key={e.id}>
+            <li key={e.id} style={{ flexWrap: 'wrap' }}>
               <Link className="rowlink" href={`/admin/events/${e.id}`}>
                 <span className="grow-1">
                   <span className="title">{e.title}</span>
@@ -71,7 +71,7 @@ export default async function AdminHome({ searchParams }: { searchParams: Promis
 function ReplaceSample({ size }: { size: EventSize }) {
   const n = (count: number, one: string) => `${count} ${one}${count === 1 ? '' : 's'}`;
   return (
-    <details className="inline-form" style={{ margin: '4px 0 10px' }}>
+    <details className="inline-form" style={{ margin: '4px 0 10px', flex: '1 1 100%' }}>
       <summary>
         <span className="pill none">Sample data</span> Replace with fresh practice data…
       </summary>
