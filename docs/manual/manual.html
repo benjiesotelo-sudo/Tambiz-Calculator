@@ -1,0 +1,1453 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>The Tambiz Manual</title>
+<style>
+  /* The Tambiz Manual. Printed to PDF with Chrome: see README.md beside this file.
+     Worksheet style after the captain's FIN1209 activity sheets: numbered steps in green circles, one action per step,
+     a picture under almost every step, "type exactly this" boxes and "if it goes wrong" notes.
+     Colours are the app's own tokens (src/app/globals.css). */
+  :root {
+    --green: #007A33; --dark: #004F21; --gold: #F2A900; --gold-text: #8A6100;
+    --ground: #FAF8F2; --ink: #1A1A1A; --body: #4A4A4A; --muted: #767670; --line: #EDEDE8; --tint: #D7E0D9;
+    --soft: #EEF4EF; --alert: #A3331C;
+  }
+  @page { size: A4; margin: 15mm 17mm 19mm; background: var(--ground);
+    @bottom-left { content: "The Tambiz Manual"; font: 8pt Arial, Helvetica, sans-serif; color: #888; border-top: 0.5pt solid #d0cfc6; vertical-align: middle; }
+    @bottom-center { content: ""; border-top: 0.5pt solid #d0cfc6; }
+    @bottom-right { content: counter(page) " / " counter(pages); font: 8pt "Courier New", monospace; color: #888; border-top: 0.5pt solid #d0cfc6; vertical-align: middle; }
+  }
+  @page p0 { @bottom-left { content: "Before you start"; } }
+  @page p1 { @bottom-left { content: "1 · How Tambiz thinks"; } }
+  @page p2 { @bottom-left { content: "2 · Preparing the workbook"; } }
+  @page p3 { @bottom-left { content: "3 · Setting up"; } }
+  @page p4 { @bottom-left { content: "4 · How a score becomes a grade"; } }
+  @page p5 { @bottom-left { content: "5 · The judge's side"; } }
+  @page p6 { @bottom-left { content: "6 · Your evening"; } }
+  @page p7 { @bottom-left { content: "7 · Results, grades and profiles"; } }
+  @page p8 { @bottom-left { content: "8 · The two files and the emails"; } }
+  @page p9 { @bottom-left { content: "9 · Running and looking after it"; } }
+  @page p10 { @bottom-left { content: "10 · What is not built yet"; } }
+  @page pa { @bottom-left { content: "At a glance"; } }
+  .p0 { page: p0; } .p1 { page: p1; } .p2 { page: p2; } .p3 { page: p3; } .p4 { page: p4; } .p5 { page: p5; }
+  .p6 { page: p6; } .p7 { page: p7; } .p8 { page: p8; } .p9 { page: p9; } .p10 { page: p10; } .pa { page: pa; }
+
+  html { background: var(--ground); -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body { margin: 0; font: 10.5pt/1.45 Arial, Helvetica, sans-serif; color: var(--ink); }
+  section { break-before: page; }
+  section:first-of-type { break-before: auto; }
+  section.cont, section:not(:has(> .kicker)) { break-before: auto; }
+  .kicker { font: 9pt "Courier New", monospace; color: var(--green); letter-spacing: .02em; margin: 0 0 2px; }
+  h1 { font: 400 25pt/1.15 "Source Serif 4", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif; color: var(--dark); margin: 0 0 4px; }
+  h1.chapter { padding-bottom: 4px; border-bottom: 1.8pt solid var(--gold); }
+  h2 { font: 400 17pt/1.2 "Source Serif 4", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif; color: var(--dark); margin: 16px 0 2px; padding-bottom: 3px; border-bottom: 0.75pt solid var(--tint); break-after: avoid; }
+  h3 { font: 700 11pt/1.3 Arial, Helvetica, sans-serif; color: var(--dark); margin: 12px 0 4px; break-after: avoid; }
+  .deck { color: var(--muted); font-size: 9.5pt; margin: 4px 0 10px; break-after: avoid; }
+  p { margin: 0 0 7px; }
+  ul, ol { margin: 0 0 8px; padding-left: 20px; }
+  li { margin-bottom: 2px; }
+  code, .k { font: 8.8pt "Courier New", monospace; background: #e6efe7; padding: 0 3px; border-radius: 2px; color: #1d3b27; }
+  .muted { color: var(--muted); }
+  .lead { font-size: 11.5pt; }
+  .rule-thick { border: 0; border-top: 3pt solid var(--green); margin: 8px 0 10px; }
+
+  /* Steps */
+  .step { border-left: 2.2pt solid var(--green); padding: 1px 0 4px 12px; margin: 12px 0; break-inside: avoid; }
+  .step > h3 { display: flex; align-items: center; gap: 9px; margin: 0 0 5px; font-size: 11pt; }
+  .step > h3 .n { flex: none; width: 20px; height: 20px; border-radius: 50%; background: var(--green); color: #fff; font: 700 8.5pt/20px Arial, sans-serif; text-align: center; }
+  .step p:last-child { margin-bottom: 3px; }
+  .step.split { break-inside: auto; }
+
+  .type { background: #fff; border: 0.75pt solid #dcdcd4; padding: 6px 10px 7px; margin: 6px 0 8px; break-inside: avoid; }
+  .type .lab { font: 8pt Arial, sans-serif; color: var(--green); letter-spacing: .06em; text-transform: uppercase; margin-bottom: 2px; }
+  .type pre { margin: 0; font: 9pt/1.45 "Courier New", monospace; color: #333; white-space: pre-wrap; word-break: break-word; }
+  .call { border-left: 2.2pt solid var(--green); padding: 2px 0 2px 12px; margin: 10px 0; break-inside: avoid; }
+  .call .lab, .wrong .lab, .confirm .lab { font: 700 8pt Arial, sans-serif; letter-spacing: .06em; text-transform: uppercase; margin-bottom: 2px; }
+  .call .lab { color: var(--green); }
+  .call.gold { border-color: var(--gold); }
+  .call.gold .lab { color: var(--gold-text); }
+  .call p:last-child { margin-bottom: 0; }
+  .wrong { background: #fdf6f3; border: 0.75pt solid #efd2c8; border-left: 2.2pt solid var(--alert); padding: 6px 10px 6px 12px; margin: 8px 0 4px; break-inside: avoid; }
+  .wrong .lab { color: var(--alert); }
+  .wrong p { margin: 0 0 4px; } .wrong p:last-child { margin: 0; }
+  .confirm { background: repeating-linear-gradient(135deg, #fbfaf4 0 8px, #f5f1e3 8px 16px); border: 1pt dashed #b9a86a; padding: 6px 10px 6px 12px; margin: 8px 0 4px; break-inside: avoid; }
+  .confirm .lab { color: var(--gold-text); }
+  .confirm p { margin: 0 0 4px; } .confirm p:last-child { margin: 0; }
+  .msg { background: #eef4ef; color: var(--dark); padding: 0 3px; }
+  .msg.bad { background: #fbece8; color: #7a2016; }
+
+  table.t { border-collapse: collapse; width: 100%; margin: 6px 0 2px; font-size: 9.2pt; }
+  table.t th { background: var(--green); color: #fff; text-align: left; font: 700 8pt Arial, sans-serif; letter-spacing: .05em; text-transform: uppercase; padding: 6px 7px; vertical-align: bottom; }
+  table.t td { background: #fff; border-bottom: 0.75pt solid #e4e3dc; padding: 4.5px 7px; vertical-align: top; }
+  table.t tr { break-inside: avoid; }
+  table.t td.num, table.t th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  table.t tr.sum td { background: var(--soft); font-weight: 700; }
+  table.t td.k1 { width: 13%; font: 700 8pt Arial, sans-serif; letter-spacing: .05em; text-transform: uppercase; color: var(--dark); background: var(--soft); }
+  table.t.fill td { height: 24px; }
+  .cap { color: var(--muted); font-size: 8.5pt; line-height: 1.35; margin: 3px 0 8px; }
+
+  /* Pictures */
+  .fig { margin: 6px 0 2px; break-inside: avoid; }
+  .frame { border: 0.75pt solid #cfd6cf; background: #fff; overflow: hidden; line-height: 0; }
+  .frame img { width: 100%; display: block; }
+  .fig.w80 { width: 80%; } .fig.w70 { width: 70%; } .fig.w60 { width: 60%; } .fig.w50 { width: 50%; }
+  .phones { display: flex; gap: 12px; align-items: flex-start; margin: 6px 0 2px; break-inside: avoid; }
+  .phones .fig { flex: 0 0 auto; width: 52mm; margin: 0; }
+  .phones .fig .frame { border-radius: 7px; }
+  .phones.two .fig { width: 58mm; }
+  .side { display: grid; grid-template-columns: 56mm 1fr; gap: 14px; align-items: start; }
+  .side .fig .frame { border-radius: 7px; }
+
+  .flow { display: flex; align-items: stretch; gap: 6px; margin: 8px 0 4px; }
+  .flow .box { flex: 1; background: #fff; border: 0.75pt solid #d5dcd5; border-top: 3pt solid var(--green); padding: 6px 8px; font-size: 8.8pt; line-height: 1.35; }
+  .flow .box b { display: block; color: var(--dark); font-size: 9.5pt; margin-bottom: 2px; }
+  .flow .arr { align-self: center; color: var(--green); font-weight: 700; }
+  .flow .box.gold { border-top-color: var(--gold); }
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .legend { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin: 6px 0; }
+  .legend > div { font-size: 8.8pt; }
+  .cover-meta { display: flex; justify-content: space-between; border-top: 0.75pt solid var(--line); border-bottom: 0.75pt solid var(--line); padding: 5px 0; margin: 8px 0 6px; }
+  .cover-meta b { color: var(--dark); }
+  .cover-meta span:last-child { font: 9pt "Courier New", monospace; color: #555; }
+  .checklist { list-style: none; padding-left: 0; }
+  .checklist li { padding-left: 24px; position: relative; margin-bottom: 7px; }
+  .checklist li::before { content: ""; position: absolute; left: 2px; top: 2px; width: 12px; height: 12px; border: 1pt solid var(--green); background: #fff; }
+  .who { font: 700 7.5pt Arial, sans-serif; letter-spacing: .04em; text-transform: uppercase; color: var(--dark); background: #e1efe4; padding: 1px 5px; border-radius: 2px; white-space: nowrap; }
+  .ts { margin: 10px 0 12px; break-inside: avoid; }
+  .ts > h3 { margin: 0 0 3px; padding-left: 9px; border-left: 2.2pt solid var(--alert); }
+  .calc { background: #fff; border: 0.75pt solid #dcdcd4; padding: 8px 12px; margin: 6px 0 8px; font: 9.5pt/1.6 "Courier New", monospace; break-inside: avoid; }
+  .calc b { color: var(--dark); }
+  .avoid { break-inside: avoid; }
+  .pb, section.pb { break-before: page; }
+</style>
+</head>
+<body>
+
+<!-- ═════════ BEFORE YOU START ═════════ -->
+<section class="p0">
+  <p class="kicker">MGT1114 Business Plan 2 | Tambiz</p>
+  <h1>The Tambiz Manual</h1>
+  <p class="lead">Everything needed to run Tambiz, from the workbook you prepare to the results email each student receives, and to look after the app from one year to the next. Written for someone who has never opened it.</p>
+  <div class="cover-meta"><b>Fourth edition: rewritten for the app as it now is</b><span>September 2026</span></div>
+  <p class="muted" style="font-size:9pt">FEU Manila · Tambiz judging, results and grades · <span class="k">tambiz-calculator-lyart.vercel.app</span></p>
+  <hr class="rule-thick">
+
+  <h2>Before you start</h2>
+  <p>Tambiz is the awarding night of MGT1114 Business Plan 2. Groups defend their business plan and run a booth, a panel of judges scores them, and every student's grade comes out of those scores. The Tambiz app does the scoring, the ranking and the grading. It asks for <b>one workbook in</b> and hands you <b>two files out</b>.</p>
+
+  <div class="call gold">
+    <div class="lab">Read this first</div>
+    <p><b>This edition replaces every earlier one.</b> The app was cut back in September 2026 to seven coordinator tabs and two judge screens. The class roll, the adviser list, the groups and members pages, the students' and advisers' private links, the release screen and group codes are all gone. If you have an earlier printed copy, recycle it: its pictures show screens that no longer exist.</p>
+  </div>
+
+  <h3>What is in this manual</h3>
+  <table class="t">
+    <tr><th style="width:7%">Ch.</th><th style="width:33%">Chapter</th><th>What it covers</th></tr>
+    <tr><td>1</td><td>How Tambiz thinks</td><td>Events, groups, judges, the two halves, what "submitted" and "closed" mean</td></tr>
+    <tr><td>2</td><td>Preparing the workbook</td><td>Your own file from the template, built a few rows at a time, and checked before it goes in</td></tr>
+    <tr><td>3</td><td>Setting up</td><td>Signing in, the event, the scoring sheet wording, the upload, the judges' slips, opening judging</td></tr>
+    <tr><td>4</td><td>How a score becomes a grade</td><td>One student worked through from judges' scores to the FEU letter band</td></tr>
+    <tr><td>5</td><td>The judge's side</td><td>Every tap a judge makes, on a phone</td></tr>
+    <tr><td>6</td><td>Your evening</td><td>Progress, correcting a score, what stops the event closing, closing it</td></tr>
+    <tr><td>7</td><td>Results, grades and profiles</td><td>The Results tab, individual grades, judge profiles and the workbook</td></tr>
+    <tr><td>8</td><td>The two files and the emails</td><td>The workbook, the email file, and sending with Power Automate</td></tr>
+    <tr><td>9</td><td>Running and looking after it</td><td>What it is made of, the accounts, changes, passwords, the yearly cycle, the month-before checklist, troubleshooting, records, handing over</td></tr>
+    <tr><td>10</td><td>What is not built yet</td><td>An honest list</td></tr>
+  </table>
+  <p class="cap">"At a glance", one page to keep beside you on the night, closes the manual.</p>
+</section>
+
+<section class="p0 pb">
+  <h3>How to read the steps</h3>
+  <p>Wherever there is something to do, it is a numbered step with one action, like the worksheets you already know. Do them in order. Three kinds of box appear beside the steps:</p>
+  <div class="legend">
+    <div class="type"><div class="lab">Type exactly this</div><pre>Judge confirmed 16, typed 0</pre><p class="muted" style="margin:4px 0 0;font-size:8.5pt;line-height:1.35">Type it character for character.</p></div>
+    <div class="wrong"><div class="lab">If it goes wrong</div><p style="font-size:8.8pt">What you see when a step fails, and how to fix it.</p></div>
+    <div class="call gold"><div class="lab">Read this twice</div><p style="font-size:8.8pt">A rule that decides grades or awards.</p></div>
+  </div>
+  <p>Words in <b>bold</b> are the words on the screen or in the file.</p>
+
+  <h3>Where the pictures come from</h3>
+  <p>Every picture of the app was taken on 18 and 19 September 2026 from the app as it now stands, running on a laptop with its own empty database, so that nothing was typed into the live app. The pictures follow one invented year, <b>Tambiz 2028</b>, from the empty Data tab to the email file: six groups, eighteen students, four judges. Every student, adviser, judge, email address and business name in them is invented. The criterion wording is an example, not the department's.</p>
+
+  <h3>What you need</h3>
+  <ul>
+    <li>A laptop with a web browser, for everything the coordinator does. Judges need only a phone.</li>
+    <li>Microsoft Excel, or any spreadsheet program that saves <b>.xlsx</b> files.</li>
+    <li>The list of students, their groups and advisers, which your staff type into the app's template (chapter 2).</li>
+    <li>The judges' names and email addresses.</li>
+    <li>The criterion wording of the department's scoring sheet, one line per criterion, in Word or Excel.</li>
+    <li>For sending the results: an FEU Microsoft 365 account with Power Automate (chapter 8).</li>
+  </ul>
+</section>
+
+<!-- ═════════ 1 · HOW TAMBIZ THINKS ═════════ -->
+<section class="p1">
+  <p class="kicker">The Tambiz Manual | Chapter 1</p>
+  <h1 class="chapter">How Tambiz thinks</h1>
+  <p class="deck">Seven ideas. Once they are clear, every screen makes sense.</p>
+
+  <div class="flow">
+    <div class="box"><b>One workbook in</b>Students with their group and adviser, and the judges. You upload it on the Data tab.</div>
+    <div class="arr">›</div>
+    <div class="box"><b>Judges score</b>Each on their own phone, group by group, in the Defense or the Booth.</div>
+    <div class="arr">›</div>
+    <div class="box"><b>You close the event</b>When every group is judged, nobody can change a score.</div>
+    <div class="arr">›</div>
+    <div class="box gold"><b>Two files out</b>The workbook for the department, and the email file that sends each student and adviser their result.</div>
+  </div>
+
+  <h2>1.1 An event is one year</h2>
+  <p>Each year's Tambiz is one <b>event</b>, for example <b>Tambiz 2028</b>. Its students, groups, advisers, judges and scores all belong to it and to nothing else, so last year can never leak into this year's grades. Past events stay in the list, readable, for as long as the app exists. The app also comes with a <b>practice event</b>, full of invented people, for trying things out.</p>
+
+  <h2>1.2 Groups, students and advisers</h2>
+  <p>A <b>group</b> is a business, known only by its name, for example <b>KAPE KULTURA</b>. There are no group numbers. Each <b>student</b> belongs to one group. Each group has one <b>adviser</b>; an adviser may have several groups. All three come from the same rows of your workbook: the groups are the different names in its Group column, the advisers the names in its Adviser column.</p>
+  <p>Group names are compared ignoring capitals, spaces and punctuation, so <b>Kape Kultura</b> and <b>KAPE KULTURA</b> are the same group.</p>
+
+  <h2>1.3 Judges</h2>
+  <p>A <b>judge</b> signs in with their own email and password, on their own phone. The app makes the password and shows it to you once, on a sign-in slip to print. Because every judge signs in as themselves, the app knows who gave every score, which is what makes corrections and judge profiles possible. A judge's account is kept from year to year.</p>
+
+  <h2>1.4 Two halves, seven categories</h2>
+  <p>Every group is judged twice: in the <b>Defense</b> and at the <b>Booth</b>. Each half has its own categories, and each category a list of criteria with a maximum for each.</p>
+  <table class="t">
+    <tr><th>Half</th><th>Weight</th><th>Categories (criteria · points)</th></tr>
+    <tr><td><b>Defense</b></td><td>70%</td><td>Elevator Pitch (5 · 100) · Infomercial (4 · 40) · Paper (9 · 100) · Product Demo (3 · 100). Defense judges also score every student: Presentation /20, Communication /40, Q&amp;A /40.</td></tr>
+    <tr><td><b>Booth</b></td><td>30%</td><td>Best Business Plan Booth (8 · 100) · Student Innovation (4 · 100) · Best Product Demonstration (6 · 100)</td></tr>
+  </table>
+  <p class="cap">39 criteria in all: 21 in the Defense, 18 at the Booth. The points, the 70/30 weights and the letter bands are fixed; only the wording of each criterion can be changed on screen (chapter 3).</p>
+
+  <h2>1.5 A sheet, and what "submitted" means</h2>
+  <p>One judge's scores for one group in one half is a <b>sheet</b>. A judge fills it in and then taps <b>Mark group complete</b>. That sheet is now <b>submitted</b>.</p>
+  <div class="call gold">
+    <div class="lab">Read this twice</div>
+    <p><b>Only submitted sheets count.</b> A sheet a judge started and never marked complete counts for nothing: not in any percentage, rank, grade, file or judge profile. The Progress tab shows these as <b>in progress · not counted</b> so you can chase them.</p>
+  </div>
+
+  <h2>1.6 A blank is never a zero</h2>
+  <p>A criterion nobody scored is left out, not counted as zero. A group that is not fully scored reads <b>Incomplete</b> and gets no rank, so a half-judged group never looks like a weak one. The single exception is a student marked <b>absent</b> from the defense: their own individual scores count as zero (chapter 4).</p>
+
+  <h2>1.7 Closing, and the point of no return</h2>
+  <p>When judging is over you <b>close the event</b>. Judges can no longer change a score, and the two files are ready. You can still undo closing, and you can still correct a score with a reason, <b>until you download the email file</b>. From that moment nothing about the event can change, because the emails would no longer match.</p>
+  <table class="t">
+    <tr><th style="width:26%">The event says</th><th>What it means</th></tr>
+    <tr><td><b>Open for judging</b></td><td>Judges on the event can score. You can change anything.</td></tr>
+    <tr><td><b>Closed</b></td><td>Judges cannot change scores. You can correct a score with a reason, download the workbook, or undo closing.</td></tr>
+    <tr><td><b>Closed, email file downloaded</b></td><td>Final. Nothing can change. You can download both files again.</td></tr>
+  </table>
+</section>
+
+<!-- ═════════ 2 · PREPARING THE WORKBOOK ═════════ -->
+<section class="p2">
+  <p class="kicker">The Tambiz Manual | Chapter 2</p>
+  <h1 class="chapter">Preparing the workbook</h1>
+  <p class="deck">Everything about the students, groups, advisers and judges comes from one Excel workbook that your staff build. Get it right here and the rest of the evening is easy.</p>
+
+  <div class="call gold">
+    <div class="lab">Read this twice</div>
+    <p><b>Your staff build their own file, starting from the app's template. Do not upload the registrar's export.</b> The export has the wrong columns and knows nothing about groups or advisers. If it is useful, copy names and numbers out of it into the template, one column at a time, but the file you upload is always your own.</p>
+  </div>
+
+  <h3>The workbook in one glance</h3>
+  <table class="t">
+    <tr><th style="width:18%">Sheet</th><th>One row per</th><th>Columns</th></tr>
+    <tr><td><b>Students</b></td><td>student</td><td>Student No., Surname, First Name, Middle Name, Section, Email, Group, Adviser, Adviser Email</td></tr>
+    <tr><td><b>Judges</b></td><td>judge</td><td>Name, Email, Password</td></tr>
+  </table>
+  <p class="cap">There is no Groups sheet and no Advisers sheet. The groups are the different names in the Group column; the advisers are the names in the Adviser column.</p>
+
+  <h2>2.1 Start from the template</h2>
+
+  <div class="step">
+    <h3><span class="n">1</span>Sign in, open the event, and press Download template</h3>
+    <p>The <b>Data</b> tab of any event has the button (chapter 3 shows how to get there). The file saves as <b>Tambiz workbook template.xlsx</b>.</p>
+    <figure class="fig w80"><div class="frame"><img src="images/c05-data-empty.jpg" alt="The Data tab of a new event, with Download template"></div>
+      <p class="cap">The Data tab of a new event. <b>Download template</b> is in the upper card and again in the empty table's card.</p></figure>
+  </div>
+
+  <div class="step">
+    <h3><span class="n">2</span>Open it and look at its three sheets</h3>
+    <p><b>Students</b> and <b>Judges</b> each have their headings and one invented example row. <b>How to fill this in</b> repeats this chapter's rules in the app's own words.</p>
+    <figure class="fig"><div class="frame"><img src="images/xl-template-students.jpg" alt="The Students sheet of the template"></div>
+      <p class="cap">Students, as downloaded. Row 2 is an invented example.</p></figure>
+    <figure class="fig w50"><div class="frame"><img src="images/xl-template-judges.jpg" alt="The Judges sheet of the template"></div>
+      <p class="cap">Judges, as downloaded.</p></figure>
+  </div>
+
+  <div class="step">
+    <h3><span class="n">3</span>Save it under this year's name</h3>
+    <p>Choose <b>File → Save As</b>, keep <b>Excel Workbook (.xlsx)</b>, and name it for the year.</p>
+    <div class="type"><div class="lab">Type exactly this as the file name</div><pre>Tambiz 2028 workbook</pre></div>
+  </div>
+
+  <h3>What each Students column is for</h3>
+  <table class="t">
+    <tr><th style="width:17%">Column</th><th style="width:12%">Needed?</th><th>What goes in it, and what the app does with it</th></tr>
+    <tr><td><b>Student No.</b></td><td>Yes</td><td>As on the class roll. It is how the app recognises a student when you upload again.</td></tr>
+    <tr><td><b>Surname</b>, <b>First Name</b></td><td>Yes</td><td>As on the class roll. The official grade sheet shows them as SURNAME, FIRST NAME.</td></tr>
+    <tr><td><b>Middle Name</b></td><td>No</td><td>Shown after the first name on the grade sheet.</td></tr>
+    <tr><td><b>Section</b></td><td>No</td><td>For example <b>Sec - 1</b>. Judging never needs it, but the For Encoding grade sheet is sorted by it.</td></tr>
+    <tr><td><b>Email</b></td><td>Yes</td><td>The student's own address. Their results email goes here.</td></tr>
+    <tr><td><b>Group</b></td><td>Yes</td><td>The business name, for example <b>KAPE KULTURA</b>. Judges see it on their phones.</td></tr>
+    <tr><td><b>Adviser</b></td><td>Yes</td><td>The group's adviser, written as the registrar writes it: <b>SANTOS, MARIA LOURDES</b>. Every row of one group must name the same adviser.</td></tr>
+    <tr><td><b>Adviser Email</b></td><td>No</td><td>Where the adviser's results email goes. It is the only place the app can learn it. An adviser without one gets no email.</td></tr>
+  </table>
+</section>
+
+<section class="p2">
+  <h2>2.2 Fill it in, a few rows at a time</h2>
+  <p>Work group by group. After each step, look at your sheet and compare it with the picture.</p>
+
+  <div class="step">
+    <h3><span class="n">4</span>Delete the example row</h3>
+    <p>On the Students sheet, right-click the row number <b>2</b> and choose <b>Delete</b>. Do the same on the Judges sheet. Keep row 1, the headings, exactly as it is.</p>
+    <div class="wrong"><div class="lab">If it goes wrong</div>
+      <p>Forgot? The upload adds an extra student, <b>DELA CRUZ, JUAN</b>, in a group called <b>SAMPLE GROUP</b>. Remove him on the Data tab: select his row and press <b>Remove student</b>. The group disappears by itself once it has nobody in it.</p></div>
+  </div>
+
+  <div class="step">
+    <h3><span class="n">5</span>Type the first group: three students</h3>
+    <p>One row per student. The three rows of KAPE KULTURA name the same adviser and the same adviser email.</p>
+    <div class="type"><div class="lab">Type exactly this, pressing Tab between cells (first row)</div><pre>2025010001  REYES  ANDREA  CRUZ  Sec - 1  andrea.reyes@example.edu.ph  KAPE KULTURA  SANTOS, MARIA LOURDES  mlsantos@example.edu.ph</pre></div>
+    <figure class="fig"><div class="frame"><img src="images/xl-step-3rows.jpg" alt="Three students typed"></div>
+      <p class="cap">After step 5. Miguel Bautista has no middle name: that cell is simply left empty.</p></figure>
+  </div>
+
+  <div class="step">
+    <h3><span class="n">6</span>Add the next two groups</h3>
+    <p>BANIG &amp; CO. has the same adviser as KAPE KULTURA, which is fine: an adviser may have several groups. SARI-SARI SMART has a different one.</p>
+    <figure class="fig"><div class="frame"><img src="images/xl-step-9rows.jpg" alt="Nine students typed"></div>
+      <p class="cap">After step 6: three groups, nine students, two advisers.</p></figure>
+  </div>
+
+  <div class="step">
+    <h3><span class="n">7</span>Add the rest, one group at a time</h3>
+    <p>Here, three more groups in Sec - 2. OCAMPO, DANILO's email is not known yet, so his Adviser Email cells are left empty for now.</p>
+    <figure class="fig"><div class="frame"><img src="images/xl-step-18rows.jpg" alt="All eighteen students typed"></div>
+      <p class="cap">After step 7: six groups, eighteen students, four advisers. Chapter 6 adds Mr Ocampo's email in the app.</p></figure>
+    <div class="wrong"><div class="lab">If it goes wrong</div>
+      <p><b>Student numbers that start with 0.</b> Excel drops a leading zero from a number. If your numbers can start with 0, select column A and choose <b>Format Cells → Text</b> before typing any. Numbers starting 20… are not affected.</p></div>
+  </div>
+
+  <div class="step">
+    <h3><span class="n">8</span>Type the judges on the Judges sheet</h3>
+    <p>Name as the judges will see it, and the email they will sign in with. Leave <b>Password</b> empty: the app makes a password for each new judge and shows it once, on a slip to print (chapter 3).</p>
+    <figure class="fig w50"><div class="frame"><img src="images/xl-step-judges.jpg" alt="Four judges typed"></div>
+      <p class="cap">Four judges, passwords left empty.</p></figure>
+  </div>
+
+  <div class="step">
+    <h3><span class="n">9</span>Save</h3>
+    <p>Press <b>Ctrl+S</b> (⌘S on a Mac). If Excel asks about the format, keep <b>Excel Workbook (.xlsx)</b>. A .xls or .csv file is refused.</p>
+  </div>
+</section>
+
+<section class="p2">
+  <h2>2.3 Check it before you upload</h2>
+  <p>Five formulas, typed once to the right of the data, catch the mistakes that matter. The app ignores any column it does not know, so they can stay in the file when you upload it.</p>
+
+  <div class="step">
+    <h3><span class="n">10</span>Type the five headings in K1 to O1</h3>
+    <div class="type"><div class="lab">Type exactly this in K1, L1, M1, N1 and O1</div><pre>BLANK    TWICE    CHECK EMAIL    ADVISER DIFFERS    CHECK SECTION</pre></div>
+  </div>
+
+  <div class="step">
+    <h3><span class="n">11</span>List your real sections in column Q</h3>
+    <p>Type <b>Sections</b> in Q1, then each section exactly as it should be written, one per cell from Q2: <b>Sec - 1</b>, <b>Sec - 2</b>, and so on.</p>
+  </div>
+
+  <div class="step">
+    <h3><span class="n">12</span>Type the five formulas in row 2</h3>
+    <div class="type"><div class="lab">K2 · a required cell is empty</div><pre>=IF(OR(A2="",B2="",C2="",F2="",G2="",H2=""),"BLANK","")</pre></div>
+    <div class="type"><div class="lab">L2 · the same student number twice</div><pre>=IF(COUNTIF($A$2:$A$500,A2)>1,"TWICE","")</pre></div>
+    <div class="type"><div class="lab">M2 · an email with no @</div><pre>=IF(ISNUMBER(SEARCH("@",F2)),"","CHECK EMAIL")</pre></div>
+    <div class="type"><div class="lab">N2 · rows of one group naming different advisers</div><pre>=IF(COUNTIFS($G$2:$G$500,G2,$H$2:$H$500,H2)&lt;COUNTIF($G$2:$G$500,G2),"ADVISER DIFFERS","")</pre></div>
+    <div class="type"><div class="lab">O2 · a section not on your list</div><pre>=IF(COUNTIF($Q$2:$Q$20,E2)=0,"CHECK SECTION","")</pre></div>
+  </div>
+
+  <div class="step">
+    <h3><span class="n">13</span>Copy K2:O2 down to the last student</h3>
+    <p>Select K2 to O2, then double-click the small square at the bottom right of the selection. Any flag that appears marks a row to fix.</p>
+    <figure class="fig"><div class="frame"><img src="images/xl-checks-mistakes.jpg" alt="The check columns flagging five mistakes"></div>
+      <p class="cap">A practice copy with five mistakes planted: an email with no @ (row 6), one number typed twice (rows 8 and 9), an empty email (row 12), "UY, TERESA" for "UY, TERESITA" (rows 14–16), and "Sec 2" for "Sec - 2" (row 18). Columns B–D and I are hidden in these two pictures so the rest can be read.</p></figure>
+    <figure class="fig"><div class="frame"><img src="images/xl-checks-clean.jpg" alt="The check columns all empty"></div>
+      <p class="cap">The real file after fixing: every check column is empty.</p></figure>
+  </div>
+
+  <h3>What the app does with each mistake, if you upload it anyway</h3>
+  <table class="t">
+    <tr><th style="width:20%">Flag</th><th>What the upload does</th></tr>
+    <tr><td><b>BLANK</b></td><td>Skips the row and says so, for example "Students row 12 has no Email, so it was skipped."</td></tr>
+    <tr><td><b>TWICE</b></td><td>Keeps only the later of the two rows, and says so. The student on the earlier row is left out until you fix the number and upload again.</td></tr>
+    <tr><td><b>CHECK EMAIL</b></td><td>Skips the row: "Students row 6: “kristine.aquino.example.edu.ph” is not an email address, so the row was skipped."</td></tr>
+    <tr><td><b>ADVISER DIFFERS</b></td><td>Refuses the <b>whole group</b> and names the rows (chapter 3, step 10). Everybody else is uploaded.</td></tr>
+    <tr><td><b>CHECK SECTION</b></td><td><b>Nothing: it uploads silently.</b> The student is sorted under the misspelt section on the grade sheet.</td></tr>
+  </table>
+
+  <div class="call gold">
+    <div class="lab">Read this twice: two mistakes the app cannot see</div>
+    <p><b>A wrong email and a wrong section upload silently.</b> The app checks only that an email looks like one (something@something.something). <span class="k">andrea.reyez@example.edu.ph</span> looks fine, uploads fine, and sends Andrea's grade to nobody, or to somebody else. A section written <b>Sec 2</b> instead of <b>Sec - 2</b> becomes a section of its own. Formulas cannot catch a real-looking wrong address: have a second person read the Email column against the class roll before you upload, and fix any mistake later directly in the Data table (chapter 3).</p>
+  </div>
+</section>
+
+<!-- ═════════ 3 · SETTING UP ═════════ -->
+<section class="p3">
+  <p class="kicker">The Tambiz Manual | Chapter 3</p>
+  <h1 class="chapter">Setting up</h1>
+  <p class="deck">From signing in to judges holding their slips. About an hour, most of it checking.</p>
+
+  <h2>3.1 Sign in</h2>
+  <div class="step">
+    <h3><span class="n">1</span>Open the app's address on a laptop</h3>
+    <div class="type"><div class="lab">Type exactly this into the address bar</div><pre>tambiz-calculator-lyart.vercel.app</pre></div>
+    <figure class="fig w70"><div class="frame"><img src="images/c01-signin.jpg" alt="The sign-in card"></div>
+      <p class="cap">The sign-in card, the same for you and for the judges.</p></figure>
+    <div class="wrong"><div class="lab">If it goes wrong</div><p>The first page of the day can take a few seconds while the database wakes up. Wait; do not press again. Chapter 9.7 covers a site that does not load at all.</p></div>
+  </div>
+
+  <div class="step">
+    <h3><span class="n">2</span>Type the coordinator email and password, and press Sign in</h3>
+    <p>The coordinator login is <b>admin@tambiz.demo</b>. The password is kept where chapter 9.2 says.</p>
+    <figure class="fig w60"><div class="frame"><img src="images/c02-signin-filled.jpg" alt="The sign-in form filled in"></div></figure>
+    <figure class="fig w80"><div class="frame"><img src="images/c03-events.jpg" alt="The Events page"></div>
+      <p class="cap">You land on <b>Events</b>. A fresh app has only the practice event.</p></figure>
+    <div class="wrong"><div class="lab">If it goes wrong</div><p><span class="msg bad">Sign-in failed. Check your email and password.</span> Check for a capital letter or a space the keyboard added. After three wrong tries the app makes you wait, 10 seconds and doubling up to 5 minutes, and says <span class="msg bad">Too many attempts. Wait … seconds, then try again.</span> A forgotten coordinator password: chapter 9.4.</p></div>
+  </div>
+
+  <div class="step">
+    <h3><span class="n">3</span>If this is a new app, change the sample password: Account → Change password</h3>
+    <p>Press <b>Account</b> at the top right. Type the current password, then the new one twice, at least 12 characters, and press <b>Change password</b>.</p>
+    <figure class="fig w50"><div class="frame"><img src="images/c04-account.jpg" alt="My account"></div></figure>
+    <div class="wrong"><div class="lab">If it goes wrong</div><p>If your new password stops working after a day and the old one works again, the site is putting a password back every time it starts. That is the <b>SEED_ADMIN_PASSWORD</b> setting in chapter 9.4.</p></div>
+  </div>
+</section>
+
+<section class="p3">
+  <h2>3.2 Create this year's event</h2>
+  <div class="step">
+    <h3><span class="n">4</span>Under Start a new event, check the Year and leave Title empty</h3>
+    <p>The year box already shows next year. Leave <b>Title</b> empty and the event is called "Tambiz" and the year.</p>
+  </div>
+  <div class="step">
+    <h3><span class="n">5</span>Press Create event</h3>
+    <p>You land on the new event's <b>Data</b> tab, with the green message <span class="msg">Created Tambiz 2028. Upload its workbook to begin.</span> (pictured in chapter 2, step 1). The seven tabs along the top are the whole app: <b>Data</b>, <b>Judges</b>, <b>Scoring sheet</b>, <b>Progress</b>, <b>Results</b>, <b>Judge profiles</b>, <b>Close the event</b>.</p>
+    <p>The new event copies its scoring sheet, points and criterion wording from the newest existing event.</p>
+    <div class="wrong"><div class="lab">If it goes wrong</div><p>Made it with the wrong year? There is no delete button. Leave it empty and create the right one; an event with nobody in it does no harm. Never put this year's students into last year's event.</p></div>
+  </div>
+
+  <h3>The practice event</h3>
+  <p>Every screen of the practice event carries a shaded <b>Practice event</b> bar. Everything in it is invented, and it is where you rehearse (chapter 9.6). Never score a real group in it.</p>
+  <figure class="fig w80"><div class="frame"><img src="images/c45-practice.jpg" alt="The practice event's Data tab with its banner"></div>
+    <p class="cap">"Practice event. Everything here is invented, for trying the app out. Scores given here count for nobody."</p></figure>
+
+  <h2>3.3 The scoring sheet wording</h2>
+  <p>Judges see each criterion's wording on their phones. Without it the rows read "Criterion 1, Criterion 2…". Wording never changes a score, so this can be done at any time, even during judging.</p>
+  <div class="step">
+    <h3><span class="n">6</span>Press the Scoring sheet tab</h3>
+    <p>Each category is a card with one box per criterion; the points for each criterion are printed beside its box, for example <b>/20</b>.</p>
+  </div>
+  <div class="step">
+    <h3><span class="n">7</span>Copy the 39 criteria from Word or Excel, one per line, and paste into the first box</h3>
+    <p>In sheet order: the 21 Defense criteria, then the 18 Booth criteria. Click the first box under <b>Elevator Pitch</b> and press <b>Ctrl+V</b>. Each line fills the next box, carrying on into the next category; numbers and bullets at the start of a line are removed.</p>
+    <figure class="fig w80"><div class="frame"><img src="images/c12-sheet-bar.jpg" alt="Wording pasted into the boxes"></div>
+      <p class="cap">After pasting. The bar at the bottom says <b>Filled 39 boxes from your paste. Check them, then press Save wording.</b></p></figure>
+  </div>
+  <div class="step">
+    <h3><span class="n">8</span>Check the last box of each category against your list</h3>
+    <p>A line too many or too few pushes everything after it one box along. The last box of each category shows it at once.</p>
+  </div>
+  <div class="step">
+    <h3><span class="n">9</span>Press Save wording</h3>
+    <figure class="fig w80"><div class="frame"><img src="images/c13-sheet-saved.jpg" alt="Wording saved"></div>
+      <p class="cap"><span class="msg">Wording saved: 39 of 39 criteria have wording. Judges see it the next time they open a group.</span></p></figure>
+  </div>
+</section>
+
+<section class="p3">
+  <h2>3.4 Upload the workbook</h2>
+  <div class="step">
+    <h3><span class="n">10</span>On the Data tab, press Choose File and pick your workbook</h3>
+    <figure class="fig"><div class="frame"><img src="images/c06-upload-chosen.jpg" alt="The workbook chosen"></div>
+      <p class="cap">The file's name appears beside <b>Choose File</b>.</p></figure>
+  </div>
+  <div class="step">
+    <h3><span class="n">11</span>Press Upload workbook, and watch it count</h3>
+    <p>A bar counts the rows of the file as they are checked, then says it is saving them all together. Nothing is saved until every row has been checked.</p>
+    <figure class="fig"><div class="frame"><img src="images/c07-upload-progress.jpg" alt="The upload counting rows"></div>
+      <p class="cap"><b>Checking 18 students · 8 of 22 rows</b>: 18 students and 4 judges make 22 rows.</p></figure>
+  </div>
+  <div class="step">
+    <h3><span class="n">12</span>Read the green message, and the shaded box under it</h3>
+    <p>The green message says what changed. The shaded box lists anything in the file that was not taken, and why. This first try had one mistake left in it: a group whose rows named two different advisers.</p>
+    <figure class="fig"><div class="frame"><img src="images/c08-upload-first.jpg" alt="The upload message, one refused group, and the judges' sign-in list"></div>
+      <p class="cap"><span class="msg">Uploaded Tambiz 2028 workbook.xlsx: 15 new students, 5 new groups, 3 new advisers, 4 new judges. No one was removed and no score changed.</span> Below it: <b>Group TAHANAN TILES was not imported: its rows name different advisers (rows 14 and 16 say UY, TERESITA; row 15 says UY, TERESA).</b> Then the judges' sign-in list.</p></figure>
+  </div>
+  <div class="step">
+    <h3><span class="n">13</span>Print the sign-in list now: press Print this list</h3>
+    <p>It lists each new judge's name, email and password, laid out to fit one page. Cut it into slips for the judges' briefing.</p>
+    <div class="call gold"><div class="lab">Read this twice</div>
+      <p><b>The passwords are shown only this once.</b> The app keeps no copy it can show again. If you leave the page without printing, or a slip is lost, give that judge a new password with <b>Reset password</b> on the Judges tab (chapter 9.4).</p></div>
+  </div>
+  <div class="step">
+    <h3><span class="n">14</span>Fix what the shaded box names, save, and upload the same file again</h3>
+    <p>Uploading twice never adds anyone twice: students are matched on Student No., judges on email, groups on name. Judges already in the app keep their passwords.</p>
+    <figure class="fig"><div class="frame"><img src="images/c09-upload-second.jpg" alt="The second upload"></div>
+      <p class="cap"><span class="msg">Uploaded Tambiz 2028 workbook.xlsx: 3 new students, 1 new group, 1 new adviser. No one was removed and no score changed.</span> The line under it counts <b>18 students in 6 groups with 4 advisers · 1 adviser without an email</b>.</p></figure>
+    <div class="wrong"><div class="lab">If it goes wrong</div>
+      <p><span class="msg bad">This does not look like an Excel .xlsx file.</span> Open it in Excel, <b>Save As → Excel Workbook (.xlsx)</b>, and upload that. <span class="msg bad">The Students sheet has no “Email” column.</span> A heading was renamed: copy row 1 from a fresh template. Nothing is saved when a file is refused.</p></div>
+  </div>
+
+  <h3>What an upload never does</h3>
+  <ul>
+    <li><b>It never removes anybody.</b> A student or judge missing from the file stays in the app. Remove them on the Data or Judges tab.</li>
+    <li><b>It never touches a score</b>, before, during or after judging.</li>
+    <li>It is refused while the event is closed.</li>
+  </ul>
+</section>
+
+<section class="p3">
+  <h2>3.5 The Data table</h2>
+  <p>Every list in the app is the same table, and it works like Excel. There is no Save button: every change saves itself, and the label at the top right says <b>All changes saved</b>, <b>Saving…</b>, or in red how many cells were refused.</p>
+  <table class="t">
+    <tr><th style="width:32%">To</th><th>Do this</th></tr>
+    <tr><td>Change a detail</td><td>Click the cell, type over it, press <b>Enter</b>. <b>Esc</b> throws away what you typed.</td></tr>
+    <tr><td>Paste from Excel</td><td>Copy the cells in Excel, click where the top-left one should go, <b>Ctrl+V</b>. A bar says how many cells will change; <b>Enter</b> applies, <b>Esc</b> cancels.</td></tr>
+    <tr><td>Move a student to another group</td><td>Type the group's name in their <b>Group</b> cell. The cell completes the name as you type; <b>Enter</b> or <b>Tab</b> accepts.</td></tr>
+    <tr><td>Change a group's adviser or adviser email</td><td>Type it on any one row of the group; every member's row follows.</td></tr>
+    <tr><td>Add a student</td><td>Type in the empty last row, <b>Add a student here</b>.</td></tr>
+    <tr><td>Remove a student</td><td>Select the row and press <b>Remove student</b> (or <b>Ctrl+Delete</b>, then <b>Enter</b>). A student the judges have already scored cannot be removed.</td></tr>
+    <tr><td>Find someone</td><td><b>Ctrl+F</b> or the <b>Search</b> box; the lists beside it filter by Section, Group or Adviser. Click a heading to sort.</td></tr>
+  </table>
+
+  <h2>3.6 The Judges tab</h2>
+  <p>It lists this event's judges. Most came in with the workbook. To add one more, type their name and email in the last row, <b>Add a judge here</b>; a sign-in list with their password appears above the table, once, to print.</p>
+  <figure class="fig w80"><div class="frame"><img src="images/c10-judges.jpg" alt="The Judges tab"></div>
+    <p class="cap">The four judges of Tambiz 2028. <b>Profile</b> opens that judge's page in Judge profiles. <b>Reset password</b> and <b>Remove from this event</b> work on the selected row (chapter 9.4).</p></figure>
+  <p>Typing the email of a judge from an earlier year adds that same account, with its password unchanged, so their judge profile carries on.</p>
+
+  <h2>3.7 Opening judging</h2>
+  <p>There is no button to press. <b>An event is open for judging from the moment it is created</b>, and a judge can score as soon as they are on it. What opens judging in practice is the slips in the judges' hands.</p>
+  <div class="step">
+    <h3><span class="n">15</span>Hand each judge their slip at the briefing</h3>
+  </div>
+  <div class="step">
+    <h3><span class="n">16</span>Ask every judge to open the address on their phone and sign in once, before the night</h3>
+    <p>A phone that has never opened the app cannot load it with no connection. After one visit, scores typed offline are kept on the phone and sent later (chapter 5).</p>
+  </div>
+  <div class="step">
+    <h3><span class="n">17</span>Open the Progress tab: it should say Judging has not started</h3>
+    <figure class="fig w70"><div class="frame"><img src="images/c14-empty-progress.jpg" alt="Progress before any score"></div>
+      <p class="cap">Before any score arrives. From the first submitted sheet on, this page fills in (chapter 6).</p></figure>
+  </div>
+</section>
+
+<!-- ═════════ 4 · HOW A SCORE BECOMES A GRADE ═════════ -->
+<section class="p4">
+  <p class="kicker">The Tambiz Manual | Chapter 4</p>
+  <h1 class="chapter">How a score becomes a grade</h1>
+  <p class="deck">One student, Andrea Reyes of KAPE KULTURA, followed from the judges' scores to her letter grade. Every number is from the Tambiz 2028 pictures in this manual.</p>
+
+  <div class="flow">
+    <div class="box"><b>Criterion averages</b>Each criterion: the average of the judges who submitted.</div>
+    <div class="arr">›</div>
+    <div class="box"><b>Category %</b>Averages added up, over the maximums added up.</div>
+    <div class="arr">›</div>
+    <div class="box"><b>Half %</b>The categories of the half, averaged.</div>
+    <div class="arr">›</div>
+    <div class="box"><b>Group overall</b>Defense × 0.7 + Booth × 0.3.</div>
+    <div class="arr">›</div>
+    <div class="box gold"><b>Final grade</b>(Member total + group overall) ÷ 2, rounded up, then its letter.</div>
+  </div>
+
+  <h2>4.1 The group's score</h2>
+  <h3>Step A · One category: Elevator Pitch</h3>
+  <p>Two defense judges submitted a sheet for KAPE KULTURA: Dr. Liza Manalo and Mr. Paolo Dizon. For each criterion the app takes the average of their two scores.</p>
+  <figure class="fig"><div class="frame"><img src="images/c23-corrected.jpg" alt="KAPE KULTURA's defense scores"></div>
+    <p class="cap">KAPE KULTURA's Defense scores (Progress → the group's name). Criterion 4 is shaded: Dr. Manalo typed 0 and the coordinator corrected it to 16 with a reason (chapter 6).</p></figure>
+  <table class="t">
+    <tr><th>Criterion</th><th class="num">Max</th><th class="num">Dr. Manalo</th><th class="num">Mr. Dizon</th><th class="num">Average</th></tr>
+    <tr><td>1. The problem is stated clearly…</td><td class="num">20</td><td class="num">17</td><td class="num">16</td><td class="num">16.50</td></tr>
+    <tr><td>2. The customer and market…</td><td class="num">20</td><td class="num">18</td><td class="num">16</td><td class="num">17.00</td></tr>
+    <tr><td>3. The product answers the problem…</td><td class="num">20</td><td class="num">18</td><td class="num">16.5</td><td class="num">17.25</td></tr>
+    <tr><td>4. The pitch closes with a clear ask</td><td class="num">20</td><td class="num">16 (corrected)</td><td class="num">16.5</td><td class="num">16.25</td></tr>
+    <tr><td>5. Delivery is confident…</td><td class="num">20</td><td class="num">16.5</td><td class="num">17</td><td class="num">16.75</td></tr>
+    <tr class="sum"><td>Elevator Pitch</td><td class="num">100</td><td></td><td></td><td class="num">83.75 → 83.75%</td></tr>
+  </table>
+  <p class="cap">Averages added up: 83.75 out of 100 points, so 83.75%. A category's percentage uses only criteria that have at least one score, so a blank criterion is left out rather than counted as zero.</p>
+
+  <h3>Step B · The two halves</h3>
+  <div class="calc">
+    Defense = (Elevator Pitch 83.75 + Infomercial 81.25 + Paper 81.50 + Product Demo 83.25) ÷ 4 = <b>82.44%</b><br>
+    Booth &nbsp; = (Best Business Plan Booth 85.50 + Student Innovation 88.50 + Best Product Demonstration 89.00) ÷ 3 = <b>87.67%</b>
+  </div>
+  <p class="cap">Every category weighs the same within its half. Infomercial is out of 40 points, not 100, but its percentage counts the same as the others'.</p>
+
+  <h3>Step C · The group overall</h3>
+  <div class="calc">
+    Overall = Defense × 0.7 + Booth × 0.3 = 82.4375 × 0.7 + 87.6667 × 0.3 = 57.71 + 26.30 = <b>84.01%</b>
+  </div>
+  <p class="cap">The app carries the halves unrounded until the end; working with the two-decimal figures gives the same 84.01. Every student of KAPE KULTURA shares this number.</p>
+  <figure class="fig"><div class="frame"><img src="images/c30-results-table.jpg" alt="Every group on the Results tab"></div>
+    <p class="cap">Results → Every group. Each category shows its percentage and, after the dot, its rank. The table scrolls sideways inside its frame: KAPE KULTURA's <b>Overall 84.01</b> and <b>Rank 2</b> are in the columns to the right of this picture, and in the workbook's Results sheet (chapter 7.4).</p></figure>
+</section>
+
+<section class="p4">
+  <h2>4.2 The student's own score</h2>
+  <h3>Step D · The member total</h3>
+  <p>In the Defense, each judge also scores every student: Presentation /20, Communication /40, Q&amp;A /40. For each of the three, the app averages the judges who scored it, then adds the three averages.</p>
+  <table class="t">
+    <tr><th>Andrea Reyes</th><th class="num">Max</th><th class="num">Dr. Manalo</th><th class="num">Mr. Dizon</th><th class="num">Average</th></tr>
+    <tr><td>Presentation</td><td class="num">20</td><td class="num">18</td><td class="num">17</td><td class="num">17.50</td></tr>
+    <tr><td>Communication</td><td class="num">40</td><td class="num">35</td><td class="num">32.5</td><td class="num">33.75</td></tr>
+    <tr><td>Q&amp;A</td><td class="num">40</td><td class="num">34</td><td class="num">32</td><td class="num">33.00</td></tr>
+    <tr class="sum"><td>Member total</td><td class="num">100</td><td></td><td></td><td class="num">84.25</td></tr>
+  </table>
+  <p class="cap">Until every one of the three has at least one judge's score, there is no member total and no grade; a partial total is never scaled up.</p>
+
+  <h3>Step E · The final grade</h3>
+  <div class="calc">
+    Final grade = (Member total 84.25 + Group overall 84.01) ÷ 2 = 168.26 ÷ 2 = <b>84.13</b>
+  </div>
+
+  <h3>Step F · Round up, then the FEU letter band</h3>
+  <div class="calc">
+    84.13 rounded <b>up</b> to a whole number = <b>85</b> &nbsp;→&nbsp; 85 is in 85–91 &nbsp;→&nbsp; <b>B+</b>, 3.5 quality points
+  </div>
+  <table class="t">
+    <tr><th>Rounded grade</th><th>92–100</th><th>85–91</th><th>78–84</th><th>71–77</th><th>64–70</th><th>57–63</th><th>50–56</th><th>0–49</th></tr>
+    <tr><td><b>Letter</b></td><td>A</td><td><b>B+</b></td><td>B</td><td>C+</td><td>C</td><td>D+</td><td>D</td><td>F</td></tr>
+    <tr><td><b>Quality points</b></td><td>4</td><td><b>3.5</b></td><td>3</td><td>2.5</td><td>2</td><td>1.5</td><td>1</td><td>0</td></tr>
+  </table>
+  <div class="call gold"><div class="lab">Read this twice</div>
+    <p><b>The grade is always rounded up.</b> Andrea's 84.13 becomes 85, a B+; rounded the ordinary way it would have been 84, a B. Any fraction at all goes up: 84.01 becomes 85 too.</p></div>
+  <figure class="fig w80"><div class="frame"><img src="images/c32-grade-detail.jpg" alt="Andrea's row on Individual grades"></div>
+    <p class="cap">Results → Individual grades, with Andrea's <b>Member total</b> cell selected. The line under the table shows each judge's three scores: <b>Dr. Liza Manalo: 18 / 35 / 34 · Mr. Paolo Dizon: 17 / 32.5 / 32</b>.</p></figure>
+</section>
+
+<section class="p4">
+  <h2>4.3 The rules that decide the numbers</h2>
+  <table class="t">
+    <tr><th style="width:28%">Rule</th><th>What it means</th></tr>
+    <tr><td><b>Only submitted sheets count</b></td><td>A sheet the judge never marked complete is ignored everywhere. Mr. Dizon started HALO-HALO HUB's defense and never submitted it, so HALO-HALO HUB's defense rests on Dr. Manalo's sheet alone.</td></tr>
+    <tr><td><b>A blank is never a zero</b></td><td>A criterion, category or half nobody scored is left out. A group with no booth score at all has its defense as its overall.</td></tr>
+    <tr><td><b>Incomplete groups are not ranked</b></td><td>Until every criterion in both halves has a score on a submitted sheet, a group reads <b>Incomplete</b>, with no rank and no place on the leaderboard.</td></tr>
+    <tr><td><b>Two decimals, one rounding</b></td><td>Every percentage shows two decimals; the screens and the workbook round the same way, so they always agree.</td></tr>
+    <tr><td><b>Ties go to the higher overall</b></td><td>In Infomercial, SARI-SARI SMART and BANIG &amp; CO. both show 78.13%. SARI-SARI SMART's overall (81.81) is higher than BANIG &amp; CO.'s (78.60), so it ranks 3rd and BANIG &amp; CO. 4th. Two groups share a place only if their overalls are equal too.</td></tr>
+    <tr><td><b>Absent means zero</b></td><td>A student marked absent from the defense has zero for every individual score nobody gave, and a grade worked out as usual (below).</td></tr>
+    <tr><td><b>Scores above the maximum are refused</b></td><td>Never quietly changed to the maximum. The judge's phone refuses them, and so does the server.</td></tr>
+  </table>
+
+  <h3>An absent student</h3>
+  <p>Kristine Aquino of BANIG &amp; CO. missed the defense and was marked absent. Her member total is 0, so her final grade is (0 + 78.60) ÷ 2 = 39.30, rounded up to 40: <b>F</b>. That is the department's rule, applied exactly. If the department decides otherwise for a student, type their individual scores on the group's scores page with a reason (chapter 6); the grade, the workbook and the email follow.</p>
+
+  <h3>Checking a grade by hand in Excel</h3>
+  <p>With the member total in A1 and the group overall in B1:</p>
+  <div class="type"><div class="lab">Type exactly this in C1</div><pre>=ROUNDUP((ROUND(A1,2)+ROUND(B1,2))/2,0)</pre></div>
+  <p>Then read the letter from the band table above. For Andrea: A1 84.25, B1 84.01, C1 85, B+.</p>
+</section>
+
+<!-- ═════════ 5 · THE JUDGE'S SIDE ═════════ -->
+<section class="p5">
+  <p class="kicker">The Tambiz Manual | Chapter 5</p>
+  <h1 class="chapter">The judge's side, click by click</h1>
+  <p class="deck">Everything a judge sees, on a phone. Photocopy this chapter for the judges' briefing. The pictures follow Dr. Liza Manalo scoring KAPE KULTURA's defense.</p>
+
+  <div class="step">
+    <h3><span class="n">1</span>Open the address on your phone, type the email and password from your slip, and tap Sign in</h3>
+    <div class="phones two">
+      <figure class="fig"><div class="frame"><img src="images/j01-signin.jpg" alt="Sign-in on a phone"></div><p class="cap">The sign-in card.</p></figure>
+      <figure class="fig"><div class="frame"><img src="images/j02-signin-filled.jpg" alt="Sign-in filled in"></div><p class="cap">Email and password from the slip.</p></figure>
+    </div>
+    <div class="wrong"><div class="lab">If it goes wrong</div><p><span class="msg bad">Sign-in failed. Check your email and password.</span> Phones often add a capital letter or a space at the start: check both. After three wrong tries the phone says <span class="msg bad">Too many attempts. Wait 8 seconds, then try again.</span> Wait, then try once more carefully. Still stuck: ask the coordinator for a new password.</p></div>
+  </div>
+
+  <div class="step">
+    <h3><span class="n">2</span>At the top, tap Defense or Booth, whichever you are judging</h3>
+    <p>The list shows every group, with its adviser and whether you have started it. You can search by group or adviser.</p>
+    <div class="phones two">
+      <figure class="fig"><div class="frame"><img src="images/j03-groups.jpg" alt="The group list, Defense"></div><p class="cap">"I am scoring: Defense". Nothing started yet.</p></figure>
+      <figure class="fig"><div class="frame"><img src="images/j18-groups-booth.jpg" alt="The group list, Booth"></div><p class="cap">Tap <b>Booth</b> to switch.</p></figure>
+    </div>
+  </div>
+</section>
+
+<section class="p5">
+  <div class="step">
+    <h3><span class="n">3</span>Tap the group in front of you, and check its name at the top</h3>
+    <p>You start on the first category. Each row has its number, the criterion, a large box, and the maximum beside it, for example <b>/20</b>. The label at the top right says whether your scores are saved.</p>
+    <div class="side">
+      <figure class="fig"><div class="frame"><img src="images/j04-category.jpg" alt="The first category, empty"></div></figure>
+      <div><p class="cap" style="margin-top:0">KAPE KULTURA, <b>DEFENSE</b>, step 1 of 6: Elevator Pitch. The strip under the name shows every category with how many of its criteria you have scored; tap one to jump to it.</p>
+        <p class="cap">The six steps of a defense are the four categories, then <b>Members</b>, then <b>Review</b>. A booth has its three categories, then Review.</p></div>
+    </div>
+  </div>
+
+  <div class="step">
+    <h3><span class="n">4</span>Tap the first box and type the score; tap Next on the keypad for the next box</h3>
+    <p>Scores can have up to two decimals, for example <b>16.5</b> or <b>8.75</b>. There is no Save button: every score is kept on the phone the moment it is typed, and sent in the background.</p>
+    <div class="phones two">
+      <figure class="fig"><div class="frame"><img src="images/j05-first-score.jpg" alt="The first score typed"></div><p class="cap">17 typed; the next box is ready.</p></figure>
+      <figure class="fig"><div class="frame"><img src="images/j07-zero.jpg" alt="Five scores, one of them zero"></div><p class="cap">All five scored: 69.5 / 100. A <b>0</b> asks <b>0 points. Intended?</b> It is allowed; it is only a reminder.</p></figure>
+    </div>
+  </div>
+</section>
+
+<section class="p5">
+  <div class="step">
+    <h3><span class="n">5</span>If a row turns red, read it and type the score again</h3>
+    <div class="side">
+      <figure class="fig"><div class="frame"><img src="images/j06-overmax.jpg" alt="A score over the maximum"></div></figure>
+      <div><p class="cap" style="margin-top:0"><span class="msg bad">Max is 20. You typed 25, so it is not counted yet.</span> A score above the maximum, or with a third decimal, is refused, never quietly changed. The category gets a red <b>!</b> in the strip until it is fixed.</p></div>
+    </div>
+  </div>
+
+  <div class="step">
+    <h3><span class="n">6</span>After the last box, tap the green button for the next category</h3>
+    <div class="phones two">
+      <figure class="fig"><div class="frame"><img src="images/j08-next-category.jpg" alt="The next category"></div><p class="cap">Step 2 of 6: Infomercial, out of 40. Elevator Pitch has its tick.</p></figure>
+    </div>
+  </div>
+
+  <div class="step">
+    <h3><span class="n">7</span>If the connection drops, keep scoring</h3>
+    <p>The label counts the scores kept on the phone, and they send by themselves when the connection is back. Do not close the browser, use a private tab, or clear the browser while scores are waiting.</p>
+    <div class="phones two">
+      <figure class="fig"><div class="frame"><img src="images/j09-offline.jpg" alt="Offline, scores kept on phone"></div><p class="cap"><b>Offline · 3 kept on phone</b>, and a note: <b>No connection. Keep scoring.</b></p></figure>
+      <figure class="fig"><div class="frame"><img src="images/j10-back-online.jpg" alt="Back online, all saved"></div><p class="cap">Connection back: <b>All saved</b>, with nothing to press.</p></figure>
+    </div>
+    <div class="wrong"><div class="lab">If it goes wrong</div><p>The label says <b>Sign in to send 3</b>: the phone was signed out while scores were waiting. Tap <b>Sign in again</b> in the message at the top, sign in, and open the same group; the kept scores send.</p></div>
+  </div>
+</section>
+
+<section class="p5">
+  <div class="step">
+    <h3><span class="n">8</span>Defense only: on Members, score every student</h3>
+    <p>One card per student, each with <b>Presentation /20</b>, <b>Communication /40</b> and <b>Q&amp;A /40</b>.</p>
+    <div class="phones two">
+      <figure class="fig"><div class="frame"><img src="images/j11-members.jpg" alt="Members step, empty"></div><p class="cap">Step 5 of 6: Members.</p></figure>
+      <figure class="fig"><div class="frame"><img src="images/j12-members-scored.jpg" alt="Members scored"></div><p class="cap">Each card shows its total out of 100.</p></figure>
+    </div>
+  </div>
+
+  <div class="step">
+    <h3><span class="n">9</span>If a student is not at the defense, tap Absent on their card</h3>
+    <div class="side">
+      <figure class="fig"><div class="frame"><img src="images/j19-absent.jpg" alt="A student marked absent"></div></figure>
+      <div><p class="cap" style="margin-top:0">BANIG &amp; CO.: <b>Absent from the defense. No scores needed: their individual scores count as zero.</b> Every judge and the coordinator see it. <b>Not absent</b> undoes it.</p>
+      <div class="call gold"><div class="lab">Read this twice</div><p style="font-size:9pt">Absent means a zero for that student's own scores, and usually a failing grade (chapter 4). Mark it only when the student really was not there.</p></div></div>
+    </div>
+  </div>
+</section>
+
+<section class="p5">
+  <div class="step">
+    <h3><span class="n">10</span>Tap Review, and tap Go beside anything it lists</h3>
+    <p>Review shows your percentage for each category, every blank box and every zero. <b>Go</b> jumps straight to that box.</p>
+    <div class="phones two">
+      <figure class="fig"><div class="frame"><img src="images/j13-review.jpg" alt="Review with one blank"></div><p class="cap">One blank left: <b>7. Risk and contingency is blank</b>. <b>Mark group complete</b> is grey.</p></figure>
+      <figure class="fig"><div class="frame"><img src="images/j14-go-blank.jpg" alt="Go jumps to the blank box"></div><p class="cap"><b>Go</b> opened Paper with the blank box ready to type in.</p></figure>
+    </div>
+  </div>
+
+  <div class="step">
+    <h3><span class="n">11</span>When nothing is blank or red, tap Mark group complete</h3>
+    <div class="phones two">
+      <figure class="fig"><div class="frame"><img src="images/j15-review-ready.jpg" alt="Review ready"></div><p class="cap"><b>Everything is filled in.</b> The button is green.</p></figure>
+      <figure class="fig"><div class="frame"><img src="images/j16-complete.jpg" alt="Marked complete"></div><p class="cap"><b>Marked complete. Scores are locked against accidental taps.</b></p></figure>
+    </div>
+    <div class="call gold"><div class="lab">Read this twice</div><p><b>Your scores for a group count only after you tap Mark group complete.</b> A group you scored but did not mark complete counts for nothing.</p></div>
+  </div>
+</section>
+
+<section class="p5">
+  <div class="step">
+    <h3><span class="n">12</span>Tap All groups (or ‹ Groups) and pick the next group</h3>
+    <div class="side">
+      <figure class="fig"><div class="frame"><img src="images/j17-groups-after.jpg" alt="The list with one group complete"></div></figure>
+      <div><p class="cap" style="margin-top:0">KAPE KULTURA now shows <b>✓ Complete</b>. The filters at the top show what is left: Not started, In progress, Complete.</p>
+      <h3>To change a group you already completed</h3>
+      <p>Open it and tap <b>Edit scores</b>. While you edit, your scores for that group stop counting; tap <b>Mark group complete</b> again when you are done. You can do this until the coordinator closes the event.</p>
+      <h3>After the event is closed</h3>
+      <p>The list says <b>Judging is closed. You can still look at your scores, but changes are no longer accepted.</b></p></div>
+    </div>
+    <div class="phones two">
+      <figure class="fig"><div class="frame"><img src="images/j21-closed.jpg" alt="The list after closing"></div><p class="cap">A booth judge's list after the event closed.</p></figure>
+      <figure class="fig"><div class="frame"><img src="images/j20-account.jpg" alt="The judge's Account page"></div><p class="cap"><b>Account</b>: a judge can change their own password here, at least 12 characters.</p></figure>
+    </div>
+  </div>
+</section>
+
+<!-- ═════════ 6 · YOUR EVENING ═════════ -->
+<section class="p6">
+  <p class="kicker">The Tambiz Manual | Chapter 6</p>
+  <h1 class="chapter">Your evening</h1>
+  <p class="deck">While the judges score: watch progress, correct what a judge asks you to, settle what stops the event closing, and close it.</p>
+
+  <h2>6.1 Watch the progress</h2>
+  <div class="step">
+    <h3><span class="n">1</span>On the laptop, press the Progress tab, and reload it now and then</h3>
+    <p>The two boxes count, for each half, the groups with at least one submitted sheet.</p>
+    <figure class="fig w80"><div class="frame"><img src="images/c20-progress.jpg" alt="Progress: the two boxes"></div>
+      <p class="cap">Defense <b>6/6</b>. Booth <b>5/6</b>, "1 more only in progress, not counted yet".</p></figure>
+  </div>
+  <div class="step">
+    <h3><span class="n">2</span>Read By group: one line per group and half</h3>
+    <figure class="fig w80"><div class="frame"><img src="images/c20-progress-groups.jpg" alt="Progress by group"></div></figure>
+    <table class="t">
+      <tr><th style="width:36%">Label</th><th>Meaning</th></tr>
+      <tr><td><b>✓ 2 submitted</b></td><td>Two judges marked it complete. Only these count.</td></tr>
+      <tr><td><b>only 1</b></td><td>One submitted sheet. It counts, but a second judge makes the result steadier.</td></tr>
+      <tr><td><b>1 in progress · not counted</b></td><td>A judge started and has not tapped Mark group complete. Their name and how far they got are shown, for example "Mr. Paolo Dizon (in progress, 9/21, not counted)".</td></tr>
+      <tr><td><b>Nothing submitted</b> (red)</td><td>Started, but no sheet submitted: the group has no score in this half yet. LIWANAG LAMPS' booth, above.</td></tr>
+      <tr><td><b>No scores</b> (red)</td><td>No judge has touched it.</td></tr>
+    </table>
+  </div>
+  <div class="step">
+    <h3><span class="n">3</span>Read By judge, to see who to chase</h3>
+    <figure class="fig w70"><div class="frame"><img src="images/c20-progress-judges.jpg" alt="Progress by judge"></div>
+      <p class="cap">Engr. Ramon Cruz: <b>Booth: 4 submitted, 1 in progress (not counted)</b>. Go and ask him to finish and tap Mark group complete.</p></figure>
+  </div>
+</section>
+
+<section class="p6">
+  <h2>6.2 Correct a judge's score, with a reason</h2>
+  <p>A judge tells you they typed 0 for KAPE KULTURA's "clear ask" and meant 16. You correct it yourself; the judge's own score is kept beside yours.</p>
+  <div class="step">
+    <h3><span class="n">4</span>On Progress, press the group's name (or its Defense or Booth label)</h3>
+    <p>One row per criterion (and, for the defense, per student's Presentation, Communication and Q&amp;A), one column per judge, and the <b>Average of submitted</b>.</p>
+    <figure class="fig w80"><div class="frame"><img src="images/c21-scores.jpg" alt="The group's scores page"></div>
+      <p class="cap">KAPE KULTURA · Defense. Each judge's heading says <b>submitted</b> or <b>in progress, not counted</b>.</p></figure>
+  </div>
+  <div class="step">
+    <h3><span class="n">5</span>Type the reason in Reason for these corrections</h3>
+    <div class="type"><div class="lab">Type exactly this</div><pre>Judge confirmed 16, typed 0</pre></div>
+    <p>A reason is required; the table takes no change without one. The same reason is used for every correction until you change it.</p>
+  </div>
+  <div class="step">
+    <h3><span class="n">6</span>Click the judge's score, type the right one, press Enter</h3>
+    <figure class="fig"><div class="frame"><img src="images/c22-correct-typing.jpg" alt="Typing the corrected score"></div>
+      <p class="cap">16 typed over Dr. Manalo's 0.</p></figure>
+    <figure class="fig"><div class="frame"><img src="images/c23-corrected.jpg" alt="The corrected score"></div>
+      <p class="cap"><span class="msg">Corrected Elevator Pitch 4 (The pitch closes with a clear ask) for Dr. Liza Manalo: 0 → 16. The judge’s own score is kept and your reason is recorded.</span> The cell is shaded and underlined; the average is now 16.25.</p></figure>
+    <div class="wrong"><div class="lab">If it goes wrong</div><p>A score above that row's maximum is refused and the cell stays red. Empty a cell to remove a score altogether. Select a corrected cell and the line under the table says who corrected it, what the judge gave, and why.</p></div>
+  </div>
+  <div class="step">
+    <h3><span class="n">7</span>Reload to see it under Corrections made</h3>
+    <figure class="fig"><div class="frame"><img src="images/c24-corrections-list.jpg" alt="Corrections made"></div>
+      <p class="cap">Every correction, with who, when and why. The workbook's Scores sheets list them too, in their last column.</p></figure>
+  </div>
+  <p>You can correct scores while the event is open and after it is closed, until the email file is downloaded.</p>
+</section>
+
+<section class="p6">
+  <h2>6.3 What stops the event closing</h2>
+  <div class="step">
+    <h3><span class="n">8</span>Press the Close the event tab and read Before closing</h3>
+    <p>Items marked <b>Needs you</b> keep the <b>Close the event</b> button grey. Items marked <b>Check</b> are worth a look but do not stop it.</p>
+    <figure class="fig"><div class="frame"><img src="images/c25-close-blockers.jpg" alt="Before closing: one item needs you"></div>
+      <p class="cap"><b>1 item needs you before the event can close.</b> <span class="msg bad">LIWANAG LAMPS: no completed Booth sheet.</span> Under it, four Checks: a half with only one completed sheet, and sheets a judge has not submitted.</p></figure>
+  </div>
+  <table class="t">
+    <tr><th style="width:38%">Needs you</th><th>How to settle it</th></tr>
+    <tr><td><b>GROUP: no completed Booth sheet</b> (or Defense), or a criterion nobody has scored</td><td>Ask the judge to finish and tap <b>Mark group complete</b>. If the group genuinely cannot be fully judged, for example it never set up its booth, use <b>Close this group with the scores it has…</b> (step 9).</td></tr>
+    <tr><td><b>STUDENT (GROUP) has incomplete individual scores</b></td><td>Ask a defense judge to score them, correct the scores yourself (6.2), or, if they missed the defense, press <b>Mark absent from the defense</b>.</td></tr>
+  </table>
+  <div class="step">
+    <h3><span class="n">9</span>Only if a group cannot be judged: Close this group with the scores it has…, type the reason, Accept with this reason</h3>
+    <figure class="fig w80"><div class="frame"><img src="images/c26-accept-open.jpg" alt="Accepting a group with a reason"></div>
+      <p class="cap">The reason is kept with the results. The missing half stays out of the group's score; it is not counted as zero, and the group is marked <b>Finalised incomplete</b> in the workbook. Here the judge finished instead, so nothing was accepted.</p></figure>
+  </div>
+  <div class="step">
+    <h3><span class="n">10</span>Read Already decided by you, and These people will get no email</h3>
+    <figure class="fig"><div class="frame"><img src="images/c25-close-decided.jpg" alt="Already decided, and people who will get no email"></div>
+      <p class="cap">Kristine Aquino is marked absent, with <b>Not absent</b> to undo it. Under <b>These people will get no email</b>: students with no grade yet, and <b>OCAMPO, DANILO, adviser of LIWANAG LAMPS, has no email</b>.</p></figure>
+  </div>
+  <div class="step">
+    <h3><span class="n">11</span>Add a missing adviser email on the Data tab</h3>
+    <p>Click the <b>Adviser email</b> cell on any row of one of their groups, type the address, press <b>Enter</b>. Every row of that adviser follows.</p>
+    <figure class="fig"><div class="frame"><img src="images/c27-adviser-email-saved.jpg" alt="The adviser email added"></div>
+      <p class="cap">docampo@example.edu.ph typed once, on Joaquin Domingo's row; all three LIWANAG LAMPS rows now carry it.</p></figure>
+  </div>
+</section>
+
+<section class="p6">
+  <h2>6.4 Close the event</h2>
+  <div class="step">
+    <h3><span class="n">12</span>When nothing Needs you, tick I have checked the progress</h3>
+    <figure class="fig"><div class="frame"><img src="images/c36-close-ticked.jpg" alt="The tick box and the Close the event button"></div>
+      <p class="cap">"Closing locks every judge’s scores. A blank score is never counted as zero. You can still correct a score with a reason, and undo closing, until you download the email file."</p></figure>
+  </div>
+  <div class="step">
+    <h3><span class="n">13</span>Press Close the event</h3>
+    <figure class="fig w80"><div class="frame"><img src="images/c37-closed.jpg" alt="The event closed"></div>
+      <p class="cap"><span class="msg">The event is closed. Judges can no longer change scores. Download the two files below.</span> The eyebrow now reads <b>TAMBIZ 2028 · CLOSED</b>.</p></figure>
+  </div>
+  <h3>Undo closing</h3>
+  <p>Until the email file is downloaded, you can reopen judging: open <b>Undo closing…</b> at the bottom of the tab, tick <b>Reopen judging</b>, press <b>Undo closing</b>. Judges can change scores again, and a workbook you already downloaded may no longer match. Close the event again when judging is done.</p>
+  <figure class="fig w70"><div class="frame"><img src="images/c38-undo-open.jpg" alt="Undo closing"></div>
+    <p class="cap">Undo closing, opened. Chapter 8 continues with the two files.</p></figure>
+</section>
+
+<!-- ═════════ 7 · RESULTS, GRADES AND PROFILES ═════════ -->
+<section class="p7">
+  <p class="kicker">The Tambiz Manual | Chapter 7</p>
+  <h1 class="chapter">Results, individual grades, judge profiles and the workbook</h1>
+  <p class="deck">Results move as judges submit, until you close the event. Only you see these pages; students and advisers see only their own email.</p>
+
+  <h2>7.1 Results: the groups</h2>
+  <div class="step">
+    <h3><span class="n">1</span>Press the Results tab and read Top 10 for the awarding</h3>
+    <p>One card per category, and <b>Overall</b>: what is read out at the awarding. Groups still sharing a place are listed alphabetically, and every group tied at 10th is listed, so in a rare year a card has eleven names or more.</p>
+    <figure class="fig"><div class="frame"><img src="images/c30-results.jpg" alt="Top 10 for the awarding"></div>
+      <p class="cap">Tambiz 2028 has only six groups, so every group appears on every card. Until any group has a complete category, the page shows <b>No results yet</b> here.</p></figure>
+  </div>
+  <div class="step">
+    <h3><span class="n">2</span>Scroll to Every group: one row per group</h3>
+    <p>Each category's percentage with its rank after the dot (<b>87.25 · 1</b>), the <b>Overall</b>, its <b>Rank</b>, and whether the group is <b>Complete</b>. A faint bar behind each percentage shows its size; the leader has a gold edge. Click a heading to sort by it, for example <b>Paper</b> for the paper ranking. A category not fully scored shows <i>incomplete</i> and no rank; nothing scored shows a dash. Press a group's name to open its scores.</p>
+    <figure class="fig"><div class="frame"><img src="images/c30-results-table.jpg" alt="Every group"></div>
+      <p class="cap">The first seven columns. Scroll the table sideways, or use <b>Sort</b> on a phone, for Overall, Rank and Judged.</p></figure>
+  </div>
+  <div class="step">
+    <h3><span class="n">3</span>Read the Adviser ranking at the bottom</h3>
+    <figure class="fig"><div class="frame"><img src="images/c30-results-advisers.jpg" alt="Adviser ranking"></div>
+      <p class="cap">Advisers ranked by the average overall of their ranked groups. Only you see it: an adviser's email lists their own groups' percentages, never a position.</p></figure>
+  </div>
+</section>
+
+<section class="p7">
+  <h2>7.2 Individual grades</h2>
+  <div class="step">
+    <h3><span class="n">4</span>Under the tabs, press Individual grades</h3>
+    <p>Every student is one row, sorted by section and surname: member total, group overall, final grade, rounded up, letter, quality points, whether they were at the defense, and their status.</p>
+    <figure class="fig w80"><div class="frame"><img src="images/c31-grades.jpg" alt="Individual grades"></div>
+      <p class="cap">The formula and the FEU bands are printed above the table, so anyone reading over your shoulder can check a grade.</p></figure>
+  </div>
+  <div class="step">
+    <h3><span class="n">5</span>Find one student with Search, or narrow the list with the filters</h3>
+    <p>Type a name or student number in <b>Search</b>. The lists narrow by <b>Section</b>, <b>Group</b>, <b>Adviser</b>, <b>Letter</b>, <b>At the defense</b> and <b>Status</b>; <b>No grade yet</b> under Status shows who still needs scores. Select a <b>Status</b> cell to see why a student has no grade, or a <b>Member total</b> cell to see each judge's three scores (chapter 4).</p>
+  </div>
+  <div class="step">
+    <h3><span class="n">6</span>To mark a student absent or present, type it in their At the defense cell</h3>
+    <div class="type"><div class="lab">Type exactly this in the cell</div><pre>Absent</pre></div>
+    <p><b>Present</b> undoes it. Absent means their unscored individual scores count as zero (chapter 4).</p>
+  </div>
+
+  <h2>7.3 Judge profiles</h2>
+  <p>A basis for knowing your panel, <b>not for removing anyone</b>. It describes how each judge scored; it does not say what to do about it. Every comparison uses only co-judges who scored the same group in the same half, and only criteria both scored.</p>
+  <div class="step">
+    <h3><span class="n">7</span>Press the Judge profiles tab</h3>
+    <figure class="fig w80"><div class="frame"><img src="images/c33-profiles.jpg" alt="Judge profiles"></div></figure>
+    <table class="t">
+      <tr><th style="width:26%">Column</th><th>What it says</th></tr>
+      <tr><td><b>Groups</b></td><td>How many groups they scored, in each half.</td></tr>
+      <tr><td><b>Marks at</b></td><td>How far above or below the other judges of the same groups they score, on average. <b>−3.94 pts</b> is about four points lower.</td></tr>
+      <tr><td><b>Separates groups</b></td><td>Whether they use the range or give nearly everyone the same: narrow, normal or wide, with their lowest and highest score.</td></tr>
+      <tr><td><b>Agrees with co-judges</b></td><td>Whether they put the groups in much the same order as the others (high), partly (medium) or differently (low), even when the numbers differ.</td></tr>
+    </table>
+  </div>
+</section>
+
+<section class="p7">
+  <div class="step">
+    <h3><span class="n">8</span>Press a judge's name to see them group by group</h3>
+    <figure class="fig w80"><div class="frame"><img src="images/c34-profile-detail.jpg" alt="One judge in detail"></div>
+      <p class="cap">Ms. Carmela Yap, Booth: her score, the others' average, the gap, where the group comes in her order and in the panel's, and anything <b>to look at</b>: the same mark entered down a whole category, criteria left blank, or a score 6 points or more from every co-judge. TAHANAN TILES had no co-judge, so it is listed but not compared. <b>Across events</b> builds one line per year the judge scores in.</p></figure>
+  </div>
+  <div class="call gold"><div class="lab">Worth remembering, as the page says</div>
+    <p><b>Marking hard is not a fault.</b> Every group's score is averaged across its judges, so a strict judge is absorbed completely. Three judges on one evening is a small sample, and the panel's consensus is not the truth. A judge who disagrees may be the one paying attention.</p></div>
+
+  <h2>7.4 The workbook</h2>
+  <p>The first of the two files. Download it on the <b>Close the event</b> tab (<b>Download the workbook</b>). Before closing it is a preview of the scores as they stand; after closing it is the record. It is made fresh each time, and its name carries the date and time, for example <b>Tambiz_2028_202609182349.xlsx</b>.</p>
+  <table class="t">
+    <tr><th style="width:22%">Sheet</th><th>What is on it</th></tr>
+    <tr><td><b>Scores</b></td><td>Every defense judge's scores, one row per judge per group, with corrections in the last column.</td></tr>
+    <tr><td><b>Booth Scores</b></td><td>The same for the booth.</td></tr>
+    <tr><td><b>Results</b></td><td>Every category percentage and rank, both halves, the overall and its rank, and <b>Judged</b>: Complete, Incomplete, or Finalised incomplete.</td></tr>
+    <tr><td><b>Leaderboard</b></td><td>Positions 1 to 10 per category and overall, with a Tied row for each further group sharing 10th.</td></tr>
+    <tr><td><b>Individual Grades</b></td><td>Every student's three scores from each judge, their total, the group overall, final grade and letter.</td></tr>
+    <tr><td><b>For Encoding</b></td><td>The official grade sheet, sorted by section: the one you copy into the encoding system.</td></tr>
+  </table>
+  <figure class="fig"><div class="frame"><img src="images/xl-wb-results.jpg" alt="The Results sheet"></div>
+    <p class="cap">Results, sorted by overall rank.</p></figure>
+</section>
+
+<section class="p7">
+  <figure class="fig"><div class="frame"><img src="images/xl-wb-encoding.jpg" alt="The For Encoding sheet"></div>
+    <p class="cap">For Encoding: the FEU header lines, then Member Name, STUDENT NAME (per Class Roll), Student ID, Section, Total Score, Group Overall %, Final Grade (rounded up) and Letter Grade. The <b>Note</b> column marks absent students and says why a grade is blank. Students with no section are listed first, together, with a line at the end saying how many.</p></figure>
+  <figure class="fig"><div class="frame"><img src="images/xl-wb-scores.jpg" alt="The Scores sheet, first columns"></div>
+    <p class="cap">Scores, the first columns: one row per judge per group, with each judge named. The last column, not shown, reads for KAPE KULTURA: <b>Elevator Pitch #4: judge gave 0, now 16 (Judge confirmed 16, typed 0)</b>.</p></figure>
+  <div class="wrong"><div class="lab">If it goes wrong</div><p>Excel opens it read-only with a yellow <b>Protected View</b> bar: press <b>Enable Editing</b>. It will not open at all: the download did not finish; download it again. Nothing is lost.</p></div>
+</section>
+
+<!-- ═════════ 8 · THE TWO FILES ═════════ -->
+<section class="p8">
+  <p class="kicker">The Tambiz Manual | Chapter 8</p>
+  <h1 class="chapter">The two files, and sending the emails</h1>
+  <p class="deck">The app sends no email itself. It gives you a file with every email already written, and Microsoft Power Automate sends them from your FEU mailbox.</p>
+
+  <table class="t">
+    <tr><th style="width:22%">File</th><th>For</th><th style="width:34%">When</th></tr>
+    <tr><td><b>1. The workbook</b></td><td>The department's record, and the For Encoding grade sheet (chapter 7.4).</td><td>Any time; after closing it no longer changes.</td></tr>
+    <tr><td><b>2. The email file</b></td><td>One row per student and adviser: Email, Name and the whole Message.</td><td>Only after closing. <b>Downloading it is final.</b></td></tr>
+  </table>
+
+  <h2>8.1 Download the email file</h2>
+  <div class="step">
+    <h3><span class="n">1</span>Download the workbook first, and check it</h3>
+    <p>Open For Encoding and read down the Letter Grade column. Look for blanks and for anything surprising. Correct scores now if needed (chapter 6.2): after the next step you cannot.</p>
+  </div>
+  <div class="step">
+    <h3><span class="n">2</span>On Close the event, tick Results are final and ready to send</h3>
+    <figure class="fig w80"><div class="frame"><img src="images/c39-email-ticked.jpg" alt="Results are final, ticked"></div>
+      <p class="cap">"Downloading the email file is final. After it, closing cannot be undone and no score, absence, student or group can change, because the emails would no longer match."</p></figure>
+  </div>
+  <div class="step">
+    <h3><span class="n">3</span>Press Download the email file, and when the download has started, reload the page</h3>
+    <figure class="fig w80"><div class="frame"><img src="images/c40-after-email.jpg" alt="After the email file download"></div>
+      <p class="cap">The eyebrow reads <b>CLOSED, EMAIL FILE DOWNLOADED</b>, and the page says when: "The email file was first downloaded on September 18, 2026 at 11:49 PM, so nothing can change now." <b>Download the email file again</b> gives the same file.</p></figure>
+    <div class="call gold"><div class="lab">Read this twice</div>
+      <p>From this moment nothing about the event can change: no score, no absence, no student, no group. If a mistake is found later, correct the grade in the official encoding system and tell the student and adviser directly (chapter 9.7).</p></div>
+  </div>
+
+  <h2>8.2 What is in the email file</h2>
+  <p>An Excel table named <b>Emails</b>, with three columns: <b>Email</b>, <b>Name</b>, <b>Message</b>. Students come first, one row each; then advisers, one row each however many groups they have. A second sheet, <b>Read me</b>, repeats the sending steps below.</p>
+  <figure class="fig"><div class="frame"><img src="images/xl-emails.jpg" alt="The Emails table"></div>
+    <p class="cap">The first rows. Each Message is the whole email, written in HTML.</p></figure>
+</section>
+
+<section class="p8">
+  <h3>What a student receives</h3>
+  <p>Their letter grade and their group's percentage. <b>Never a rank or a placing.</b></p>
+  <figure class="fig w70"><div class="frame"><img src="images/m01-student-email.jpg" alt="A student's email"></div>
+    <p class="cap">Andrea Reyes's Message, as it reads in her inbox. The Subject is whatever you type in Power Automate.</p></figure>
+  <h3>What an adviser receives</h3>
+  <p>Each of their groups with its percentage, and, for each group that placed in the top 10, the categories, never the place. It says plainly that a place in the top 10 is not the same as winning an award.</p>
+  <figure class="fig w70"><div class="frame"><img src="images/m02-adviser-email.jpg" alt="An adviser's email"></div>
+    <p class="cap">Prof. Santos's Message. With only six groups this year, both her groups are top 10 in every category; in a real year the list is shorter.</p></figure>
+  <p>The wording of every email lives in one file of the app, <span class="k">src/lib/messages.ts</span>. Changing it is a programmer's job (chapter 9.3).</p>
+</section>
+
+<section class="p8">
+  <h2>8.3 Send them with Power Automate</h2>
+  <div class="confirm"><div class="lab">Confirm on first use</div>
+    <p>These steps are the email file's own Read me sheet. The writer of this manual had no FEU Microsoft 365 account, so the Power Automate screens are not pictured. The first time you do it, check the names on screen against each step, and correct this page in pen if they differ.</p></div>
+  <div class="step">
+    <h3><span class="n">4</span>Save the email file to your OneDrive or to SharePoint</h3>
+  </div>
+  <div class="step">
+    <h3><span class="n">5</span>In Power Automate, start a flow with the Excel Online (Business) action List rows present in a table</h3>
+    <p>Choose the file, and choose the table:</p>
+    <div class="type"><div class="lab">Type exactly this as the table</div><pre>Emails</pre></div>
+  </div>
+  <div class="step">
+    <h3><span class="n">6</span>In that action's Settings, turn Pagination on and set the Threshold to 1000</h3>
+    <div class="wrong"><div class="lab">If it goes wrong</div><p>Without it, only the first 256 rows are read, and the advisers at the bottom of the file, and some students, get nothing. Count the emails sent against the number of rows.</p></div>
+  </div>
+  <div class="step">
+    <h3><span class="n">7</span>Add Apply to each over the rows, with an Outlook Send an email (V2) action inside it</h3>
+    <table class="t">
+      <tr><th style="width:26%">Field of Send an email (V2)</th><th>Set it to</th></tr>
+      <tr><td><b>To</b></td><td>the <b>Email</b> column</td></tr>
+      <tr><td><b>Subject</b></td><td>your own words, for example <b>Your Tambiz 2028 result</b></td></tr>
+      <tr><td><b>Body</b></td><td>the <b>Message</b> column. The Body sends HTML as it is, so the message arrives formatted.</td></tr>
+    </table>
+  </div>
+  <div class="step">
+    <h3><span class="n">8</span>Test on yourself first</h3>
+    <p>Make a copy of the file with only one row, put your own address in its Email cell, run the flow on the copy, and read the email that arrives. Only then run it on the real file.</p>
+  </div>
+  <div class="call gold"><div class="lab">Read this twice</div>
+    <p><b>Keep the email file private.</b> It holds every student's grade. Do not leave it in a shared folder, and delete your OneDrive copy once the emails are sent. The workbook is the record you keep (chapter 9.8).</p></div>
+</section>
+
+<!-- ═════════ 9 · RUNNING AND LOOKING AFTER IT ═════════ -->
+<section class="p9">
+  <p class="kicker">The Tambiz Manual | Chapter 9</p>
+  <h1 class="chapter">Running and looking after it</h1>
+  <p class="deck">How to keep Tambiz alive from one year to the next, and how to take it over. Written for a careful person who is not a programmer; where a step needs one, it says so.</p>
+
+  <div class="confirm"><div class="lab">Confirm on first use</div>
+    <p>The Vercel and Neon dashboards need their owner's sign-in, which the writer of this manual did not have. Steps in those dashboards follow Vercel's and Neon's own help pages. The first time you do one, check the names on screen and correct this page in pen if they differ. Every step inside the Tambiz app was checked against the app.</p></div>
+
+  <h2>9.1 What it is made of</h2>
+  <div class="flow">
+    <div class="box"><b>The code · GitHub</b>The recipe for the app. Changing it is how the app changes.</div>
+    <div class="arr">›</div>
+    <div class="box"><b>The site · Vercel</b>Builds the code and runs it at tambiz-calculator-lyart.vercel.app.</div>
+    <div class="arr">‹›</div>
+    <div class="box"><b>The database · Neon</b>Holds every event, student, score and account.</div>
+  </div>
+  <p>Phones and laptops talk only to the site; the site talks to the database. Nobody opens the database directly.</p>
+  <table class="t">
+    <tr><th style="width:14%">Piece</th><th>What it is</th><th style="width:26%">Where</th><th style="width:16%">Cost</th></tr>
+    <tr><td>Code</td><td>The public repository <b>benjiesotelo-sudo/Tambiz-Calculator</b> on GitHub. It also keeps the original single-file calculator, <b>index.html</b>. It holds no student data.</td><td>github.com</td><td>GitHub Free: nothing</td></tr>
+    <tr><td>Site</td><td>The Vercel project <b>tambiz-calculator</b>.</td><td>Vercel, Singapore (the live site answers from <b>sin1</b>, checked 19 September 2026)</td><td>Vercel Hobby: nothing</td></tr>
+    <tr><td>Database</td><td>The Neon project <b>Tambiz Calculator</b>, a Postgres database.</td><td>AWS Asia Pacific (Singapore)</td><td>Neon Free: nothing</td></tr>
+  </table>
+  <p>There is no bought web address, no email service and no other paid tool. The emails go out from your own FEU mailbox (chapter 8).</p>
+  <ul>
+    <li><b>Keep the site and the database in the same region.</b> One click asks the database several questions; across an ocean each would be slow.</li>
+    <li><b>The database sleeps</b> after five minutes with nobody using it, and wakes on the next visit. That is why the first page of the day takes a few seconds. Nothing is lost.</li>
+    <li><b>The free plans</b> are far larger than one event a year needs. Vercel's Hobby plan is "restricted to non-commercial personal use only"; a course tool with no payments is arguably fine, but if the department is unsure, Vercel's page says to ask Vercel Support. The paid plan, Pro, is $20 a month per developer.</li>
+  </ul>
+  <h3>The four settings (environment variables) in Vercel</h3>
+  <table class="t">
+    <tr><th style="width:30%">Name</th><th>What it means</th></tr>
+    <tr><td><b>DATABASE_URL</b></td><td>The database's address with its password built in. Never delete it: without it the site starts on an empty temporary database, wiped whenever Vercel restarts it.</td></tr>
+    <tr><td><b>SEED_ADMIN_PASSWORD</b></td><td>The coordinator's (<b>admin@tambiz.demo</b>) password. While it is set, it is put back on that account every time the site starts (9.4).</td></tr>
+    <tr><td><b>SEED_JUDGE_PASSWORD</b></td><td>The same for the three sample judges, judge1@ to judge3@tambiz.demo. Real judges are never touched by it.</td></tr>
+    <tr><td><b>TAMBIZ_PREVIEW_DATABASE</b></td><td>Normally absent. Leave it that way: it keeps test copies of a change away from the real data (9.3).</td></tr>
+  </table>
+</section>
+
+<section class="p9">
+  <h2>9.2 The accounts, and who holds them</h2>
+  <table class="t">
+    <tr><th style="width:12%">Account</th><th>What it is for</th><th>If access is lost</th></tr>
+    <tr><td><b>GitHub</b></td><td>Keeps the code. Anyone who can write to it can change the app; a change on its main branch goes live by itself.</td><td>The site keeps running exactly as it is. No change can be made, including an urgent fix. Recover it through GitHub's account recovery.</td></tr>
+    <tr><td><b>Vercel</b></td><td>Builds and runs the site. Holds the settings, the build logs and the Redeploy button.</td><td>The site keeps running its last version. No redeploy, no setting changes, and route A back into the coordinator account (9.4) is closed.</td></tr>
+    <tr><td><b>Neon</b></td><td>Runs the database. Shows the connection string; can restore the last 6 hours.</td><td>The app keeps working. Route B back in (9.4) is closed. If the database itself is ever lost, the yearly workbooks are the record (9.8).</td></tr>
+  </table>
+  <div class="call gold"><div class="lab">Read this twice</div>
+    <p>Losing all three at once loses nothing that matters, if the workbooks were kept. That is why 9.8 matters more than any password.</p></div>
+
+<!--PRIVATE-ACCOUNTS-->
+  <h3>What to write down, and where</h3>
+  <p>Fill this in by hand and keep it with the printed manual in a locked drawer, or in the department's password manager. Do not photograph it into a shared folder.</p>
+  <table class="t fill">
+    <tr><th style="width:18%">Account</th><th style="width:30%">Signs in with</th><th>Password kept in</th><th>Recovery codes kept in</th></tr>
+    <tr><td>GitHub</td><td></td><td></td><td></td></tr>
+    <tr><td>Vercel</td><td></td><td></td><td></td></tr>
+    <tr><td>Neon</td><td></td><td></td><td></td></tr>
+    <tr><td>Tambiz app</td><td>admin@tambiz.demo</td><td></td><td>none</td></tr>
+  </table>
+  <table class="t fill">
+    <tr><th style="width:48%">Also note</th><th>Written in by, and date</th></tr>
+    <tr><td>This page last checked</td><td></td></tr>
+    <tr><td>Where the yearly workbooks are kept (9.8)</td><td></td></tr>
+  </table>
+<!--/PRIVATE-ACCOUNTS-->
+  <div class="wrong"><div class="lab">Never write these on paper</div>
+    <p>The database connection string (it starts <span class="k">postgresql://</span>) and the two SEED passwords. Anyone holding the connection string can read and change every grade without signing in. They belong only in Vercel's settings and a password manager.</p></div>
+  <p><b>Turn on two-step sign-in</b> for all three accounts and keep the recovery codes each gives you. A lost phone without recovery codes is the commonest way an account is lost for good.</p>
+</section>
+
+<section class="p9">
+  <h2>9.3 How a change reaches the live site</h2>
+  <p>Nobody edits the live site by hand. A change is proposed, checked, merged, and the site rebuilds itself.</p>
+  <div class="flow">
+    <div class="box"><b>1 · Proposed</b>A programmer opens a pull request on GitHub: the change, with a description.</div>
+    <div class="arr">›</div>
+    <div class="box"><b>2 · Checked</b>Vercel builds a test copy on throwaway sample data. The tests run. Someone reads it.</div>
+    <div class="arr">›</div>
+    <div class="box"><b>3 · Merged</b>The pull request is merged into the main branch.</div>
+    <div class="arr">›</div>
+    <div class="box"><b>4 · Live</b>Vercel builds main and swaps the live site over.</div>
+  </div>
+  <p class="cap">Pull request 7 was merged at 14:34:03 on 18 September 2026 (UTC); Vercel reported the live deployment ready at 14:34:38, 35 seconds later. Allow a minute or two.</p>
+
+  <div class="step">
+    <h3><span class="n">1</span>Open the list of changes on GitHub</h3>
+    <div class="type"><div class="lab">Type exactly this into the address bar</div><pre>github.com/benjiesotelo-sudo/Tambiz-Calculator/commits/main</pre></div>
+    <figure class="fig w80"><div class="frame"><img src="images/g01-commits.jpg" alt="The list of changes"></div>
+      <p class="cap">Newest at the top. A green tick with <b>1 / 1</b> means Vercel built that version. "Merge pull request #7" is what is live.</p></figure>
+  </div>
+  <div class="step">
+    <h3><span class="n">2</span>Open a pull request, and scroll to its bottom to see the checks</h3>
+    <figure class="fig w80"><div class="frame"><img src="images/g02-pr-checks.jpg" alt="A merged pull request's checks"></div>
+      <p class="cap">Vercel's comment: the test copy was <b>Ready</b>, with a Preview link. At the bottom: merged into main, <b>2 checks passed</b>. The test copy never touches real data.</p></figure>
+  </div>
+  <div class="step">
+    <h3><span class="n">3</span>Recognise a failed build: a red ✗ and 0 / 1</h3>
+    <figure class="fig w80"><div class="frame"><img src="images/g04-failed-commit.jpg" alt="A failed build"></div>
+      <p class="cap">The repository's first change, which held only the old calculator and nothing Vercel could build: <b>✗ 0 / 1</b>.</p></figure>
+    <div class="wrong"><div class="lab">If it goes wrong</div><p>A failed build does not break the live site: Vercel keeps serving the last version that built. The change simply is not live. Tell whoever made it; the ✗ links to Vercel's log, which needs the Vercel sign-in.</p></div>
+  </div>
+</section>
+
+<section class="p9">
+  <h3>Redeploying without a change</h3>
+  <p>After changing a setting (9.4) the site must be rebuilt, because Vercel applies new values only to new deployments.</p>
+  <div class="confirm"><div class="lab">Confirm on first use</div>
+    <p>In Vercel: open the project, then <b>Deployments</b>. Open the newest deployment marked Production and use its <b>Redeploy</b> button. Wait until it shows Ready, about a minute.</p></div>
+
+  <h3>Rules for whoever changes the code</h3>
+  <p>Give this list to any programmer you ask for help. It comes from the repository's own notes (<span class="k">CLAUDE.md</span>, <span class="k">README.md</span>).</p>
+  <ul>
+    <li><b>Never edit index.html.</b> It is the original calculator and the authority on the scoring rules; the tests check the app against it.</li>
+    <li>Every scoring change keeps <span class="k">npm test</span> passing. The rules, and where the department's decisions deliberately differ from the old calculator, are in <span class="k">src/lib/scoring.ts</span>.</li>
+    <li>Database changes only add, never remove or rename, because the live database may receive them before the code that uses them.</li>
+    <li><b>Never commit real student data.</b> The repository is public. Excel and CSV files are blocked on purpose.</li>
+    <li>Never run a copy of the app against the live database without the coordinator's say-so. A copy on a laptop uses its own local database unless told otherwise.</li>
+    <li>The app is deliberately small: no new screens, files or sign-ins without the course owner's say-so.</li>
+  </ul>
+  <h3>Upkeep that cannot be skipped</h3>
+  <p>The app is built on Next.js, whose makers publish security fixes, and Vercel retires old build tools. A site not rebuilt for a year may fail to build just when a change is needed. So once a year, a month before the event, a programmer updates it, the checks pass, and it is merged while there is time to fix anything (9.6). It needs Node.js 22 or newer to build.</p>
+  <p>This manual lives in the same repository, in <span class="k">docs/manual/</span>, with a README saying how to print it again after a change.</p>
+</section>
+
+<section class="p9">
+  <h2>9.4 Passwords and access</h2>
+  <table class="t">
+    <tr><th>Task</th><th style="width:26%">Who</th><th style="width:30%">Where</th></tr>
+    <tr><td>Add this year's judges</td><td>Coordinator</td><td>The workbook, or the Judges tab</td></tr>
+    <tr><td>Give a judge a new password</td><td>Coordinator</td><td>Judges tab (below)</td></tr>
+    <tr><td>Take a judge off this year's event</td><td>Coordinator</td><td>Judges tab (below)</td></tr>
+    <tr><td>Change your own password</td><td>Anyone</td><td>Account</td></tr>
+    <tr><td>Coordinator password lost</td><td>Vercel or Neon holder</td><td>Outside the app (routes A and B)</td></tr>
+  </table>
+
+  <div class="step">
+    <h3><span class="n">4</span>A judge lost their slip: on the Judges tab, click their name and press Reset password</h3>
+    <figure class="fig"><div class="frame"><img src="images/c41-reset-confirm.jpg" alt="Reset password, asking first"></div>
+      <p class="cap">"Reset the password of Engr. Ramon Cruz? Their old password stops working and they are signed out everywhere. Press Enter to confirm or Esc to cancel."</p></figure>
+  </div>
+  <div class="step">
+    <h3><span class="n">5</span>Press Enter, then print or write down the new password</h3>
+    <figure class="fig w70"><div class="frame"><img src="images/c42-reset-slip.jpg" alt="The new password, shown once"></div>
+      <p class="cap">A one-line sign-in list, shown once. Then press <b>I have printed or written them down</b>. Closed it too soon? Reset again: each reset makes a new password.</p></figure>
+  </div>
+  <div class="step">
+    <h3><span class="n">6</span>To take a judge off the event: select their row, press Ctrl+Delete, then Enter</h3>
+    <p>Sheets they already submitted still count; they can no longer score. The app cannot delete or switch off an account: a removed judge can still sign in and sees the newest event they are still on. To lock someone out completely, reset their password and do not tell them the new one.</p>
+  </div>
+  <div class="call gold"><div class="lab">Read this twice: the coordinator's own password</div>
+    <p>If <b>SEED_ADMIN_PASSWORD</b> is set in Vercel, a password you change under Account does not last: the site puts the variable's password back each time it starts, which Vercel does often. Choose one, and write down which: keep the coordinator password in the variable and change it the Vercel way (route A), or ask the Vercel holder to delete the variable and redeploy, after which Account changes last.</p></div>
+</section>
+
+<section class="p9">
+  <h3>The way back in when the coordinator password is lost</h3>
+  <p>There is no "forgot password" link, because the app sends no email. Both routes need one of the accounts in 9.2.</p>
+  <div class="step">
+    <h3><span class="n">7</span>Route A (Vercel): set SEED_ADMIN_PASSWORD to a new long password, save, and redeploy</h3>
+    <div class="confirm"><div class="lab">Confirm on first use</div>
+      <p>In Vercel: the project <b>tambiz-calculator</b> → <b>Settings</b> → <b>Environment Variables</b>. Edit <b>SEED_ADMIN_PASSWORD</b> (or add it) for <b>Production</b>, at least 12 characters, Save, then redeploy (9.3).</p></div>
+    <p>On its first visit the rebuilt site stores the new password on admin@tambiz.demo, clears any wrong-password wait, and signs that account out everywhere.</p>
+    <div class="wrong"><div class="lab">If it goes wrong</div><p>Still refused? The redeploy has not finished, or the variable was saved for Preview only. Check it is set for Production and redeploy again.</p></div>
+  </div>
+  <div class="step">
+    <h3><span class="n">8</span>Route B (Neon and a programmer): run the reset from a copy of the repository</h3>
+    <p>Works for any account. The Neon holder copies the connection string (Neon project → <b>Connect</b>) and gives it to the programmer through a password manager, never by email or chat. In the repository folder, after <span class="k">npm install</span>:</p>
+    <div class="type"><div class="lab">Type exactly this, with the real connection string and a new password</div><pre>DATABASE_URL="paste the connection string here" npm run reset-password -- admin@tambiz.demo "a new long password"</pre></div>
+    <p>It answers: <span class="msg">Password reset for admin@tambiz.demo. Every session for that account was signed out.</span></p>
+    <div class="wrong"><div class="lab">If it goes wrong</div><p><span class="msg bad">Use at least 12 characters.</span> The new password is too short. <span class="msg bad">No account with the login …</span> The email is spelled differently from the account; nothing changed. If SEED_ADMIN_PASSWORD is still set, the next restart puts that password back.</p></div>
+  </div>
+  <h3>Wrong passwords and waiting</h3>
+  <p>After three wrong passwords in a row an account waits 10 seconds, then 20, then 40, doubling up to 5 minutes, and says <span class="msg bad">Too many attempts. Wait … seconds, then try again.</span> The right password after the wait works normally. Reset password and both routes clear the wait at once.</p>
+  <div class="phones two">
+    <figure class="fig"><div class="frame"><img src="images/j22-signin-failed.jpg" alt="Sign-in failed"></div><p class="cap">One wrong password.</p></figure>
+    <figure class="fig"><div class="frame"><img src="images/j23-too-many.jpg" alt="Too many attempts"></div><p class="cap">After four.</p></figure>
+  </div>
+</section>
+
+<section class="p9">
+  <h2>9.5 The yearly cycle</h2>
+  <p>Every year is a new event. Almost nothing is copied into it, on purpose.</p>
+  <table class="t">
+    <tr><th>Carries over by itself</th><th>Do again each year</th><th>Never carried over</th></tr>
+    <tr><td>The coordinator account<br>Every judge account and password<br>Each judge's record in Judge profiles<br>The scoring sheet: points, weights, bands and wording, copied from the newest event<br>Every past event, readable</td>
+        <td>Create the event<br>Check the wording, and change what changed<br>Build and upload this year's workbook<br>Add this year's judges and print slips<br>Rehearse on the practice event</td>
+        <td>Students, groups and advisers<br>Scores, corrections and absences<br>Results and grades</td></tr>
+  </table>
+  <div class="step">
+    <h3><span class="n">9</span>On Events, check the Year and press Create event</h3>
+    <figure class="fig w70"><div class="frame"><img src="images/c44-events-after.jpg" alt="Events with last year's event"></div>
+      <p class="cap">Every past event stays in the list, newest first, with its state: <b>Closed, email file downloaded</b>.</p></figure>
+  </div>
+  <div class="step">
+    <h3><span class="n">10</span>Check the Scoring sheet tab says 39 of 39 criteria have wording</h3>
+    <p>A new event copies from the newest event, meaning the latest year. If it shows no wording, the event it copied from had none; paste it again (chapter 3). A new event spells the second defense category <b>Infomercial</b>, even if an older one had "Informercial".</p>
+  </div>
+  <div class="call gold"><div class="lab">Read this twice</div>
+    <p>Points, the 70/30 weights and the letter bands cannot be changed on screen. Changing them is a programmer's job, done before next year's event is created and checked with the tests. Ask a month ahead, never on the day. Leave last year's event as it is: never delete it, and never put this year's students into it.</p></div>
+</section>
+
+<section class="p9">
+  <h2>9.6 A month before the event</h2>
+  <p>Most problems of a once-a-year app come from the eleven months nobody touched it. Tick each box in order.</p>
+  <ul class="checklist">
+    <li><b>Re-read the free-plan pages</b> of Vercel and Neon. Check both still cost nothing. If either has changed, decide what to do before anything else. <span class="who">Coordinator</span></li>
+    <li><b>Update the app and redeploy.</b> A programmer updates the framework, runs the tests and merges; check the green tick (9.3). <span class="who">Programmer</span></li>
+    <li><b>Sign in and look.</b> Open the live site, sign in as coordinator, open last year's event and its Results. <span class="who">Coordinator</span></li>
+    <li><b>Test the way back in, without using it.</b> Find SEED_ADMIN_PASSWORD in Vercel, or note that it was deleted; find Neon's Connect button. Update 9.2. <span class="who">Account holders</span></li>
+    <li><b>Create this year's event</b> and check its wording (9.5). <span class="who">Coordinator</span></li>
+    <li><b>Build, check and upload the workbook</b> (chapters 2 and 3). <span class="who">Coordinator and staff</span></li>
+    <li><b>Print the judges' slips.</b> <span class="who">Coordinator</span></li>
+    <li><b>Run the ten-minute rehearsal</b> below. <span class="who">Coordinator</span></li>
+    <li><b>The day before:</b> open the live site once, and ask every judge to sign in on their phone. <span class="who">Coordinator, judges</span></li>
+  </ul>
+  <h3>The ten-minute rehearsal, on the practice event</h3>
+  <div class="call gold"><div class="lab">Read this twice</div>
+    <p>A judge always sees the newest event they are on. Rehearse with a <b>separate rehearsal account added only to the practice event</b>, never with a real judge who is already on this year's event, or their rehearsal scores land on the real one. The app cannot delete a sheet of scores, so never rehearse on the real event.</p></div>
+  <div class="step">
+    <h3><span class="n">11</span>Open PRACTICE · Tambiz 2027, then its Judges tab, and add a rehearsal judge in the last row</h3>
+    <div class="type"><div class="lab">Type exactly this, pressing Tab between the cells</div><pre>Rehearsal judge      rehearsal@tambiz.demo</pre></div>
+    <p>Print the password it shows. Next year, add the same email again and press Reset password.</p>
+  </div>
+  <div class="step">
+    <h3><span class="n">12</span>On a real phone, sign in as the rehearsal judge and score one group's defense</h3>
+  </div>
+  <div class="step">
+    <h3><span class="n">13</span>Halfway, turn Airplane Mode on, keep scoring, then turn it off</h3>
+    <p>You pass if the label counts the kept scores while offline (chapter 5, step 7), returns to <b>All saved</b> by itself, and the scores appear on the laptop's Progress tab. If it never returns to All saved, note the phone and browser and tell the programmer before the night.</p>
+  </div>
+</section>
+
+<section class="p9">
+  <h2>9.7 When something goes wrong</h2>
+  <p>Find the symptom, then do the fix.</p>
+  <div class="ts"><h3>The site will not load at all</h3><table class="t">
+    <tr><td class="k1">Why</td><td>Vercel or Neon is down; a free-plan limit was reached; or DATABASE_URL was removed.</td></tr>
+    <tr><td class="k1">Fix</td><td>Check vercel-status.com and neonstatus.com, and try every ten minutes. Ask the Vercel holder to look for a limit message and check DATABASE_URL. If judging cannot wait, score on the original calculator (below) and enter the scores later.</td></tr></table></div>
+  <div class="ts"><h3>The first click of the day is slow</h3><table class="t">
+    <tr><td class="k1">Why</td><td>The database was asleep (9.1).</td></tr>
+    <tr><td class="k1">Fix</td><td>Nothing is wrong. Open the site yourself ten minutes before judging, and before a break ends.</td></tr></table></div>
+  <div class="ts"><h3>A judge cannot sign in</h3><table class="t">
+    <tr><td class="k1">Why</td><td>A typo, an extra capital or space from the phone's keyboard, or several wrong tries.</td></tr>
+    <tr><td class="k1">Fix</td><td>Check their email on the Judges tab. Still failing: Reset password (9.4), which also ends the wait. If they see <b>No event yet</b>, they are not on this event: add them on the Judges tab.</td></tr></table></div>
+  <div class="ts"><h3>A judge says they scored a group, but it does not count</h3><table class="t">
+    <tr><td class="k1">Why</td><td>Almost always: they never tapped <b>Mark group complete</b>. Otherwise the scores are still on their phone: <b>Offline · 3 kept on phone</b> or <b>Sign in to send 3</b>.</td></tr>
+    <tr><td class="k1">Fix</td><td>Ask them to open the group on the same phone and browser, get online or sign in again, then Review and Mark group complete. Progress shows the result.</td></tr></table></div>
+  <div class="ts"><h3>An upload refuses a group, or skips rows</h3><table class="t">
+    <tr><td class="k1">Why</td><td>The group's rows name different advisers or adviser emails; a row misses a required cell or has an address with no @.</td></tr>
+    <tr><td class="k1">Fix</td><td>The shaded box names the rows. Fix them in Excel and upload the same file again; nothing is added twice (chapter 2.3).</td></tr></table></div>
+  <div class="ts"><h3>A student's email or section was wrong</h3><table class="t">
+    <tr><td class="k1">Why</td><td>They upload silently (chapter 2.3).</td></tr>
+    <tr><td class="k1">Fix</td><td>Before the email file is downloaded: type the right one in the Data table. Emptying a cell in the workbook and uploading does not clear it.</td></tr></table></div>
+</section>
+
+<section class="p9">
+  <div class="ts"><h3>A grade looks wrong</h3><table class="t">
+    <tr><td class="k1">Why</td><td>Usually a rule doing its job: an unsubmitted sheet does not count; the grade is rounded up; an absent student has zeros.</td></tr>
+    <tr><td class="k1">Fix</td><td>On Individual grades, select their Member total cell for each judge's scores, and check by hand with chapter 4. Look for a correction on the group's scores page. Before the email file: correct with a reason (chapter 6).</td></tr></table></div>
+  <div class="ts"><h3>A mistake is found after the email file was downloaded</h3><table class="t">
+    <tr><td class="k1">Why</td><td>Nothing can change in the app after that moment, by design.</td></tr>
+    <tr><td class="k1">Fix</td><td>Correct the grade in the official encoding system, tell the student and adviser directly, and keep a note with the workbook of what changed and why.</td></tr></table></div>
+  <div class="ts"><h3>Some people got no email</h3><table class="t">
+    <tr><td class="k1">Why</td><td>Pagination was off in Power Automate (only 256 rows read); the adviser had no email; the student had no grade.</td></tr>
+    <tr><td class="k1">Fix</td><td>Chapter 8, step 6. The Close the event tab listed everyone who would get no email.</td></tr></table></div>
+  <div class="ts"><h3>Nobody can sign in as coordinator</h3><table class="t">
+    <tr><td class="k1">Why</td><td>A forgotten password, or one changed under Account and put back by SEED_ADMIN_PASSWORD.</td></tr>
+    <tr><td class="k1">Fix</td><td>Try the password kept in the variable first. Otherwise route A or B (9.4).</td></tr></table></div>
+  <div class="ts"><h3>A change did not go live</h3><table class="t">
+    <tr><td class="k1">Why</td><td>The build is still running, or it failed and the site kept the previous version.</td></tr>
+    <tr><td class="k1">Fix</td><td>Wait two minutes and reload. Look for the red ✗ on GitHub (9.3) and send the programmer its link.</td></tr></table></div>
+
+  <h3>If the app is gone on the night: the original calculator</h3>
+  <div class="step">
+    <h3><span class="n">14</span>Open index.html on GitHub and press the download arrow beside Raw</h3>
+    <div class="type"><div class="lab">Type exactly this into the address bar</div><pre>github.com/benjiesotelo-sudo/Tambiz-Calculator/blob/main/index.html</pre></div>
+    <figure class="fig w80"><div class="frame"><img src="images/g03-index.jpg" alt="index.html on GitHub"></div>
+      <p class="cap">The file page. Double-click the downloaded <b>index.html</b> to open it in a browser; it needs no account.</p></figure>
+    <div class="wrong"><div class="lab">If it goes wrong</div><p>The old calculator uses old rules: a score above the maximum is quietly changed to the maximum, and a blank can count as zero. Check every row by eye, and save its Excel file before closing the tab. The app cannot import it.</p></div>
+  </div>
+</section>
+
+<section class="p9">
+  <h2>9.8 Keeping the records</h2>
+  <p><b>The database is where the app works. The workbook is what the department keeps.</b></p>
+  <table class="t">
+    <tr><th>The database</th><th>The yearly workbook</th></tr>
+    <tr><td>Neon's free plan can restore only the last 6 hours.</td><td>A file that never changes once saved.</td></tr>
+    <tr><td>Free plans have been withdrawn before by other companies.</td><td>Opens in Excel, with no account, for as long as Excel exists.</td></tr>
+    <tr><td>Results are worked out afresh each time a page opens.</td><td>A snapshot of every score, correction, percentage, rank and grade.</td></tr>
+    <tr><td>Reachable only through the app.</td><td>Readable by anyone the department trusts with grades.</td></tr>
+  </table>
+  <div class="step">
+    <h3><span class="n">15</span>Download the workbook after closing, and once more just before the email file</h3>
+  </div>
+  <div class="step">
+    <h3><span class="n">16</span>Save it in one OneDrive folder per year, shared with one other trusted colleague</h3>
+    <div class="type"><div class="lab">For example, a folder named exactly this</div><pre>Tambiz records / Tambiz 2028</pre></div>
+    <p>Keep the email file out of it, private, and delete it once the emails are sent.</p>
+  </div>
+  <div class="call gold"><div class="lab">Read this twice</div>
+    <p><b>Never put a workbook in the GitHub repository.</b> It is public, and the workbook holds real names, student numbers and grades.</p></div>
+  <h3>Reading a past year</h3>
+  <table class="t">
+    <tr><th>The question</th><th style="width:26%">Sheet</th></tr>
+    <tr><td>What grade did a student get?</td><td>For Encoding</td></tr>
+    <tr><td>How was that grade made?</td><td>Individual Grades</td></tr>
+    <tr><td>How did a group do in each category?</td><td>Results</td></tr>
+    <tr><td>Who placed in each category?</td><td>Leaderboard</td></tr>
+    <tr><td>What did each judge give; was anything corrected?</td><td>Scores, Booth Scores</td></tr>
+  </table>
+
+  <h2>9.9 Handing it over</h2>
+  <p>In this order, in person if you can, ticking each together.</p>
+  <ul class="checklist">
+    <li><b>The three accounts.</b> Sit together, sign in to GitHub, Vercel and Neon, and change each account's email and password to the successor's, with their own two-step sign-in. Fill in 9.2 afresh and destroy the old page.</li>
+    <li><b>This manual:</b> the printed copy with its filled-in pages, and the PDF in the repository (<span class="k">docs/manual/Tambiz-Manual.pdf</span>). Read chapters 1 and 9 together.</li>
+    <li><b>The yearly workbooks.</b> Share the Tambiz records folder with the successor, so it does not live only in the leaving person's OneDrive.</li>
+    <li><b>The repository and its README</b>, which says how to run the app on a computer and build the site again on new Vercel and Neon accounts. A new site gets a new address.</li>
+    <li><b>The coordinator sign-in</b>, and the SEED_ADMIN_PASSWORD decision (9.4). Then do 9.6 together once.</li>
+  </ul>
+<!--PRIVATE-WHO-->
+  <table class="t fill">
+    <tr><th style="width:34%">Who to ask about</th><th>Name</th><th>How to reach them</th></tr>
+    <tr><td>The course and its decisions</td><td></td><td></td></tr>
+    <tr><td>The code, and a programmer's help</td><td></td><td></td></tr>
+    <tr><td>The previous holder of the accounts</td><td></td><td></td></tr>
+    <tr><td>Vercel</td><td>Vercel's help pages</td><td>vercel.com/help</td></tr>
+    <tr><td>Neon</td><td>Neon's help pages</td><td>neon.com/docs</td></tr>
+  </table>
+<!--/PRIVATE-WHO-->
+</section>
+
+<!-- ═════════ 10 · WHAT IS NOT BUILT YET ═════════ -->
+<section class="p10">
+  <p class="kicker">The Tambiz Manual | Chapter 10</p>
+  <h1 class="chapter">What is not built yet</h1>
+  <p class="deck">An honest list, so nobody is surprised on the night. The app was cut back on purpose in September 2026; some of these are choices, not oversights.</p>
+  <table class="t">
+    <tr><th style="width:30%">Not there</th><th>What to do instead</th></tr>
+    <tr><td><b>Changing points, weights or letter bands on screen</b></td><td>Only the criterion wording can be changed. Each event keeps the sheet it was created with. A programmer changes the default before next year's event is created (9.5).</td></tr>
+    <tr><td><b>Renaming a group that already has scores</b></td><td>A group is its name: a new name makes a new group, and the scores stay with the old one. Get group names right before judging starts.</td></tr>
+    <tr><td><b>Deleting a sheet of scores</b></td><td>There is no button to delete a judge's whole sheet, for example after a rehearsal; only one score at a time, by emptying its cell with a reason. Rehearse on the practice event (9.6).</td></tr>
+    <tr><td><b>Deleting or disabling an account</b></td><td>Remove the judge from the event and reset their password (9.4).</td></tr>
+    <tr><td><b>A "forgot password" link</b></td><td>The app sends no email. Judges: Reset password. Coordinator: routes A and B (9.4).</td></tr>
+    <tr><td><b>Forcing a new judge to change their password</b></td><td>Judges can change it under Account; they are not made to.</td></tr>
+    <tr><td><b>Full offline mode</b></td><td>Scores typed offline are kept and sent later, but a phone that has never opened the app cannot load it offline, and reloading with no connection shows the browser's offline page. Every judge signs in once beforehand (chapter 3).</td></tr>
+    <tr><td><b>Sending the emails</b></td><td>The app writes them; Power Automate sends them (chapter 8). The Power Automate screens are not pictured in this manual.</td></tr>
+    <tr><td><b>Checking that an email address is the right one</b></td><td>Only its shape is checked. A second person reads the Email column (chapter 2).</td></tr>
+    <tr><td><b>Frozen results and file history</b></td><td>Closing locks the scores, but results are worked out afresh each time; the saved workbook is the snapshot (9.8).</td></tr>
+    <tr><td><b>A screen for the change history</b></td><td>Score corrections are listed on each group's scores page and in the workbook. Other changes (uploads, moves, closing) are recorded in the database with no screen to read them.</td></tr>
+    <tr><td><b>Corrections after the email file</b></td><td>Nothing can change once it is downloaded, and there is no "send corrected results" step (9.7).</td></tr>
+    <tr><td><b>Sign-ins for students or advisers</b></td><td>Deliberately none. Each gets one email.</td></tr>
+  </table>
+</section>
+
+<!-- ═════════ AT A GLANCE ═════════ -->
+<section class="pa">
+  <p class="kicker">The Tambiz Manual | At a glance</p>
+  <h1 class="chapter">At a glance</h1>
+  <p class="deck">One page to keep beside you. The chapter for each line is in brackets.</p>
+  <table class="t">
+    <tr class="sum"><td colspan="2">A month before</td></tr>
+    <tr><td style="width:36%">Update, redeploy, rehearse</td><td>Checklist and ten-minute rehearsal on the practice event (9.6)</td></tr>
+    <tr class="sum"><td colspan="2">Setting up</td></tr>
+    <tr><td>Build the workbook</td><td>From the template: Students and Judges sheets, the five check formulas, a second reader for emails (2)</td></tr>
+    <tr><td>Create the event</td><td>Events → Year → Create event (3.2)</td></tr>
+    <tr><td>Criterion wording</td><td>Scoring sheet → paste 39 lines → Save wording (3.3)</td></tr>
+    <tr><td>Upload</td><td>Data → Choose File → Upload workbook → read the shaded box (3.4)</td></tr>
+    <tr><td>Judges' slips</td><td>Print this list, straight after the upload. Shown once (3.4)</td></tr>
+    <tr><td>Before the night</td><td>Every judge signs in once on their phone (3.7)</td></tr>
+    <tr class="sum"><td colspan="2">On the night</td></tr>
+    <tr><td>Judges</td><td>Defense or Booth → group → score → Review → <b>Mark group complete</b> (5)</td></tr>
+    <tr><td>Watch</td><td>Progress: chase <b>in progress · not counted</b> and red labels (6.1)</td></tr>
+    <tr><td>Correct a score</td><td>Group's name → reason → type over the score → Enter (6.2)</td></tr>
+    <tr><td>Lost slip</td><td>Judges → select → Reset password → Enter → print (9.4)</td></tr>
+    <tr class="sum"><td colspan="2">Closing</td></tr>
+    <tr><td>Settle</td><td>Close the event → everything under <b>Needs you</b> (6.3)</td></tr>
+    <tr><td>Close</td><td>Tick <b>I have checked the progress</b> → Close the event (6.4)</td></tr>
+    <tr><td>File 1</td><td>Download the workbook, check For Encoding, save it to the records folder (7.4, 9.8)</td></tr>
+    <tr><td>File 2, final</td><td>Tick <b>Results are final</b> → Download the email file. Nothing can change after (8.1)</td></tr>
+    <tr><td>Send</td><td>Power Automate: table <b>Emails</b>, Pagination 1000, test on yourself first (8.3)</td></tr>
+    <tr class="sum"><td colspan="2">The rules that decide grades</td></tr>
+    <tr><td>Grade</td><td>(Member total + group overall) ÷ 2, <b>rounded up</b>, then 92 A · 85 B+ · 78 B · 71 C+ · 64 C · 57 D+ · 50 D · below F (4)</td></tr>
+    <tr><td>Always</td><td>Only submitted sheets count · a blank is never a zero · absent means zero · ties by overall · two decimals (1, 4)</td></tr>
+  </table>
+</section>
+
+</body>
+</html>

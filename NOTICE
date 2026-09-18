@@ -1,0 +1,19 @@
+Tambiz
+Copyright (c) 2026 Benjamin C. Sotelo
+
+The MIT licence in LICENSE covers the code. It does not cover the marks.
+
+The Far Eastern University seal, the FEU wordmark and the crest of the
+Institute of Accounts, Business and Finance (IABF) are the property of
+Far Eastern University. They are in this repository only so that FEU can
+run its own Tambiz awarding:
+
+  src/assets/brand/feu-seal.webp
+  src/assets/brand/feu-wordmark.png
+  src/assets/brand/feu-wordmark-white.png
+  src/assets/brand/iabf-crest.png
+
+They also appear in the screenshots under docs/. No licence to use them is
+granted. Anyone reusing this software must replace them with their own
+marks, and remove FEU's name from the screens and the grade sheet,
+before running it for anyone other than FEU.

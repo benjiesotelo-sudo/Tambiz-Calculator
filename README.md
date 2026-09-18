@@ -1,126 +1,112 @@
 # Tambiz
 
-Judging, results and individual grades for the annual Tambiz awarding in MGT1114 Business Plan 2, FEU Manila.
+Judging, results and grades for the annual Tambiz awarding at FEU Manila, where MGT1114 Business Plan 2 groups defend their business plans and run a booth before a panel of judges.
 
-This repository holds two things:
+![The Tambiz sign-in screen](docs/images/sign-in.jpg)
 
-| What | Where | Status |
-|---|---|---|
-| **The hosted Tambiz app** (Next.js, TypeScript, Postgres) | `src/`, deployed on Vercel | First working version |
-| **The original single-file calculator** | `index.html` | Unchanged. It is the authority on the scoring rules and the fallback if the app is unavailable: open it in any browser. |
+## What it does
 
-The coordinator's click-by-click guide is [`docs/how-to-run-an-event.md`](docs/how-to-run-an-event.md).
+- **One workbook in.** The coordinator's staff fill in one Excel file, students with their group and adviser on one sheet and the judges on another, and upload it. Mistakes are named row by row, and uploading again never adds anyone twice.
+- **Judges score on their own phones.** Each judge signs in, picks a group, and scores one category at a time with the criterion's wording and maximum beside every box. A score over the maximum is refused, not quietly changed, and scores typed with no signal are kept on the phone and sent later.
+- **The coordinator sees the evening as it happens:** which groups each judge has finished, and which scores do not count yet because a judge has not submitted them. A mistyped score can be corrected, with a reason, and the judge's own score is kept beside it.
+- **Results and grades follow the department's rules exactly.** Category and overall rankings, the top 10 for the awarding, and every student's grade from the FEU letter bands. A blank is never counted as zero, and every number has two decimals, on screen and in Excel alike.
+- **Judge profiles** show how each judge marks compared with their co-judges, as a basis for knowing the panel, not for judging the judges.
+- **Two files out.** Closing the event gives the department's Excel workbook, with the official grade sheet ready to encode, and an email file that Microsoft Power Automate sends from the coordinator's mailbox: each student their letter grade and group percentage, each adviser their groups' results, and never a rank.
 
-## What the app does
+The coordinator's manual, with a picture of every step, is in [`docs/manual/`](docs/manual/): [`Tambiz-Manual.pdf`](docs/manual/Tambiz-Manual.pdf).
 
-The judges enter their own scores on their phones, instead of staff typing them in.
-
-- **Coordinator** (admin): uploads one Excel workbook (a Students sheet and a Judges sheet), keeps it up to date in one editable table, prints the judges' sign-in list, pastes the criterion wording, watches judging progress, corrects scores with a reason, reads results, individual grades and judge profiles, and closes the event. Closing hands over two files: the Excel **workbook** (Scores, Booth Scores, Results, Leaderboard, Individual Grades, For Encoding) and the **email file** (Email, Name and a ready HTML Message per student and adviser) for Microsoft Power Automate to send.
-- **Judges**: sign in on a phone, pick Defense or Booth, pick a group, and score one category per screen with the criterion wording and maximum beside every box. A score above the maximum, or with more than two decimals, is refused with a message. Review lists every blank and error with a Go button, and “Mark group complete” stays locked until the sheet is clean. Defense judges also score each member, or mark them absent. Scores are kept on the phone the moment they are typed and sent in the background.
-- **Results**: every category percentage with its rank, the defense and booth halves, the overall score and rank, a top-10 leaderboard per category, the adviser ranking, and each student's member total, final grade and letter grade.
-- **Students and advisers** have no sign-in. Each gets one email from the email file: a student their letter grade and their group's percentage, never a rank; an adviser each of their groups' percentages and which placed in the top 10, never which place.
-
-Scoring began as a port of `index.html` and follows the coordinator's decisions of 14 and 17 September 2026; `src/lib/scoring.ts` lists every rule and where it differs. Overall = Defense × 0.7 + Booth × 0.3, every category weighs the same within its half, a blank score is never counted as zero (an incomplete group has no rank), percentages are rounded to two decimals the same way on screen and in Excel, category ties are broken by overall score, a student absent from the defense has individual scores of zero, and a final grade is rounded **up** to a whole number before its letter is looked up (84.5 → 85 → B+).
+The original single-file calculator the app replaced is kept as [`index.html`](index.html). It still opens in any browser, and it is the authority the app's scoring is tested against.
 
 ## Run it on your computer
 
-Needs Node.js 22 or newer.
+It needs **Node.js 22 or newer**, and either a **Postgres connection string** or nothing at all: without one, the app uses PGlite, a real Postgres compiled to WebAssembly, stored in `.local-db/`.
 
 ```bash
 npm install
-npm run dev
+DATABASE_URL= npm run dev
 ```
 
-Open http://localhost:3000. With no `DATABASE_URL`, the app uses PGlite (a real Postgres compiled to WebAssembly) stored in `.local-db/`, and fills it with a practice event (invented students, the real event's group names) the first time it starts.
+Open http://localhost:3000. The empty `DATABASE_URL=` makes sure a connection string in a local `.env.local` file is not used. The first start fills the local database with a practice event of invented students, groups and scores. Delete `.local-db/` to start again.
 
-Delete `.local-db/` to start again from the sample data.
-
-### Sample sign-ins
-
-The sample data creates one coordinator and three judges. Their passwords come from `SEED_ADMIN_PASSWORD` and `SEED_JUDGE_PASSWORD` when those are set (applied on every server start); otherwise the password is `tambiz-demo-2027`.
+The sample sign-ins use the password `tambiz-demo-2027`, or `SEED_ADMIN_PASSWORD` and `SEED_JUDGE_PASSWORD` when those are set:
 
 | Role | Email |
 |---|---|
 | Coordinator | `admin@tambiz.demo` |
 | Judge | `judge1@tambiz.demo`, `judge2@tambiz.demo`, `judge3@tambiz.demo` |
 
-**Change these passwords (Account → Change password) before any real student data goes in.** The practice event, its students, advisers and scores are invented; only its group names come from the real event.
+To use your own Postgres instead, set `DATABASE_URL` to its connection string.
 
-## Tests
+### Tests
 
 ```bash
 npm test
 ```
 
-- `tests/golden.test.ts`: the reference answers from the original `index.html` (design research, `evidence/golden-rules.js`); where a decision changed a rule, the test names the old answer and the decision. Also rounding, decimals and the letter-grade rule.
-- `tests/crosscheck.test.ts`: runs the original scoring functions extracted from `index.html` on 60 random events and checks the new code gives identical percentages and ranks wherever nothing is left blank (the deliberate differences are explained at the top of the file).
-- `tests/upload.test.ts`: the workbook in: the column list, the template, “Download current data”, a group whose rows disagree about its adviser, and above all that uploading never touches a score and never removes anybody.
-- `tests/app-flows.test.ts`: the coordinator's flows on a real Postgres (PGlite in memory): the Data and Judges tables, absence, corrections, closing, undoing and the email file.
-- `tests/finalise.test.ts`, `tests/ranking.test.ts`, `tests/email-file.test.ts`, `tests/judge-profiles.test.ts`, `tests/rubric.test.ts`, `tests/excel-export.test.ts`, `tests/grid.test.ts`, `tests/schema.test.ts`: closing checks, the adviser ranking and top-10 wording, the email messages, judge profiles, criterion wording, workbook rounding, the table, and the schema applying twice.
+- `tests/golden.test.ts`: the reference answers from the original `index.html`; where the department changed a rule, the test names the old answer and the decision.
+- `tests/crosscheck.test.ts`: runs the scoring functions extracted from `index.html` on random events and checks the app gives the same percentages and ranks wherever nothing is blank.
+- `tests/upload.test.ts`: the workbook in, and above all that uploading never touches a score and never removes anybody.
+- `tests/app-flows.test.ts`: the coordinator's flows on a real Postgres in memory: tables, absence, corrections, closing, undoing, and the email file.
+- The rest cover closing, rankings, the emails, judge profiles, the criterion wording, workbook rounding, the table and the schema.
 
-Running the app locally: this folder's `.env.local` may hold the real `DATABASE_URL`, and `next dev` reads it. To be sure you are on the local database, start with `DATABASE_URL= npm run dev` (an empty value is never replaced by `.env.local`).
+## How it is deployed
 
-## Deploy to Vercel with Neon
+The live app runs on two free plans: **[Vercel](https://vercel.com)** (Hobby) for the site and **[Neon](https://neon.com)** (Free) for the Postgres database, both in Singapore so every click stays close to Manila. A change merged into `main` goes live by itself in about a minute. There is no other paid service: the emails go out from the coordinator's own mailbox.
 
-1. **Create the database.** In Neon, create a project in the Singapore region (AWS ap-southeast-1). Copy the connection string (it starts `postgresql://` and ends `?sslmode=require`). In the project settings, cap autoscaling at 1 compute unit.
-2. **Create the tables and the sample data.** On your computer, in this folder:
+To set it up from nothing:
+
+1. **Create the database.** In Neon, create a project in the Singapore region (AWS ap-southeast-1) and copy its connection string (it starts `postgresql://` and ends `?sslmode=require`). Cap autoscaling at 1 compute unit.
+2. **Create the tables and the sample data** (optional: the app does this on its first request, but running it yourself shows any connection problem at once):
    ```bash
-   DATABASE_URL="postgresql://…your connection string…" SEED_ADMIN_PASSWORD="a long coordinator password" SEED_JUDGE_PASSWORD="a long judge password" npm run db:setup
+   DATABASE_URL="postgresql://…" SEED_ADMIN_PASSWORD="a long coordinator password" SEED_JUDGE_PASSWORD="a long judge password" npm run db:setup
    ```
-   It prints `Database ready (Postgres from DATABASE_URL): 4 accounts, 1 events.` Running it again is safe: it only adds missing tables and never duplicates the sample data. (The app also runs this set-up by itself on its first request, so this step is optional, but running it yourself shows any connection problem straight away.)
-3. **Create the Vercel project.** In Vercel, choose Add New → Project, import this GitHub repository, and keep the detected framework (Next.js) and default build settings.
-4. **Set the environment variables** (Project → Settings → Environment Variables, for Production and Preview):
+   It prints `Database ready (Postgres from DATABASE_URL): 4 accounts, 1 events.` Running it again is safe.
+3. **Create the Vercel project.** Add New → Project, import this repository, keep the detected framework (Next.js) and the default build settings.
+4. **Set the environment variables** (Project → Settings → Environment Variables):
 
    | Name | Value | Required |
    |---|---|---|
-   | `DATABASE_URL` | The Neon connection string | **Yes.** Without it the deployed app runs on a temporary in-memory database that is wiped whenever Vercel restarts it. |
-   | `SEED_ADMIN_PASSWORD` | Password for `admin@tambiz.demo` | Recommended. See “Changing the sample account passwords” below. |
-   | `SEED_JUDGE_PASSWORD` | Password for the three sample judges (`judge1@`, `judge2@`, `judge3@tambiz.demo`) | Recommended. Same. |
+   | `DATABASE_URL` | The Neon connection string | **Yes.** Without it the deployed app runs on a temporary in-memory database, wiped whenever Vercel restarts it. |
+   | `SEED_ADMIN_PASSWORD` | Password for `admin@tambiz.demo` | Recommended (see below). |
+   | `SEED_JUDGE_PASSWORD` | Password for the three sample judges | Recommended. |
 
-   If you use Vercel's Neon integration instead of pasting the string, it creates `DATABASE_URL` for you. Turn off “create a database branch for every preview deployment”; the free plan allows only 10 branches.
+   If you use Vercel's Neon integration, it creates `DATABASE_URL` for you; turn off "create a database branch for every preview deployment", since the free plan allows only 10 branches.
 
-   **Preview deployments never use `DATABASE_URL`.** A pull request's preview runs on its own throwaway sample data (in-memory PGlite), so reviewing a change can never alter live data or apply its schema early. To let previews use the real database anyway, set `TAMBIZ_PREVIEW_DATABASE=1` in the Preview environment.
-5. **Deploy.** Press Deploy, open the address Vercel gives you, and sign in as the coordinator.
-6. **Before real data:** change the coordinator password, remove or reset the sample judges, and create the real event. The sample event is marked as practice on every screen; leave it for rehearsals. A database set up by an older version keeps its old, unmarked sample event until you replace it (see the start of `docs/how-to-run-an-event.md`).
+   **Preview deployments never use `DATABASE_URL`.** A pull request's preview runs on its own throwaway sample data, so reviewing a change can never alter live data. To let previews use the real database anyway, set `TAMBIZ_PREVIEW_DATABASE=1` in the Preview environment.
+5. **Deploy**, open the address Vercel gives you, and sign in as the coordinator.
+6. **Before real data:** change the coordinator password and create the real event. The practice event says so on every screen; keep it for rehearsals.
 
-### Changing the sample account passwords
+### The sample account passwords
 
-`SEED_ADMIN_PASSWORD` and `SEED_JUDGE_PASSWORD` are applied every time the server starts, not only when the database is first filled:
-
-1. In Vercel, change the variable's value (Project → Settings → Environment Variables).
-2. Redeploy (Deployments → the latest one → Redeploy).
-3. On its first request, the app compares each sample account's stored password with the variable. Where they differ, it stores the new password, clears any lockout, and signs that account out everywhere. The server log says which accounts changed.
-
-While a variable is set, it wins: a password someone changed under **Account** is put back to the variable's value on the next server start. If you would rather people keep the passwords they choose, delete the variable and redeploy. Judge accounts created by an upload or on the Judges tab are never touched by these variables.
-
-### Database migrations
-
-The schema is in `src/lib/schema.ts`. Every statement is idempotent (`CREATE TABLE IF NOT EXISTS`, and `ADD COLUMN IF NOT EXISTS` for future changes), and it runs automatically on each server start. To apply it by hand, run `DATABASE_URL=… npm run db:setup`.
+`SEED_ADMIN_PASSWORD` and `SEED_JUDGE_PASSWORD` are applied every time the server starts. To change one, change the variable in Vercel and redeploy; on its first request the app stores the new password, clears any lockout, and signs that account out everywhere. While a variable is set it wins: a password changed under Account is put back on the next start. Delete the variable and redeploy if people should keep the passwords they choose. Judges created by an upload or on the Judges tab are never touched.
 
 ### Emergency password reset
-
-If the coordinator password is lost:
 
 ```bash
 DATABASE_URL="postgresql://…" npm run reset-password -- admin@tambiz.demo "a new long password"
 ```
 
+### Database changes
+
+The schema is in `src/lib/schema.ts`. Every statement is idempotent and additive, and it runs on each server start; `DATABASE_URL=… npm run db:setup` applies it by hand.
+
 ## Where things are
 
 | Path | What |
 |---|---|
-| `src/lib/scoring.ts` | Every scoring rule, ported from `index.html` with line references |
-| `src/lib/rubric.ts` | The default scoring sheet (maximums, weights, member fields, letter-grade bands). Each event stores its own copy. |
-| `src/lib/db.ts` | The only module that talks to the database (Neon when `DATABASE_URL` is set, PGlite otherwise) |
-| `src/lib/schema.ts` | Tables |
-| `src/lib/repo.ts` | Shared reads, and the whole-event report used by results, grades and both files |
-| `src/lib/data-workbook.ts`, `src/lib/data-upload.ts` | The one workbook in: its column list, template and parsing; applying an upload |
-| `src/lib/excel-export.ts`, `src/lib/email-file.ts`, `src/lib/messages.ts` | The two files out: the workbook, the email file, and every word of the emails |
-| `src/components/ScoreSheet.tsx` | The judge scoring screen |
-| `src/app/admin/actions.ts`, `src/app/admin/table-actions.ts` | Every coordinator change (forms, and the spreadsheet tables' saves), each checking the caller is the coordinator |
-| `src/components/DataGrid.tsx` | The spreadsheet table used by every coordinator list |
-| `src/app/api/judge/sheet/route.ts` | Where judges' scores arrive; refuses anything above a maximum |
+| `src/lib/scoring.ts` | Every scoring rule, with `index.html` line references and the department's deliberate differences |
+| `src/lib/rubric.ts` | The default scoring sheet: maximums, weights, member fields and letter bands. Each event keeps its own copy. |
+| `src/lib/db.ts`, `src/lib/schema.ts` | The only module that talks to the database (Neon or PGlite), and the tables |
+| `src/lib/data-workbook.ts`, `src/lib/data-upload.ts` | The workbook in: its columns, template and parsing, and applying an upload |
+| `src/lib/excel-export.ts`, `src/lib/email-file.ts`, `src/lib/messages.ts` | The two files out, and every word of the emails |
+| `src/components/ScoreSheet.tsx`, `src/app/api/judge/sheet/route.ts` | The judge's scoring screen, and where its scores arrive |
+| `src/components/DataGrid.tsx`, `src/app/admin/table-actions.ts` | The spreadsheet table behind every coordinator list, and its saves |
+| `docs/manual/` | The manual: its HTML source, pictures and PDF |
 
-## Real student data
+Real student names, numbers, emails and grades must never be committed here. `.gitignore` blocks Excel and CSV files, `.env*.local` and the local database folder.
 
-Real student names, numbers, emails and grades must never be committed to this repository. `.gitignore` blocks Excel and CSV files, `.env*.local` and the local database folder.
+## Licence
+
+The code is released under the [MIT Licence](LICENSE), so another department or university can take it and run their own awarding without asking anyone.
+
+**The licence covers the code, not the marks.** The Far Eastern University seal, the FEU wordmark and the IABF crest belong to Far Eastern University and are included only for FEU's own use. If you reuse this software, replace them with your own. See [`NOTICE`](NOTICE).
