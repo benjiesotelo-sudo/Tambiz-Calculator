@@ -1,6 +1,8 @@
+import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { AppBar } from '@/components/AppBar';
 import { DataGrid } from '@/components/DataGrid';
+import { EmptyState } from '@/components/EmptyState';
 import { EventHeader, ResultsViews } from '@/components/EventNav';
 import { requireAdmin } from '@/lib/auth';
 import type { GridColumn } from '@/lib/grid';
@@ -34,8 +36,8 @@ export default async function ResultsPage({ params }: { params: Promise<{ id: st
   const columns: GridColumn[] = [
     { key: 'group', label: 'Group', width: 'minmax(9rem, 1.6fr)' },
     { key: 'adviser', label: 'Adviser', filter: true, width: 'minmax(6.5rem, 1fr)' },
-    ...categories.map((c): GridColumn => ({ key: `c:${c.key}`, label: c.name, type: 'number', align: 'right', width: 'minmax(6.2rem, .8fr)' })),
-    { key: 'overall', label: 'Overall', type: 'number', align: 'right', width: '5.4rem' },
+    ...categories.map((c): GridColumn => ({ key: `c:${c.key}`, label: c.name, type: 'number', align: 'right', bar: true, width: 'minmax(8.5rem, .8fr)' })),
+    { key: 'overall', label: 'Overall', type: 'number', align: 'right', bar: true, width: '5.4rem' },
     { key: 'rank', label: 'Rank', type: 'number', align: 'right', width: '3.8rem' },
     { key: 'judged', label: 'Judged', filter: true, width: '6.6rem' },
   ];
@@ -55,29 +57,45 @@ export default async function ResultsPage({ params }: { params: Promise<{ id: st
           To look up one student’s grade, open <b>Individual grades</b> above. The workbook and the email file are on the <b>Close the event</b> tab.
         </p>
 
-        <div className="section-title">Top 10 for the awarding</div>
-        <div className="lb-grid compact">
-          {report.results.leaderboards.map((lb) => (
-            <div className="lb-card" key={lb.key}>
-              <div className={`lb-head ${lb.half === 'booth' ? 'booth' : lb.half === 'overall' ? 'overall' : ''}`}>{lb.name}</div>
-              {lb.entries.length ? (
-                lb.entries.map((e) => (
-                  <div className="lb-item" key={e.id}>
-                    <Rank r={e.rank} />
-                    <span className="nm">{e.name}</span>
-                    <span className="pc">{fmtPct(e.score)}</span>
-                  </div>
-                ))
-              ) : (
-                <div className="lb-empty">No complete scores yet</div>
-              )}
+        {!report.results.leaderboards.some((lb) => lb.entries.length) ? (
+          <EmptyState
+            icon="chart"
+            title="No results yet"
+            action={
+              <Link className="btn secondary" href={`/admin/events/${id}/progress`}>
+                See judging progress
+              </Link>
+            }
+          >
+            {report.groups.length ? 'The top 10 fill in as judges submit their sheets. Until then there is nothing to rank.' : 'There are no groups yet. They arrive with the workbook on the Data tab.'}
+          </EmptyState>
+        ) : (
+          <>
+            <div className="section-title">Top 10 for the awarding</div>
+            <div className="lb-grid compact">
+              {report.results.leaderboards.map((lb) => (
+                <div className="lb-card" key={lb.key}>
+                  <div className={`lb-head ${lb.half === 'booth' ? 'booth' : lb.half === 'overall' ? 'overall' : ''}`}>{lb.name}</div>
+                  {lb.entries.length ? (
+                    lb.entries.map((e) => (
+                      <div className="lb-item" key={e.id}>
+                        <Rank r={e.rank} />
+                        <span className="nm">{e.name}</span>
+                        <span className="pc">{fmtPct(e.score)}</span>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="lb-empty">No complete scores yet</div>
+                  )}
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
-        <p className="sub">
-          Ranked on the two-decimal percentages shown. When two groups show the same category percentage, the higher overall goes first; they share a place only if both are
-          equal. Every group tied at 10th is listed.
-        </p>
+            <p className="sub">
+              Ranked on the two-decimal percentages shown. When two groups show the same category percentage, the higher overall goes first; they share a place only if both are
+              equal. Every group tied at 10th is listed.
+            </p>
+          </>
+        )}
 
         <div className="section-title">Every group</div>
         <p className="sub" style={{ marginTop: 0 }}>

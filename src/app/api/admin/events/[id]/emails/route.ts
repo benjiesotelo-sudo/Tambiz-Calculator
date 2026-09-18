@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { currentAccount } from '@/lib/auth';
+import { fromThisApp } from '@/lib/same-origin';
 import { logStatement } from '@/lib/change-log';
 import { one, query } from '@/lib/db';
 import { buildEmailFile, emailRecipients } from '@/lib/email-file';
@@ -12,15 +13,6 @@ export const dynamic = 'force-dynamic';
 // undone and nothing about the event can change, so the emails already sent always match the app. A POST, so no link
 // preview or prefetch can download it by accident.
 
-/** A request from a page on this app, or with no Origin at all. An Origin that is not a URL, such as "null", is refused. */
-function fromThisApp(origin: string | null, host: string | null) {
-  if (!origin) return true;
-  try {
-    return new URL(origin).host === host;
-  } catch {
-    return false;
-  }
-}
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;

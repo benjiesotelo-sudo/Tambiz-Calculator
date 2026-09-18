@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { AppBar } from '@/components/AppBar';
+import { EmptyState } from '@/components/EmptyState';
 import { EventHeader } from '@/components/EventNav';
 import { ProfileCaveats } from '@/components/ProfileCaveats';
 import { requireAdmin } from '@/lib/auth';
@@ -67,8 +68,20 @@ export default async function JudgeProfilesPage({ params }: { params: Promise<{ 
               </Link>
             </li>
           ))}
-          {!profiles.length ? <li className="sub">No judges yet.</li> : null}
         </ul>
+        {!profiles.length ? (
+          <EmptyState
+            icon="person"
+            title="No judges yet"
+            action={
+              <Link className="btn secondary" href={`/admin/events/${id}/judges`}>
+                Go to the Judges tab
+              </Link>
+            }
+          >
+            Every judge of this event has a profile here. Judges come with the workbook, or are added on the Judges tab.
+          </EmptyState>
+        ) : null}
 
         <details className="inline-form" style={{ marginTop: 16 }}>
           <summary>How these are worked out</summary>
@@ -77,7 +90,7 @@ export default async function JudgeProfilesPage({ params }: { params: Promise<{ 
               Every comparison uses only the co-judges who scored <b>the same group in the same half</b>, and only the criteria both sides scored. Scores are worked out the same
               way as results: out of 100, categories averaged, blanks left out.
             </p>
-            <ul style={{ paddingLeft: 18, marginBottom: 0 }}>
+            <ul style={{ paddingLeft: 24, marginBottom: 0 }}>
               <li>
                 <b>Groups</b>: how many groups the judge scored, in each half.
               </li>

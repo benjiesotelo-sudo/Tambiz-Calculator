@@ -37,6 +37,7 @@ export function resultGridRow(event: EventLike, g: GroupRow, r: GroupResult): Gr
     sort,
     tones,
     links: { group: scoresHref(event.id, g.id) },
+    lead: r.overallRank === 1,
     notes: r.accepted ? { judged: `Finalised without every score, with your reason: ${g.accept_reason}` } : !ranked ? { overall: 'Incomplete: from what is scored so far, so it has no rank.' } : undefined,
   };
 }

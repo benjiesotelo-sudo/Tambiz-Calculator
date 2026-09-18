@@ -10,6 +10,7 @@ import { useRouter } from 'next/navigation';
 import { SignInSlips, type SignInSlip } from './SignInSlips';
 import {
   canEditCell,
+  columnsMinRem,
   columnTracks,
   completeWith,
   completionMatches,
@@ -918,6 +919,22 @@ export function DataGrid(props: DataGridProps) {
 
   // ── drawing ───────────────────────────────────────────────────
   const template = useMemo(() => columnTracks(columns), [columns]);
+  // On a wide screen too narrow for every column, the table scrolls sideways inside its own frame rather than
+  // squeezing its headings; a phone shows each row as a card instead, so it never needs to.
+  const minRem = useMemo(() => columnsMinRem(columns), [columns]);
+  const [wide, setWide] = useState(false);
+  useEffect(() => {
+    const frame = gridRef.current?.parentElement;
+    if (!frame) return;
+    const check = () => {
+      const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+      setWide(window.matchMedia('(min-width: 760px)').matches && frame.clientWidth < minRem * rem);
+    };
+    check();
+    const watch = new ResizeObserver(check);
+    watch.observe(frame);
+    return () => watch.disconnect();
+  }, [minRem]);
   const firstEditable = (columns.find((c) => c.editable && c.required) ?? columns.find((c) => c.editable))?.key;
   const errorCount = [...errors.values()].reduce((n, m) => n + Object.keys(m).length, 0) + Object.keys(rowErrors).length;
   const newWaiting = [...pendingNew.current].filter((k) => missingFor(k).length);
@@ -1015,8 +1032,10 @@ export function DataGrid(props: DataGridProps) {
         </span>
         {save ? (
           <span className={`dg-save ${status.cls}`} role="status" aria-live="polite">
-            <span className="dot" />
-            {status.text}
+            <span className="swap" key={status.cls + status.text}>
+              {status.cls === 'busy' ? <span className="spinner" aria-hidden="true" /> : <span className="dot" />}
+              {status.text}
+            </span>
           </span>
         ) : null}
       </div>
@@ -1125,12 +1144,12 @@ export function DataGrid(props: DataGridProps) {
 
       <div
         ref={gridRef}
-        className="dg-grid"
+        className={`dg-grid${wide ? ' dg-wide' : ''}`}
         role="grid"
         aria-label={label}
         aria-rowcount={keys.length + 1}
         tabIndex={0}
-        style={{ '--dg-cols': template } as React.CSSProperties}
+        style={{ '--dg-cols': template, '--dg-min': `${minRem}rem` } as React.CSSProperties}
         onKeyDown={onGridKey}
         onCopy={onCopy}
         onCut={onCut}
@@ -1240,12 +1259,14 @@ const GridRowView = memo(function GridRowView(p: {
   const selected = p.selCols ? new Set(p.selCols.split('|')) : null;
   const isBlank = p.rowKey === BLANK;
   return (
-    <div className={`dg-row${isBlank ? ' dg-blank' : ''}${p.rowError ? ' row-err' : ''}${!isBlank && isNewRow(p.row.id) ? ' dg-new' : ''}`} role="row">
+    <div className={`dg-row${isBlank ? ' dg-blank' : ''}${p.rowError ? ' row-err' : ''}${!isBlank && isNewRow(p.row.id) ? ' dg-new' : ''}${p.row.lead ? ' dg-lead' : ''}`} role="row">
       {p.columns.map((c) => {
         const editable = canEditCell(c, isBlank ? null : p.row);
         const proposed = p.proposals?.[c.key];
         const err = p.errors?.[c.key];
         const tone = p.row.tones?.[c.key];
+        const n = c.bar ? p.row.sort?.[c.key] : null;
+        const fill = typeof n === 'number' ? Math.max(0, Math.min(100, n)) : null;
         const cls = [
           'dg-cell',
           c.align ?? '',
@@ -1255,6 +1276,7 @@ const GridRowView = memo(function GridRowView(p: {
           err ? 'err' : '',
           proposed !== undefined ? 'proposed' : '',
           tone ? `tone-${tone}` : '',
+          fill !== null ? 'barred' : '',
         ]
           .filter(Boolean)
           .join(' ');
@@ -1275,6 +1297,7 @@ const GridRowView = memo(function GridRowView(p: {
             onMouseDown={(e) => p.api.current.down(p.rowKey, c.key, e)}
             onDoubleClick={() => p.api.current.double(p.rowKey, c.key)}
           >
+            {fill !== null && !isEditing ? <i className="dg-fill" style={{ '--fill': fill / 100 } as React.CSSProperties} aria-hidden="true" /> : null}
             <span className="dg-v">
               {isEditing ? (
                 <CellEditor column={c} editing={p.editing!} rowKey={p.rowKey} api={p.api} />

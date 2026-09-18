@@ -1,5 +1,9 @@
 import { redirect } from 'next/navigation';
-import { AppBar, Notice } from '@/components/AppBar';
+import Image from 'next/image';
+import { Notice } from '@/components/AppBar';
+import { SubmitButton } from '@/components/SubmitButton';
+import crest from '@/assets/brand/iabf-crest.png';
+import seal from '@/assets/brand/feu-seal.webp';
 import { currentAccount, signIn } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
@@ -17,15 +21,15 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
   const sp = await searchParams;
   if (await currentAccount()) redirect('/');
   return (
-    <>
-      <AppBar subtitle="FEU Manila · MGT1114" />
-      <main className="page narrow">
-        <div className="login-hero">
+    <main className="signin">
+      <div className="signin-card">
+        <div className="mark">
+          <span className="goldrule" aria-hidden="true" />
           <h1>Tambiz</h1>
-          <p>Judging, results and grades</p>
         </div>
+        <p className="signin-sub">Business Plan 2 · IABF · FEU Manila</p>
         <Notice error={sp.error} ok={sp.signedout ? 'You are signed out.' : undefined} />
-        <form action={login} className="card form">
+        <form action={login} className="form">
           <div className="field">
             <label htmlFor="email">Email</label>
             <input className="input" id="email" name="email" type="email" autoComplete="username" required defaultValue={sp.email ?? ''} />
@@ -34,12 +38,21 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
             <label htmlFor="password">Password</label>
             <input className="input" id="password" name="password" type="password" autoComplete="current-password" required />
           </div>
-          <button className="btn block" type="submit">
+          <SubmitButton className="btn block" busy="Signing in…">
             Sign in
-          </button>
+          </SubmitButton>
         </form>
-        <p className="note">Judges: use the email and password the coordinator gave you.</p>
-      </main>
-    </>
+        <p className="signin-help">Judges: use the email and password on the slip you were handed at the briefing.</p>
+        <div className="crest">
+          <Image src={seal} alt="Far Eastern University seal" height={32} />
+          <Image src={crest} alt="Institute of Accounts, Business and Finance crest" height={32} />
+          <small>
+            Far Eastern University
+            <br />
+            Institute of Accounts, Business and Finance
+          </small>
+        </div>
+      </div>
+    </main>
   );
 }

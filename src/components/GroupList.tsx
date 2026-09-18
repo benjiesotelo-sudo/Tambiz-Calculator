@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import type { Half } from '@/lib/rubric';
 import { readDraft } from './draft';
+import { EmptyState } from './EmptyState';
 
 export interface JudgeGroup {
   id: string;
@@ -116,8 +117,36 @@ export function GroupList({ judgeId, groups }: { judgeId: string; groups: JudgeG
             </Link>
           </li>
         ))}
-        {!shown.length ? <li className="note" style={{ padding: 20 }}>No groups match.</li> : null}
       </ul>
+      {!groups.length ? (
+        <div className="gp-inner">
+          <EmptyState icon="table" title="No groups yet" flat>
+            The coordinator has not added this event’s groups yet. They appear here as soon as the workbook is uploaded.
+          </EmptyState>
+        </div>
+      ) : !shown.length ? (
+        <div className="gp-inner">
+          <EmptyState
+            icon="table"
+            title="No groups match"
+            flat
+            action={
+              <button
+                className="btn secondary"
+                type="button"
+                onClick={() => {
+                  setQ('');
+                  setFilter('all');
+                }}
+              >
+                Show every group
+              </button>
+            }
+          >
+            Nothing matches the search and filter you chose.
+          </EmptyState>
+        </div>
+      ) : null}
     </div>
   );
 }

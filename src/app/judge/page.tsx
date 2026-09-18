@@ -1,4 +1,6 @@
+import Link from 'next/link';
 import { AppBar } from '@/components/AppBar';
+import { EmptyState } from '@/components/EmptyState';
 import { PracticeBanner } from '@/components/EventNav';
 import { GroupList, type JudgeGroup } from '@/components/GroupList';
 import { requireJudge } from '@/lib/auth';
@@ -16,8 +18,17 @@ export default async function JudgeHome() {
       <>
         <AppBar subtitle="Judge scoring" account={acc} />
         <main className="page narrow">
-          <h1 className="page-title">No event yet</h1>
-          <p className="lead">You have not been added to a Tambiz event. Ask the coordinator to add you as a judge.</p>
+          <EmptyState
+            icon="compass"
+            title="No event yet"
+            action={
+              <Link className="btn secondary" href="/account">
+                Check your account
+              </Link>
+            }
+          >
+            You have not been added to a Tambiz event, so there is nothing to score. Ask the coordinator to add you as a judge, then open this page again.
+          </EmptyState>
         </main>
       </>
     );
@@ -41,12 +52,12 @@ export default async function JudgeHome() {
     <>
       <AppBar title={event.title} subtitle="Judge scoring" account={acc} home="/judge" />
       {event.practice ? (
-        <div className="page" style={{ paddingBottom: 0 }}>
+        <div className="page judge-top">
           <PracticeBanner event={event} />
         </div>
       ) : null}
       {event.status === 'finalised' ? (
-        <div className="page" style={{ paddingBottom: 0 }}>
+        <div className="page judge-top">
           <div className="notice warn">Judging is closed. You can still look at your scores, but changes are no longer accepted.</div>
         </div>
       ) : null}

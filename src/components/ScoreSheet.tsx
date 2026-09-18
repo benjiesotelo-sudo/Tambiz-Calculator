@@ -8,6 +8,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { categoryMax, criterionLabel, type Category, type Half, type Rubric } from '@/lib/rubric';
 import { fmtPct } from '@/lib/scoring';
 import { absentKey, checkScore, critKey, fmtScore, memberKey } from '@/lib/sheet';
+import { Brand } from './AppBar';
 import { readDraft, writeDraft } from './draft';
 
 interface Member {
@@ -181,6 +182,17 @@ export function ScoreSheet(props: Props) {
   };
 
   const locked = complete || props.closed;
+
+  // Which of the review's two buttons is being sent, so it can say so while it works.
+  const [pressed, setPressed] = useState<'complete' | 'edit' | null>(null);
+  const press = async (which: 'complete' | 'edit', extra: { complete: boolean }) => {
+    setPressed(which);
+    try {
+      await send(extra);
+    } finally {
+      setPressed(null);
+    }
+  };
 
   // ── statistics ──────────────────────────────────────────────
   const catStats = (cat: Category) => {
@@ -406,23 +418,25 @@ export function ScoreSheet(props: Props) {
             </div>
           </div>
         </div>
-        {st.maxes.map((m, i) => {
-          const k = critKey(st.key, i);
-          const c = checkScore(rawRef.current[k], m);
-          const label = criterionLabel(st, i);
-          return (
-            <div key={k} className={`crit${c.state === 'ok' ? ' filled' : ''}${c.state === 'error' ? ' error' : ''}`}>
-              <span className="num">{i + 1}</span>
-              <div className="label">{label}</div>
-              <div className="scorebox">
-                {scoreInput(k, m, `${st.name}, ${label}`)}
-                <span className="max">/{m}</span>
+        <div className="critlist">
+          {st.maxes.map((m, i) => {
+            const k = critKey(st.key, i);
+            const c = checkScore(rawRef.current[k], m);
+            const label = criterionLabel(st, i);
+            return (
+              <div key={k} className={`crit${c.state === 'ok' ? ' filled' : ''}${c.state === 'error' ? ' error' : ''}`}>
+                <span className="num">{i + 1}</span>
+                <div className="label">{label}</div>
+                <div className="scorebox">
+                  {scoreInput(k, m, `${st.name}, ${label}`)}
+                  <span className="max">/{m}</span>
+                </div>
+                {c.state === 'error' ? <div className="msg">{c.msg}</div> : null}
+                {c.state === 'ok' && c.n === 0 ? <div className="hint">0 points. Intended?</div> : null}
               </div>
-              {c.state === 'error' ? <div className="msg">{c.msg}</div> : null}
-              {c.state === 'ok' && c.n === 0 ? <div className="hint">0 points. Intended?</div> : null}
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
       </>
     );
   } else if (cur.kind === 'members') {
@@ -594,15 +608,29 @@ export function ScoreSheet(props: Props) {
         </ul>
         {props.closed ? null : complete ? (
           <>
-            <button className="secondary" onClick={() => void send({ complete: false })}>
-              Edit scores
+            <button className="secondary" onClick={() => void press('edit', { complete: false })} aria-busy={pressed === 'edit' || undefined}>
+              {pressed === 'edit' ? (
+                <span className="swap">
+                  <span className="spinner" aria-hidden="true" />
+                  Unlocking…
+                </span>
+              ) : (
+                'Edit scores'
+              )}
             </button>
             <div className="note">Marked complete. You can still change scores until the coordinator closes judging.</div>
           </>
         ) : (
           <>
-            <button className="primary" disabled={!can} onClick={() => void send({ complete: true })}>
-              Mark group complete
+            <button className="primary" disabled={!can} onClick={() => void press('complete', { complete: true })} aria-busy={pressed === 'complete' || undefined}>
+              {pressed === 'complete' ? (
+                <span className="swap">
+                  <span className="spinner" aria-hidden="true" />
+                  Marking complete…
+                </span>
+              ) : (
+                'Mark group complete'
+              )}
             </button>
             <div className="note">{can ? 'Everything is filled in.' : `${left} left. Every score is already saved as you type.`}</div>
           </>
@@ -614,15 +642,14 @@ export function ScoreSheet(props: Props) {
   return (
     <>
       <header className="appbar">
-        <Link href={`/judge?half=${half}`} className="brand">
-          {props.eventTitle}
-          <small>Judge scoring</small>
-        </Link>
+        <Brand title={props.eventTitle} subtitle="Judge scoring" href={`/judge?half=${half}`} />
         <div className="spacer" />
         <span className="who">{props.judgeName}</span>
         <span className={syncCls} role="status" aria-live="polite">
           <span className="dot" />
-          {syncText}
+          <span className="swap" key={syncText}>
+            {syncText}
+          </span>
         </span>
       </header>
       <div className={`pane-sheet half-${half}`}>

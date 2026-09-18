@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import { AppBar, Notice } from '@/components/AppBar';
 import { DataGrid } from '@/components/DataGrid';
+import { EmptyState } from '@/components/EmptyState';
 import { EventHeader } from '@/components/EventNav';
 import { UploadForm } from '@/components/UploadForm';
 import { requireAdmin } from '@/lib/auth';
@@ -9,7 +10,6 @@ import type { GridColumn } from '@/lib/grid';
 import { rosterLock, sentLock } from '@/lib/locks';
 import { dataRows, getEvent, listAdvisers, listGroups } from '@/lib/repo';
 import { dataGridRow } from '@/lib/tables';
-import { uploadWorkbook } from '../../../actions';
 import { removeStudentsTable, saveDataTable } from '../../../table-actions';
 
 export const dynamic = 'force-dynamic';
@@ -100,16 +100,29 @@ export default async function DataPage({ params, searchParams }: { params: Promi
             </a>
             <span className="sub">Change the current data in Excel and upload it back.</span>
           </div>
-          <UploadForm action={uploadWorkbook.bind(null, id)} eventTitle={event.title} disabled={locked ?? undefined} />
+          <UploadForm eventId={id} eventTitle={event.title} disabled={locked ?? undefined} />
         </div>
 
-        <p className="lead" style={{ marginTop: 14 }}>
+        {!students.length ? (
+          <EmptyState
+            icon="table"
+            title="No students yet"
+            action={
+              <a className="btn secondary" href="/api/admin/workbook-template">
+                Download template
+              </a>
+            }
+          >
+            Upload your workbook above and everyone appears here. You can also type a student into the table below.
+          </EmptyState>
+        ) : null}
+        <p className="lead" style={{ marginTop: 24 }}>
           <b>{students.length}</b> student{students.length === 1 ? '' : 's'} in <b>{groups.length}</b> group{groups.length === 1 ? '' : 's'} with <b>{advising.length}</b>{' '}
           adviser{advising.length === 1 ? '' : 's'}
           {noEmail ? (
             <>
               {' '}
-              · <b style={{ color: 'var(--error-ink)' }}>{noEmail}</b> adviser{noEmail === 1 ? '' : 's'} without an email
+              · <b style={{ color: 'var(--alert)' }}>{noEmail}</b> adviser{noEmail === 1 ? '' : 's'} without an email
             </>
           ) : null}
           {noSection ? (

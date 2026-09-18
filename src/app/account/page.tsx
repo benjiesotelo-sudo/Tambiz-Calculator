@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
 import { AppBar, Notice } from '@/components/AppBar';
+import { SubmitButton } from '@/components/SubmitButton';
 import { requireAccount, signOut } from '@/lib/auth';
 import { one, query } from '@/lib/db';
 import { hashPassword, MIN_PASSWORD_LENGTH, verifyPassword } from '@/lib/passwords';
@@ -56,14 +57,12 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
             <label htmlFor="again">New password again</label>
             <input className="input" id="again" name="again" type="password" autoComplete="new-password" required />
           </div>
-          <button className="btn" type="submit">
-            Change password
-          </button>
+          <SubmitButton busy="Changing password…">Change password</SubmitButton>
         </form>
         <form action={logout} className="card">
-          <button className="btn secondary block" type="submit">
+          <SubmitButton className="btn secondary block" busy="Signing out…">
             Sign out
-          </button>
+          </SubmitButton>
         </form>
       </main>
     </>

@@ -1,6 +1,8 @@
+import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { AppBar, Notice } from '@/components/AppBar';
 import { DataGrid } from '@/components/DataGrid';
+import { EmptyState } from '@/components/EmptyState';
 import { EventHeader } from '@/components/EventNav';
 import { requireAdmin } from '@/lib/auth';
 import type { GridColumn } from '@/lib/grid';
@@ -39,6 +41,19 @@ export default async function JudgesPage({ params, searchParams }: { params: Pro
           them and press <b>Reset password</b>: a new password is shown once in the same way and the old one stops working. Typing the email of a judge from an earlier year adds
           that account instead, with its password unchanged.
         </p>
+        {!judges.length ? (
+          <EmptyState
+            icon="person"
+            title="No judges yet"
+            action={
+              <Link className="btn secondary" href={`/admin/events/${id}/students`}>
+                See the Data tab
+              </Link>
+            }
+          >
+            They arrive with the workbook, on its second sheet. Or type a judge’s name and email into the table below.
+          </EmptyState>
+        ) : null}
         <DataGrid
           label="Judges of this event"
           columns={columns}

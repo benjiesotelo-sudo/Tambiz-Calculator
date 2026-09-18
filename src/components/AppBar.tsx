@@ -1,13 +1,26 @@
+import Image from 'next/image';
 import Link from 'next/link';
 import type { Account } from '@/lib/auth';
+import wordmarkWhite from '@/assets/brand/feu-wordmark-white.png';
+
+/** The FEU wordmark, white for the green chrome, beside the name in the serif. */
+export function Brand({ title = 'Tambiz', subtitle, href }: { title?: string; subtitle?: string; href: string }) {
+  return (
+    <Link href={href} className="brand">
+      <Image src={wordmarkWhite} alt="Far Eastern University" className="wordmark" height={24} priority />
+      <span className="rule" aria-hidden="true" />
+      <span className="brand-text">
+        <span className="brand-name">{title}</span>
+        {subtitle ? <small>{subtitle}</small> : null}
+      </span>
+    </Link>
+  );
+}
 
 export function AppBar({ title = 'Tambiz', subtitle, account, home = '/' }: { title?: string; subtitle?: string; account?: Account | null; home?: string }) {
   return (
     <header className="appbar">
-      <Link href={home} className="brand">
-        {title}
-        {subtitle ? <small>{subtitle}</small> : null}
-      </Link>
+      <Brand title={title} subtitle={subtitle} href={home} />
       <div className="spacer" />
       {account ? (
         <>

@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { AppBar, Notice } from '@/components/AppBar';
 import { EventHeader } from '@/components/EventNav';
+import { SubmitButton } from '@/components/SubmitButton';
 import { requireAdmin } from '@/lib/auth';
 import { emailRecipients } from '@/lib/email-file';
 import { itemsNeedYou, type Check } from '@/lib/finalise';
@@ -44,9 +45,9 @@ export default async function ClosePage({ params, searchParams }: { params: Prom
               <span className="label-text">Reason, kept with the results</span>
               <input className="input" name="reason" required minLength={3} maxLength={200} placeholder="For example: did not run a booth" />
             </label>
-            <button className="btn small" type="submit">
+            <SubmitButton className="btn small" busy="Accepting…">
               Accept with this reason
-            </button>
+            </SubmitButton>
           </form>
         </details>
       );
@@ -56,9 +57,9 @@ export default async function ClosePage({ params, searchParams }: { params: Prom
       <div className="actions">
         <form action={setMemberAbsent}>
           {hidden({ eventId: id, groupId: gid, studentId: b.id, absent: 'yes', return: here })}
-          <button className="btn small secondary" type="submit">
+          <SubmitButton className="btn small secondary" busy="Marking absent…">
             Mark absent from the defense
-          </button>
+          </SubmitButton>
         </form>
         <Link className="btn small secondary" href={scoresHref(id, gid)}>
           See their scores
@@ -71,16 +72,16 @@ export default async function ClosePage({ params, searchParams }: { params: Prom
     d.kind === 'group' ? (
       <form action={clearAcceptance}>
         {hidden({ eventId: id, groupId: d.id, return: here })}
-        <button className="btn small secondary" type="submit" disabled={sent}>
+        <SubmitButton className="btn small secondary" busy="Undoing…" disabled={sent}>
           Undo
-        </button>
+        </SubmitButton>
       </form>
     ) : (
       <form action={setMemberAbsent}>
         {hidden({ eventId: id, groupId: groupOfStudent.get(d.id) ?? '', studentId: d.id, absent: 'no', return: here })}
-        <button className="btn small secondary" type="submit" disabled={sent}>
+        <SubmitButton className="btn small secondary" busy="Saving…" disabled={sent}>
           Not absent
-        </button>
+        </SubmitButton>
       </form>
     );
 
@@ -154,7 +155,7 @@ export default async function ClosePage({ params, searchParams }: { params: Prom
           <ul className="list">
             {checks.blockers.map((b) => (
               <li key={`${b.kind}:${b.id}:${b.text}`} style={{ display: 'block' }}>
-                <div className="title" style={{ marginBottom: 6 }}>
+                <div className="title" style={{ marginBottom: 8 }}>
                   <span className="pill err">Needs you</span> {b.text}
                 </div>
                 {blockerActions(b)}
@@ -196,18 +197,18 @@ export default async function ClosePage({ params, searchParams }: { params: Prom
         {!closed ? (
           <>
             {nobody}
-            <form action={closeEvent} className="card form" style={{ marginTop: 14 }}>
+            <form action={closeEvent} className="card form" style={{ marginTop: 16 }}>
               {hidden({ eventId: id })}
               <p style={{ margin: 0 }}>
                 Closing locks every judge’s scores. A blank score is never counted as zero. You can still correct a score with a reason, and undo closing, until you download
                 the email file.
               </p>
-              <label style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-                <input type="checkbox" name="confirm" value="yes" style={{ width: 22, height: 22 }} /> I have checked the progress
+              <label className="check">
+                <input type="checkbox" name="confirm" value="yes" /> I have checked the progress
               </label>
-              <button className="btn gold" type="submit" disabled={checks.blockers.length > 0}>
+              <SubmitButton className="btn" busy="Closing the event…" disabled={checks.blockers.length > 0}>
                 Close the event
-              </button>
+              </SubmitButton>
             </form>
             <div className="section-title">Preview</div>
             {workbook}
@@ -236,11 +237,11 @@ export default async function ClosePage({ params, searchParams }: { params: Prom
               ) : null}
               <form method="post" action={`/api/admin/events/${id}/emails`} className="form">
                 {!sent ? (
-                  <label style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-                    <input type="checkbox" name="confirm" value="yes" style={{ width: 22, height: 22, flex: '0 0 auto' }} /> Results are final and ready to send
+                  <label className="check">
+                    <input type="checkbox" name="confirm" value="yes" /> Results are final and ready to send
                   </label>
                 ) : null}
-                <button className={`btn ${sent ? 'secondary' : 'gold'}`} type="submit" disabled={checks.blockers.length > 0 && !sent}>
+                <button className={`btn${sent ? ' secondary' : ''}`} type="submit" disabled={checks.blockers.length > 0 && !sent}>
                   {sent ? 'Download the email file again' : 'Download the email file'}
                 </button>
                 {!sent ? <span className="sub">When the download has started, reload this page.</span> : null}
@@ -254,12 +255,12 @@ export default async function ClosePage({ params, searchParams }: { params: Prom
                   <div className="notice warn" style={{ marginTop: 0 }}>
                     Judges will be able to change scores again, and a workbook you have already downloaded may no longer match. Close the event again when judging is done.
                   </div>
-                  <label style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-                    <input type="checkbox" name="confirm" value="yes" style={{ width: 22, height: 22, flex: '0 0 auto' }} /> Reopen judging
+                  <label className="check">
+                    <input type="checkbox" name="confirm" value="yes" /> Reopen judging
                   </label>
-                  <button className="btn small danger" type="submit">
+                  <SubmitButton className="btn small danger" busy="Reopening…">
                     Undo closing
-                  </button>
+                  </SubmitButton>
                 </form>
               </details>
             ) : null}
