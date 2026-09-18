@@ -305,10 +305,6 @@ export function leaveCompletion(column: GridColumn, c: Completion, away: boolean
 
 const DEFAULT_WIDTH = 'minmax(6rem, 1fr)';
 
-/**
- * The CSS grid tracks for the columns. Each column keeps its minimum width while the table has room; in a narrower
- * table every minimum shrinks by the same share, so the columns always fit and none is cut off.
- */
 /** The narrowest the columns can be, in rem: below it, a wide screen scrolls the table inside its frame. */
 export function columnsMinRem(columns: GridColumn[]): number {
   return columns.reduce((n, c) => {
@@ -318,6 +314,10 @@ export function columnsMinRem(columns: GridColumn[]): number {
   }, 0);
 }
 
+/**
+ * The CSS grid tracks for the columns. Each column keeps its minimum width while the table has room; in a narrower
+ * table every minimum shrinks by the same share, so the columns always fit and none is cut off.
+ */
 export function columnTracks(columns: GridColumn[]): string {
   const tracks = columns.map((c) => {
     const width = (c.width ?? DEFAULT_WIDTH).trim();

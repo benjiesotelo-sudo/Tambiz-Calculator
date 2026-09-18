@@ -496,8 +496,8 @@ button.linkish { border: 0; background: none; padding: 0; color: inherit; font-w
 /* Results: a faint bar behind each percentage, and the leader's gold edge (the one gold on the screen). */
 .dg-fill { position: absolute; left: 0; width: calc(var(--fill) * 100%); top: 6px; height: 24px; background: var(--green); opacity: .1; border-radius: 3px; pointer-events: none; }
 .dg-cell.barred .dg-v { z-index: 0; }
-.dg-row.dg-lead > .dg-cell { background: var(--gold-pale); }
-.dg-row.dg-lead > .dg-cell:first-child { box-shadow: inset 3px 0 0 var(--gold); }
+:where(.dg-row.dg-lead > .dg-cell) { background: var(--gold-pale); }
+:where(.dg-row.dg-lead > .dg-cell:first-child) { box-shadow: inset 3px 0 0 var(--gold); }
 @media (max-width: 759px) {
   .dg-head { display: none; }
   .dg-sortsel { display: inline-flex; }
@@ -512,7 +512,7 @@ button.linkish { border: 0; background: none; padding: 0; color: inherit; font-w
   .dg-v { min-height: 36px; display: flex; align-items: center; }
   .dg-fill { left: calc(var(--h3) + (100% - var(--h3)) * .4 + var(--s1)); width: calc((100% - var(--h3)) * .6 - var(--s1)); transform-origin: left; transform: scaleX(var(--fill)); }
   .dg-row.dg-lead { background: var(--gold-pale); }
-  .dg-row.dg-lead > .dg-cell { box-shadow: inset 3px 0 0 var(--gold); }
+  :where(.dg-row.dg-lead > .dg-cell) { box-shadow: inset 3px 0 0 var(--gold); }
 }
 
 /* Judges' sign-in slips: one page, printed on their own. */

@@ -26,7 +26,8 @@ export function UploadForm({ eventId, eventTitle, disabled }: { eventId: string;
 
   const upload = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const fd = new FormData(e.currentTarget);
+    const form = e.currentTarget;
+    const fd = new FormData(form);
     setPending(true);
     setProgress(null);
     setResult(null);
@@ -56,6 +57,7 @@ export function UploadForm({ eventId, eventTitle, disabled }: { eventId: string;
     } catch {
       final = FAILED;
     }
+    form.reset();
     setResult(final);
     setPending(false);
     // The Data table below the form shows the students as they are now.
