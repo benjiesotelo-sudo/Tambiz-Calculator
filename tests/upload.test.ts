@@ -382,4 +382,14 @@ describe('the upload route (the Data tab page uses it to show progress)', () => 
     const lines = await post(new File(['hello'], 'notes.txt'));
     expect(lines).toEqual([{ result: expect.objectContaining({ ok: false, message: expect.stringMatching(/does not look like an Excel \.xlsx file/) }) }]);
   });
+
+  it('refuses a file over 8 MB with a plain message, as the server action body limit did, touching nothing', async () => {
+    const before = { scores: await everyScore(), people: await everyone() };
+    const fd = new FormData();
+    fd.set('file', new File([new Uint8Array(8 * 1024 * 1024 + 1)], 'huge.xlsx'));
+    const res = await uploadRoute(new Request(`http://tambiz.test/api/admin/events/${event.id}/upload`, { method: 'POST', body: fd }), { params: Promise.resolve({ id: event.id }) });
+    expect(res.status).toBe(413);
+    expect(await res.json()).toEqual({ error: expect.stringMatching(/larger than 8 MB/) });
+    expect({ scores: await everyScore(), people: await everyone() }).toEqual(before);
+  });
 });

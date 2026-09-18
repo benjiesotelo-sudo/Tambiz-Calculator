@@ -36,7 +36,7 @@ export default async function ResultsPage({ params }: { params: Promise<{ id: st
   const columns: GridColumn[] = [
     { key: 'group', label: 'Group', width: 'minmax(9rem, 1.6fr)' },
     { key: 'adviser', label: 'Adviser', filter: true, width: 'minmax(6.5rem, 1fr)' },
-    ...categories.map((c): GridColumn => ({ key: `c:${c.key}`, label: c.name, type: 'number', align: 'right', bar: true, width: 'minmax(6.2rem, .8fr)' })),
+    ...categories.map((c): GridColumn => ({ key: `c:${c.key}`, label: c.name, type: 'number', align: 'right', bar: true, width: 'minmax(8.5rem, .8fr)' })),
     { key: 'overall', label: 'Overall', type: 'number', align: 'right', bar: true, width: '5.4rem' },
     { key: 'rank', label: 'Rank', type: 'number', align: 'right', width: '3.8rem' },
     { key: 'judged', label: 'Judged', filter: true, width: '6.6rem' },
