@@ -1,0 +1,69 @@
+<!doctype html>
+<!-- The repository banner, drawn in the sign-in screen's language (src/app/globals.css, ".signin").
+     One design, two sizes: banner.html?h=320 (README) and banner.html?h=640 (GitHub social preview).
+     Rebuild steps are in README.md beside this file. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Tambiz banner</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,600&display=block" rel="stylesheet">
+<style>
+  :root {
+    --ink: #1a1a1a; --muted: #818181; --line: #ededE8; --gold: #f2a900;
+    --serif: "Source Serif 4", Georgia, "Times New Roman", serif;
+    --sans: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; width: 1280px; height: 320px; overflow: hidden; -webkit-font-smoothing: antialiased; }
+  body.tall { height: 640px; }
+
+  /* The field: copied from .signin and .signin::after in src/app/globals.css, unchanged. */
+  .field { position: relative; isolation: isolate; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;
+    background:
+      radial-gradient(120% 90% at 78% 12%, rgba(242, 169, 0, .13), transparent 58%),
+      repeating-linear-gradient(135deg, rgba(255, 255, 255, .035) 0 2px, transparent 2px 13px),
+      linear-gradient(158deg, #00662a 0%, #004f21 42%, #003516 100%);
+    background-color: #004f21; }
+  .field::after { content: ''; position: absolute; inset: 0; pointer-events: none; z-index: -1;
+    background:
+      linear-gradient(to right, rgba(242, 169, 0, .5) 0 1px, transparent 1px) 8% 0 / 1px 100% no-repeat,
+      linear-gradient(to right, rgba(242, 169, 0, .28) 0 1px, transparent 1px) 14% 0 / 1px 100% no-repeat,
+      linear-gradient(to right, rgba(242, 169, 0, .16) 0 1px, transparent 1px) 20% 0 / 1px 100% no-repeat,
+      linear-gradient(115deg, transparent 58%, rgba(242, 169, 0, .22) 58.1%, rgba(242, 169, 0, .22) 58.4%, transparent 58.5%),
+      linear-gradient(115deg, transparent 66%, rgba(242, 169, 0, .13) 66.1%, rgba(242, 169, 0, .13) 66.35%, transparent 66.45%),
+      radial-gradient(90% 70% at 50% 120%, rgba(0, 0, 0, .34), transparent 70%); }
+
+  /* The card, as .signin-card, .mark, .signin-sub and .crest, scaled up for a banner. */
+  .card { background: #fff; border-radius: 16px; box-shadow: 0 30px 70px -26px rgba(0, 0, 0, .55), 0 2px 8px rgba(0, 0, 0, .08);
+    padding: 36px 48px 34px; display: flex; align-items: center; gap: 48px; }
+  .mark { display: flex; align-items: center; gap: 20px; }
+  .goldrule { width: 44px; height: 5px; background: var(--gold); border-radius: 3px; flex: 0 0 auto; }
+  h1 { margin: 0; font: 600 88px/1 var(--serif); letter-spacing: -.02em; color: var(--ink); }
+  .sub { margin: 16px 0 0 64px; font: 19px/1.3 var(--sans); color: var(--muted); white-space: nowrap; }
+  .seal { height: 96px; width: auto; flex: 0 0 auto; padding-left: 48px; border-left: 1px solid var(--line); box-sizing: content-box; }
+
+  body.tall .card { padding: 52px 64px 48px; gap: 56px; }
+  body.tall h1 { font-size: 112px; }
+  body.tall .goldrule { width: 52px; height: 6px; }
+  body.tall .mark { gap: 24px; }
+  body.tall .sub { font-size: 23px; margin: 22px 0 0 76px; }
+  body.tall .seal { height: 124px; padding-left: 56px; }
+</style>
+</head>
+<body>
+<div class="field">
+  <div class="card">
+    <div>
+      <div class="mark"><span class="goldrule"></span><h1>Tambiz</h1></div>
+      <p class="sub">Judging, results and grades · Business Plan 2 · IABF · FEU Manila</p>
+    </div>
+    <img class="seal" src="../../src/assets/brand/feu-seal.webp" alt="Far Eastern University seal">
+  </div>
+</div>
+<script>
+  if (new URLSearchParams(location.search).get('h') === '640') document.body.classList.add('tall');
+</script>
+</body>
+</html>

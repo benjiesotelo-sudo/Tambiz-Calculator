@@ -1,3 +1,5 @@
+![Tambiz: judging, results and grades for Business Plan 2, IABF, FEU Manila](docs/brand/banner.png)
+
 # Tambiz
 
 Judging, results and grades for the annual Tambiz awarding at FEU Manila, where MGT1114 Business Plan 2 groups defend their business plans and run a booth before a panel of judges.
