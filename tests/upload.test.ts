@@ -22,7 +22,9 @@ vi.mock('@/lib/auth', () => {
 import { uploadWorkbook } from '@/app/admin/actions';
 import { saveScoresTable } from '@/app/admin/table-actions';
 import { GET as currentData } from '@/app/api/admin/events/[id]/current-data/route';
+import { POST as uploadRoute } from '@/app/api/admin/events/[id]/upload/route';
 import { GET as template } from '@/app/api/admin/workbook-template/route';
+import type { UploadLine } from '@/lib/data-upload';
 import { buildDataWorkbook, ImportError, JUDGE_COLUMNS, parseWorkbook, planJudges, planStudents, STUDENT_COLUMNS, type ParsedSheet } from '@/lib/data-workbook';
 import { one, query } from '@/lib/db';
 import { LOCKED_SENT } from '@/lib/locks';
@@ -337,5 +339,47 @@ describe('uploading never touches a score and never removes anybody', () => {
 
   it('a file that is not Excel is refused with a plain message', async () => {
     expect(await upload(new File(['hello'], 'notes.txt'))).toMatchObject({ ok: false, message: expect.stringMatching(/does not look like an Excel \.xlsx file/) });
+  });
+});
+
+describe('the upload route (the Data tab page uses it to show progress)', () => {
+  const post = async (f: File) => {
+    const fd = new FormData();
+    fd.set('file', f);
+    const res = await uploadRoute(new Request(`http://tambiz.test/api/admin/events/${event.id}/upload`, { method: 'POST', body: fd }), { params: Promise.resolve({ id: event.id }) });
+    return (await res.text())
+      .trim()
+      .split('\n')
+      .map((l) => JSON.parse(l) as UploadLine);
+  };
+
+  it('counts up through the rows of the file, then gives the same result as the upload itself, touching no score', async () => {
+    const before = await everyScore();
+    const lines = await post(
+      await file({
+        Students: [
+          ['Student No.', 'Surname', 'First Name', 'Email', 'Group', 'Adviser'],
+          ['2099333331', 'Lim', 'Ria', 'ria@tambiz.test', 'PROGRESS GROUP', 'LIM, ANA'],
+          ['2099333332', 'Lim', 'Rio', 'rio@tambiz.test', 'PROGRESS GROUP', 'LIM, ANA'],
+        ],
+        Judges: [
+          ['Name', 'Email', 'Password'],
+          ['Progress Judge', 'progress.judge@tambiz.test', ''],
+        ],
+      }),
+    );
+    const progress = lines.flatMap((l) => ('progress' in l ? [l.progress] : []));
+    expect(progress.every((p) => p.of === 3 && p.students === 2 && p.judges === 1)).toBe(true);
+    expect(progress.map((p) => p.done)).toEqual([...progress.map((p) => p.done)].sort((a, b) => a - b));
+    expect(progress.map((p) => p.stage)).toEqual(['students', 'students', 'students', 'judges', 'saving', 'done']);
+    const last = lines.at(-1)!;
+    expect('result' in last && last.result).toMatchObject({ ok: true, message: expect.stringMatching(/2 new students.*1 new judge/) });
+    expect('result' in last && last.result.signIns.map((s) => s.login)).toEqual(['progress.judge@tambiz.test']);
+    expect(await everyScore()).toEqual(before);
+  });
+
+  it('says why a file is refused, as the upload does', async () => {
+    const lines = await post(new File(['hello'], 'notes.txt'));
+    expect(lines).toEqual([{ result: expect.objectContaining({ ok: false, message: expect.stringMatching(/does not look like an Excel \.xlsx file/) }) }]);
   });
 });

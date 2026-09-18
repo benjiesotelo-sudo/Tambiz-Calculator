@@ -39,6 +39,8 @@ export interface GridColumn {
   /** CSS grid track, for example '6rem' or 'minmax(12rem, 2fr)'. */
   width?: string;
   align?: 'left' | 'right' | 'center';
+  /** Draw a faint bar behind the cell, as wide as its sort number out of 100 (a percentage). Looks only. */
+  bar?: boolean;
 }
 
 export interface GridRow {
@@ -55,6 +57,8 @@ export interface GridRow {
   sort?: Record<string, number | null>;
   /** The maximum for this row's score cells, when it differs by row (one criterion per row). */
   max?: number;
+  /** Marked with the leader's gold edge (Results: the group ranked first overall). Looks only. */
+  lead?: boolean;
 }
 
 export interface CellChange {
@@ -305,6 +309,15 @@ const DEFAULT_WIDTH = 'minmax(6rem, 1fr)';
  * The CSS grid tracks for the columns. Each column keeps its minimum width while the table has room; in a narrower
  * table every minimum shrinks by the same share, so the columns always fit and none is cut off.
  */
+/** The narrowest the columns can be, in rem: below it, a wide screen scrolls the table inside its frame. */
+export function columnsMinRem(columns: GridColumn[]): number {
+  return columns.reduce((n, c) => {
+    const width = (c.width ?? DEFAULT_WIDTH).trim();
+    const m = /^([\d.]+)rem$/.exec(width) ?? /^minmax\(\s*([\d.]+)rem\s*,/.exec(width);
+    return n + (m ? Number(m[1]) : 0);
+  }, 0);
+}
+
 export function columnTracks(columns: GridColumn[]): string {
   const tracks = columns.map((c) => {
     const width = (c.width ?? DEFAULT_WIDTH).trim();

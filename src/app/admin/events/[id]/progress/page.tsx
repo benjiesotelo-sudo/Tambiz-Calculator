@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { AppBar, Notice } from '@/components/AppBar';
+import { EmptyState } from '@/components/EmptyState';
 import { EventHeader } from '@/components/EventNav';
 import { requireAdmin } from '@/lib/auth';
 import { eventJudges, eventReport, getEvent } from '@/lib/repo';
@@ -39,80 +40,112 @@ export default async function ProgressPage({ params, searchParams }: { params: P
           only those scores count. <span className="pill none">1 in progress · not counted</span> means a judge has started but not submitted: none of those scores
           count until the judge taps <b>Mark group complete</b>. Tap a group, or its Defense or Booth label, to see and correct its scores.
         </p>
-        <div className="grid">
-          {summary.map((x) => (
-            <div className="tile" key={x.h}>
-              <b>{event.rubric.halves[x.h].label}</b>
-              <div className="stat">
-                {x.withComplete}/{report.groups.length}
-              </div>
-              <div className="sub">
-                groups with a submitted sheet{x.withOpenOnly ? ` · ${x.withOpenOnly} more only in progress, not counted yet` : ''}
-              </div>
-            </div>
-          ))}
-        </div>
-
-        <div className="section-title">By group</div>
-        <ul className="list">
-          {report.groups.map((g) => (
-            <li key={g.id} style={{ display: 'block' }}>
-              <div style={{ display: 'flex', gap: 10, alignItems: 'baseline' }}>
-                <Link href={scoresHref(id, g.id)} className="title" style={{ color: 'inherit', textDecoration: 'none', minWidth: 0 }}>
-                  {g.name}
-                </Link>
-              </div>
-              {halves.map((h) => {
-                const done = report.sheets.filter((s) => s.group_id === g.id && s.half === h);
-                const part = report.openSheets.filter((s) => s.group_id === g.id && s.half === h && (report.filled.get(s.id) ?? 0) > 0);
-                const sheets = [...done, ...part];
-                return (
-                  <div key={h} className="judgechips" style={{ alignItems: 'center' }}>
-                    <Link href={scoresHref(id, g.id, h)} className={`pill ${h}`} style={{ minWidth: 70, textAlign: 'center', textDecoration: 'none' }}>
-                      {event.rubric.halves[h].label}
-                    </Link>
-                    {!done.length ? <span className="pill err">{part.length ? 'Nothing submitted' : 'No scores'}</span> : null}
-                    {done.length ? <span className="pill done">✓ {done.length} submitted</span> : null}
-                    {done.length === 1 ? <span className="pill part">only 1</span> : null}
-                    {part.length ? <span className="pill none">{part.length} in progress · not counted</span> : null}
-                    <span className="sub" style={{ overflowWrap: 'anywhere' }}>
-                      {[
-                        ...done.map((s) => `${s.judge_name} ✓`),
-                        ...part.map((s) => `${s.judge_name} (in progress, ${report.filled.get(s.id) ?? 0}/${needed[h]}, not counted)`),
-                      ].join(', ')}
-                    </span>
+        {!report.groups.length ? (
+          <EmptyState
+            icon="table"
+            title="No groups yet"
+            action={
+              <Link className="btn secondary" href={`/admin/events/${id}/students`}>
+                Go to the Data tab
+              </Link>
+            }
+          >
+            Groups come from the students’ rows in the workbook. Upload it, and each group appears here with its judges.
+          </EmptyState>
+        ) : !report.sheets.length && !report.openSheets.some((s) => (report.filled.get(s.id) ?? 0) > 0) ? (
+          <EmptyState
+            icon="compass"
+            title="Judging has not started"
+            action={
+              <Link className="btn secondary" href={`/admin/events/${id}/judges`}>
+                See the judges
+              </Link>
+            }
+          >
+            No judge has scored a group yet. Each judge signs in on their phone with the slip from the briefing, and their scores show here as they go.
+          </EmptyState>
+        ) : null}
+        {report.groups.length ? (
+          <>
+            <div className="grid">
+              {summary.map((x) => (
+                <div className="tile" key={x.h}>
+                  <b>{event.rubric.halves[x.h].label}</b>
+                  <div className="stat">
+                    {x.withComplete}/{report.groups.length}
                   </div>
+                  <div className="sub">
+                    groups with a submitted sheet{x.withOpenOnly ? ` · ${x.withOpenOnly} more only in progress, not counted yet` : ''}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="section-title">By group</div>
+            <ul className="list">
+              {report.groups.map((g) => (
+                <li key={g.id} style={{ display: 'block' }}>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'baseline' }}>
+                    <Link href={scoresHref(id, g.id)} className="title" style={{ color: 'inherit', textDecoration: 'none', minWidth: 0 }}>
+                      {g.name}
+                    </Link>
+                  </div>
+                  {halves.map((h) => {
+                    const done = report.sheets.filter((s) => s.group_id === g.id && s.half === h);
+                    const part = report.openSheets.filter((s) => s.group_id === g.id && s.half === h && (report.filled.get(s.id) ?? 0) > 0);
+                    const sheets = [...done, ...part];
+                    return (
+                      <div key={h} className="judgechips" style={{ alignItems: 'center' }}>
+                        <Link href={scoresHref(id, g.id, h)} className={`pill ${h}`} style={{ minWidth: 72, textAlign: 'center', textDecoration: 'none' }}>
+                          {event.rubric.halves[h].label}
+                        </Link>
+                        {!done.length ? <span className="pill err">{part.length ? 'Nothing submitted' : 'No scores'}</span> : null}
+                        {done.length ? <span className="pill done">✓ {done.length} submitted</span> : null}
+                        {done.length === 1 ? <span className="pill part">only 1</span> : null}
+                        {part.length ? <span className="pill none">{part.length} in progress · not counted</span> : null}
+                        <span className="sub" style={{ overflowWrap: 'anywhere' }}>
+                          {[
+                            ...done.map((s) => `${s.judge_name} ✓`),
+                            ...part.map((s) => `${s.judge_name} (in progress, ${report.filled.get(s.id) ?? 0}/${needed[h]}, not counted)`),
+                          ].join(', ')}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </li>
+              ))}
+            </ul>
+          </>
+        ) : null}
+
+        {judges.length ? (
+          <>
+            <div className="section-title">By judge</div>
+            <ul className="list">
+              {judges.map((j) => {
+                const submitted = report.sheets.filter((s) => s.judge_id === j.id);
+                const open = report.openSheets.filter((s) => s.judge_id === j.id);
+                return (
+                  <li key={j.id}>
+                    <span className="grow-1">
+                      <span className="title">{j.display_name}</span>
+                      <span className="sub" style={{ display: 'block' }}>
+                        {halves
+                          .map((h) => {
+                            const done = submitted.filter((s) => s.half === h).length;
+                            const part = open.filter((s) => s.half === h).length;
+                            return done || part ? `${event.rubric.halves[h].label}: ${done} submitted, ${part} in progress (not counted)` : null;
+                          })
+                          .filter(Boolean)
+                          .join(' · ') || 'Has not scored yet'}
+                      </span>
+                    </span>
+                  </li>
                 );
               })}
-            </li>
-          ))}
-          {!report.groups.length ? <li className="sub">No groups yet.</li> : null}
-        </ul>
-
-        <div className="section-title">By judge</div>
-        <ul className="list">
-          {judges.map((j) => {
-            const submitted = report.sheets.filter((s) => s.judge_id === j.id);
-            const open = report.openSheets.filter((s) => s.judge_id === j.id);
-            return (
-              <li key={j.id}>
-                <span className="grow-1">
-                  <span className="title">{j.display_name}</span>
-                  <span className="sub" style={{ display: 'block' }}>
-                    {halves
-                      .map((h) => {
-                        const done = submitted.filter((s) => s.half === h).length;
-                        const part = open.filter((s) => s.half === h).length;
-                        return done || part ? `${event.rubric.halves[h].label}: ${done} submitted, ${part} in progress (not counted)` : null;
-                      })
-                      .filter(Boolean)
-                      .join(' · ') || 'Has not scored yet'}
-                  </span>
-                </span>
-              </li>
-            );
-          })}
-        </ul>
+            </ul>
+          </>
+        ) : null}
 
       </main>
     </>

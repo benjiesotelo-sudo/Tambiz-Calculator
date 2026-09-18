@@ -11,9 +11,9 @@ The whole job, in one line: **you upload one workbook, the judges score on their
 - Your coordinator email and password.
 - One Excel workbook with two sheets, **Students** and **Judges** (Part C says exactly what goes in it; the app gives you an empty one to fill in).
 
-**Try it on the practice event first.** The app comes with an event called **PRACTICE · Tambiz 2027**. Every name, group, score and email in it is invented, and every screen of it says **Practice event** in a yellow bar. Try every part of this guide on it, then create the real event. Never score a real group in the practice event.
+**Try it on the practice event first.** The app comes with an event called **PRACTICE · Tambiz 2027**. Every name, group, score and email in it is invented, and every screen of it says **Practice event** in a shaded bar under the title. Try every part of this guide on it, then create the real event. Never score a real group in the practice event.
 
-If the app was set up before this version, its old sample event (called **Tambiz 2027**, with no yellow bar) is still there. On the **Events** page it shows **Sample data** and **Replace with fresh practice data**. Press it once, tick the box, and the old sample event, with its invented students, groups and scores, is replaced by the practice event. It is offered only for the sample event, never for an event you created.
+If the app was set up before this version, its old sample event (called **Tambiz 2027**, with no **Practice event** bar) is still there. On the **Events** page it shows **Sample data** and **Replace with fresh practice data**. Press it once, tick the box, and the old sample event, with its invented students, groups and scores, is replaced by the practice event. It is offered only for the sample event, never for an event you created.
 
 **Words used here**
 
@@ -33,7 +33,7 @@ The Data table, the Judges table, a group's scores, Results and Individual grade
 - Click a cell, or move to it with the arrow keys, and type. **Enter** goes down, **Tab** goes right (Shift+Tab left). **Esc** throws away what you typed in that cell. Tab past the very last cell leaves the table.
 - **F2** or a double-click puts the cursor inside the cell's text, to change part of it.
 - **To add a row, type in the empty last row.** It saves once its required cells are filled; until then the label says what it still needs.
-- **To paste from Excel:** copy the cells in Excel, click the cell where the top-left one should go, and press **Ctrl+V** (⌘V on a Mac). A yellow bar says how many cells will change and how many rows will be added, and the new values are highlighted in the table. Press **Enter** to apply or **Esc** to cancel. Rows past the end become new rows.
+- **To paste from Excel:** copy the cells in Excel, click the cell where the top-left one should go, and press **Ctrl+V** (⌘V on a Mac). A bar above the table says how many cells will change and how many rows will be added, and the new values are highlighted in the table. Press **Enter** to apply or **Esc** to cancel. Rows past the end become new rows.
 - **Shift** with the arrow keys selects several cells. **Ctrl+C** copies them to paste into Excel; **Delete** empties them; one value pasted over a selection fills all of it.
 - A cell with a list (a group, an adviser, Present or Absent) completes what you type, as Excel does. The rest of the best match appears in the cell, highlighted, so you can read what will be saved before you press a key: type `PAYONG P` and the cell shows PAYONG P**ALAY**. Keep typing to narrow it. **Down** shows the next match in the cell and **Up** the one before; the list under the cell shows the matches. **Enter** or **Tab** saves exactly what the cell shows, and only Enter or Tab accept a completion: clicking away or switching to another window or tab never saves one. **Esc** or **Backspace** removes the completion and keeps only what you typed (press **Esc** again to leave the cell unchanged). On the Data table, a **Group** or **Adviser** that is not on the list is taken as a new one: remove the completion, then press **Enter**.
 - **Ctrl+Delete** removes the selected row, after you press **Enter** to confirm. **Ctrl+Enter** opens the row's link, for example a group's scores.
@@ -123,7 +123,7 @@ A judge from an earlier year keeps their account and their record in Judge profi
 
 1. Save the workbook as **Excel Workbook (.xlsx)**.
 2. On the **Data** tab, press **Choose File**, pick the workbook, and press **Upload workbook**.
-3. A green message says what changed, for example "1 new student, 2 new judges". A yellow box lists anything in the file that was skipped and why. Correct those rows in Excel and upload again; uploading the same file twice never adds anyone twice.
+3. A green message says what changed, for example "1 new student, 2 new judges". A shaded box under it lists anything in the file that was skipped and why. While the upload runs, a bar under the button counts the rows of the file as they are checked, then says it is saving them all together. Correct those rows in Excel and upload again; uploading the same file twice never adds anyone twice.
 4. **If any judge got a password, a sign-in list appears: print it now.** It is laid out to fit one page, with each judge's name, email and password, to hand out at the judges' briefing. Press **Print this list**. **This is the only time the passwords are shown.** The app keeps no copy it can show again. A lost slip is fixed with **Reset password** on the Judges tab (Part E).
 
 **What uploading never does:**
@@ -187,7 +187,7 @@ Judges can score as soon as they are added to an event, until you close it.
 Give this part to the judges.
 
 1. Open the web address on your phone and sign in.
-2. At the top, tap **Defense** or **Booth**, whichever you are judging. The screen turns green for Defense and gold for Booth.
+2. At the top, tap **Defense** or **Booth**, whichever you are judging. The half you chose is named at the top of every group.
 3. Tap the group in front of you. You can search by group name or adviser.
 4. Check the group name at the top matches the group in front of you.
 5. You are on the first category. Each row has a number, the criterion, a large box, and the maximum beside it (for example **/20**).
@@ -204,7 +204,7 @@ About saving:
 - There is no Save button. Every score is kept on the phone the moment it is typed and sent in the background.
 - The label at the top right says **All saved**, **Sending 2…**, or **Offline · 3 kept on phone**.
 - If the connection drops, keep scoring. Do not close the browser's private tab or clear the browser. The scores send by themselves when the connection is back.
-- If it says **Sign in to send 3**, tap **Sign in again** in the yellow message, sign in, and open the same group again.
+- If it says **Sign in to send 3**, tap **Sign in again** in the message at the top, sign in, and open the same group again.
 - To change a group you already marked complete, open it and tap **Edit scores**. While you edit, that group's scores from you stop counting; tap **Mark group complete** again when you are done.
 
 ---
@@ -223,7 +223,7 @@ About saving:
 
 **Only a submitted sheet counts.** A sheet a judge started and never marked complete is left out of every percentage, rank, leaderboard, grade, both files and Judge profiles.
 
-If a group shows **No scores** or **Nothing submitted** in a half at the end of the night, find the judge for that half before closing the event. A gold **only 1** means a half has just one submitted sheet: it counts, but a second judge makes the result steadier.
+If a group shows **No scores** or **Nothing submitted** in a half at the end of the night, find the judge for that half before closing the event. An **only 1** means a half has just one submitted sheet: it counts, but a second judge makes the result steadier.
 
 ### Correcting a judge's score
 
@@ -235,7 +235,7 @@ You can correct any judge's score yourself, for example when a judge tells you t
 4. Click the judge's score and type the new one, then press **Enter**. Empty the cell to remove the score altogether. A score above that row's maximum is refused and stays red.
 5. The green message says what changed. The same reason is used for every correction until you change the box.
 
-The judge's own score is kept. The corrected cell turns yellow; select it and the line under the table says who corrected it, what the judge gave and your reason. **Corrections made** at the bottom of the page lists every correction with who and when (reload the page to see new ones there). The workbook's **Scores** and **Booth Scores** sheets list corrections in their last column.
+The judge's own score is kept. The corrected cell is shaded and underlined; select it and the line under the table says who corrected it, what the judge gave and your reason. **Corrections made** at the bottom of the page lists every correction with who and when (reload the page to see new ones there). The workbook's **Scores** and **Booth Scores** sheets list corrections in their last column.
 
 You can correct scores while the event is open and after it is closed, until the email file has been downloaded.
 
@@ -264,7 +264,7 @@ The **Results** tab has two views, **Groups** and **Individual grades**.
 
 1. Press the **Results** tab.
 2. **Top 10 for the awarding** shows one small card per category plus **Overall**: what is read out at the awarding. Groups that still share a place are listed alphabetically. Every group tied at 10th place is listed, so in a rare year a card shows eleven or more names; that is correct.
-3. **Every group** is a table of all the groups, one row each: the group and its adviser, each category's percentage with its rank after the dot (for example `91.00 · 1`), the **Overall**, its **Rank**, and whether the group is **Complete** or **Incomplete**. It starts in overall order.
+3. **Every group** is a table of all the groups, one row each: the group and its adviser, each category's percentage with its rank after the dot (for example `91.00 · 1`), the **Overall**, its **Rank**, and whether the group is **Complete** or **Incomplete**. It starts in overall order. A faint bar behind each percentage shows its size at a glance, and the group ranked first overall has a gold edge. Until any group has a complete category, the page shows **No results yet** in place of the Top 10 cards.
    - Click a column heading to sort by it, for example **Paper** to see the paper ranking.
    - Type in **Search** to find a group, or use the **Adviser** and **Judged** lists to show only some groups.
    - A category that is not fully scored shows its percentage with *incomplete* and no rank; nothing scored shows a dash.
@@ -322,7 +322,7 @@ Closing locks judging and hands over two files. You can undo it until you downlo
 2. Settle each item:
    - **"PINILI: no completed Booth sheet"** (or "a criterion nobody has scored"). Ask the judge to finish and tap **Mark group complete**. If the group genuinely cannot be fully judged, for example it never ran a booth, press **Close this group with the scores it has…**, type the reason, and press **Accept with this reason**. Its missing half stays out of its score; it is not counted as zero.
    - **"Andrea Dela Cruz (PAYONG PALAY) has incomplete individual scores."** Ask the defense judges to score them, correct the scores yourself (Part H), or, if the student missed the defense, press **Mark absent from the defense**.
-3. Read the gold **Check** items. They do not block closing: a half with only one completed sheet, and sheets a judge has not marked complete (their scores do not count).
+3. Read the **Check** items. They do not block closing: a half with only one completed sheet, and sheets a judge has not marked complete (their scores do not count).
 4. **Already decided by you** lists accepted groups and absent students, each with **Undo** or **Not absent**.
 5. **These people will get no email** lists advisers with no email and students with no grade. Add the missing adviser emails on the Data tab now.
 6. Tick **I have checked the progress** and press **Close the event**.

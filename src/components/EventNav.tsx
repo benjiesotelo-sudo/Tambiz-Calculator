@@ -27,7 +27,7 @@ export function PracticeBanner({ event }: { event: Pick<EventRow, 'practice'> })
 
 export function EventHeader({ event, tab, title }: { event: EventRow; tab: EventTab; title?: string }) {
   return (
-    <>
+    <header className="event-head">
       <div className="crumbs">
         <Link href="/admin">‹ All events</Link>
       </div>
@@ -38,12 +38,12 @@ export function EventHeader({ event, tab, title }: { event: EventRow; tab: Event
       <PracticeBanner event={event} />
       <nav className="tabs" aria-label="Event sections">
         {TABS.map(([k, label]) => (
-          <Link key={k} href={`/admin/events/${event.id}/${k}`} className={k === tab ? 'on' : ''}>
+          <Link key={k} href={`/admin/events/${event.id}/${k}`} className={k === tab ? 'on' : ''} aria-current={k === tab ? 'page' : undefined}>
             {label}
           </Link>
         ))}
       </nav>
-    </>
+    </header>
   );
 }
 

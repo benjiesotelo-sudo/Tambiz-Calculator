@@ -5,6 +5,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { saveCriteria } from '@/app/admin/actions';
+import { SubmitButton } from './SubmitButton';
 import { categoryMax, HALVES, MAX_WORDING, splitPastedLines, wordingField, type Rubric } from '@/lib/rubric';
 
 export function CriteriaForm({ eventId, rubric }: { eventId: string; rubric: Rubric }) {
@@ -90,9 +91,7 @@ export function CriteriaForm({ eventId, rubric }: { eventId: string; rubric: Rub
           <span className="sub" role="status">
             {note ?? `${filled} of ${fields.length} criteria have wording${dirty ? ' · not saved yet' : ''}`}
           </span>
-          <button className="btn" type="submit">
-            Save wording
-          </button>
+          <SubmitButton busy="Saving wording…">Save wording</SubmitButton>
         </div>
       </div>
     </form>

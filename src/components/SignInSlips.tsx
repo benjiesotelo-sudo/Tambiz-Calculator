@@ -4,6 +4,9 @@
 // only here: the app keeps a fingerprint of each, never the password, so they cannot be shown again. A lost slip is
 // replaced with Reset password on the Judges tab.
 
+import Image from 'next/image';
+import wordmark from '@/assets/brand/feu-wordmark.png';
+
 export interface SignInSlip {
   name: string;
   login: string;
@@ -29,6 +32,7 @@ export function SignInSlips({ slips, eventTitle, onDone }: { slips: SignInSlip[]
         can show again; if a slip is lost, use <b>Reset password</b> on the Judges tab.
       </p>
       <div className="slips">
+        <Image src={wordmark} alt="Far Eastern University" className="slips-brand" height={28} />
         <h2 className="slips-title">{eventTitle}: judges’ sign-in</h2>
         <p className="slips-sub">Open the Tambiz app on your phone and sign in with your email and password.</p>
         <table className="slips-table">

@@ -1,6 +1,8 @@
 import Link from 'next/link';
 import { AppBar, Notice } from '@/components/AppBar';
+import { EmptyState } from '@/components/EmptyState';
 import { statusLabel } from '@/components/EventNav';
+import { SubmitButton } from '@/components/SubmitButton';
 import { requireAdmin } from '@/lib/auth';
 import { query } from '@/lib/db';
 import { listEvents } from '@/lib/repo';
@@ -26,25 +28,31 @@ export default async function AdminHome({ searchParams }: { searchParams: Promis
         <h1 className="page-title">Events</h1>
         <p className="lead">Each year’s Tambiz is one event. Its students, groups, judges and scores all belong to it. A practice event is for trying the app out.</p>
         <Notice ok={sp.ok} error={sp.error} />
-        <ul className="list">
-          {events.map((e) => (
-            <li key={e.id} style={{ flexWrap: 'wrap' }}>
-              <Link className="rowlink" href={`/admin/events/${e.id}`}>
-                <span className="grow-1">
-                  <span className="title">{e.title}</span>
-                  <span className="sub" style={{ display: 'block' }}>
-                    {e.year}
-                    {e.practice ? ' · Practice: invented data, not a real event' : ''}
+        {events.length ? (
+          <ul className="list">
+            {events.map((e) => (
+              <li key={e.id} style={{ flexWrap: 'wrap' }}>
+                <Link className="rowlink" href={`/admin/events/${e.id}`}>
+                  <span className="grow-1">
+                    <span className="title">{e.title}</span>
+                    <span className="sub" style={{ display: 'block' }}>
+                      {e.year}
+                      {e.practice ? ' · Practice: invented data, not a real event' : ''}
+                    </span>
                   </span>
-                </span>
-                {e.practice ? <span className="pill part">Practice</span> : null}
-                <span className={`pill ${e.status === 'finalised' ? 'done' : 'none'}`}>{statusLabel(e)}</span>
-              </Link>
-              {replaceable.some((r) => r.id === e.id) ? <ReplaceSample size={replaceable.find((r) => r.id === e.id)!} /> : null}
-            </li>
-          ))}
-          {!events.length ? <li className="sub">No events yet. Create the first one below.</li> : null}
-        </ul>
+                  {e.practice ? <span className="pill part">Practice</span> : null}
+                  <span className={`pill ${e.status === 'finalised' ? 'done' : 'none'}`}>{statusLabel(e)}</span>
+                </Link>
+                {replaceable.some((r) => r.id === e.id) ? <ReplaceSample size={replaceable.find((r) => r.id === e.id)!} /> : null}
+              </li>
+            ))}
+          </ul>
+        ) : null}
+        {!events.length ? (
+          <EmptyState icon="compass" title="No events yet" action={<a className="btn secondary" href="#year">Start the first event</a>}>
+            Each year’s Tambiz is one event. Create the first one below, then upload its workbook.
+          </EmptyState>
+        ) : null}
 
         <div className="section-title">Start a new event</div>
         <form action={createEvent} className="card form">
@@ -59,9 +67,7 @@ export default async function AdminHome({ searchParams }: { searchParams: Promis
             </div>
           </div>
           <span className="sub">The scoring sheet is copied from the newest event, so this year’s maximums carry over.</span>
-          <button className="btn" type="submit">
-            Create event
-          </button>
+          <SubmitButton busy="Creating the event…">Create event</SubmitButton>
         </form>
       </main>
     </>
@@ -71,7 +77,7 @@ export default async function AdminHome({ searchParams }: { searchParams: Promis
 function ReplaceSample({ size }: { size: EventSize }) {
   const n = (count: number, one: string) => `${count} ${one}${count === 1 ? '' : 's'}`;
   return (
-    <details className="inline-form" style={{ margin: '4px 0 10px', flex: '1 1 100%' }}>
+    <details className="inline-form" style={{ margin: '8px 0 16px', flex: '1 1 100%' }}>
       <summary>
         <span className="pill none">Sample data</span> Replace with fresh practice data…
       </summary>
@@ -81,12 +87,12 @@ function ReplaceSample({ size }: { size: EventSize }) {
           This removes <b>{size.title}</b> and everything in it: {n(size.students, 'student')}, {n(size.groups, 'group')} and {n(size.sheets, 'score sheet')} from the judges. In its
           place comes the practice event, {PRACTICE_TITLE}, with invented data. Events you created are never touched, and no password changes.
         </div>
-        <label style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-          <input type="checkbox" name="confirm" value="yes" style={{ width: 22, height: 22, flex: '0 0 auto' }} /> Remove {size.title} and its scores
+        <label className="check">
+          <input type="checkbox" name="confirm" value="yes" /> Remove {size.title} and its scores
         </label>
-        <button className="btn small danger" type="submit">
+        <SubmitButton className="btn small danger" busy="Replacing…">
           Replace with fresh practice data
-        </button>
+        </SubmitButton>
       </form>
     </details>
   );

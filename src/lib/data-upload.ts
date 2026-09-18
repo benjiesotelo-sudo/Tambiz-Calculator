@@ -7,10 +7,10 @@
 
 import { logStatement } from './change-log';
 import { newId, query, transaction, type Statement } from './db';
-import { planJudges, planStudents, type ParsedWorkbook } from './data-workbook';
-import { LOCKED_CLOSED, LOCKED_SENT } from './locks';
+import { ImportError, parseWorkbook, planJudges, planStudents, type ParsedWorkbook } from './data-workbook';
+import { LOCKED_CLOSED, LOCKED_SENT, sentLock } from './locks';
 import { generatePassword, hashPassword } from './passwords';
-import type { EventRow } from './repo';
+import { getEvent, type EventRow } from './repo';
 
 /** A judge's sign-in details, shown once to print and hand out; never stored readable. */
 export interface SignIn {
@@ -28,7 +28,28 @@ export interface UploadResult {
 
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
-export async function applyUpload(event: EventRow, accountId: string, fileName: string, parsed: ParsedWorkbook): Promise<UploadResult> {
+/**
+ * How far an upload has got, out of the rows in the file: the students checked, then the judges set up (a new
+ * password takes a moment to secure), then everything saved together in one step. It only reports; it changes nothing.
+ */
+export interface UploadProgress {
+  stage: 'students' | 'judges' | 'saving' | 'done';
+  done: number;
+  of: number;
+  students: number;
+  judges: number;
+}
+
+/** One line of the upload route's answer. */
+export type UploadLine = { progress: UploadProgress } | { result: UploadResult };
+
+export async function applyUpload(
+  event: EventRow,
+  accountId: string,
+  fileName: string,
+  parsed: ParsedWorkbook,
+  onProgress?: (p: UploadProgress) => void,
+): Promise<UploadResult> {
   if (event.released_at) return { ok: false, message: LOCKED_SENT, problems: [], signIns: [] };
   if (event.status === 'finalised') return { ok: false, message: `${LOCKED_CLOSED} Then upload again.`, problems: [], signIns: [] };
 
@@ -36,6 +57,8 @@ export async function applyUpload(event: EventRow, accountId: string, fileName: 
   const statements: Statement[] = [];
   const counts = { studentsNew: 0, studentsChanged: 0, moved: 0, groupsNew: 0, advisersNew: 0, groupAdvisers: 0, judgesNew: 0, judgesAdded: 0, passwords: 0 };
   const emptied = new Set<string>();
+  const inFile = { students: parsed.students?.lines.length ?? 0, judges: parsed.judges?.lines.length ?? 0 };
+  const report = (stage: UploadProgress['stage'], done: number) => onProgress?.({ stage, done, of: inFile.students + inFile.judges, ...inFile });
 
   if (parsed.students) {
     const plan = planStudents(parsed.students);
@@ -100,7 +123,9 @@ export async function applyUpload(event: EventRow, accountId: string, fileName: 
     const byNumber = new Map(students.map((s) => [s.student_number, s]));
     // Columns the sheet lacks keep what the app has; the required ones are always there.
     const fields = (['surname', 'first_name', 'middle_name', 'section', 'email'] as const).filter((f) => has(f));
+    let checked = 0;
     for (const s of plan.students) {
+      report('students', Math.min(checked++, inFile.students));
       const groupId = groupIds.get(s.groupKey)!;
       const before = byNumber.get(s.student_number);
       if (!before) {
@@ -141,6 +166,8 @@ export async function applyUpload(event: EventRow, accountId: string, fileName: 
     }
   }
 
+  report('students', inFile.students);
+
   const signIns: SignIn[] = [];
   if (parsed.judges) {
     const plan = planJudges(parsed.judges);
@@ -150,7 +177,9 @@ export async function applyUpload(event: EventRow, accountId: string, fileName: 
        FROM account a WHERE lower(a.email) = ANY($1::text[])`,
       [plan.judges.map((j) => j.email), event.id],
     );
+    let set = 0;
     for (const j of plan.judges) {
+      report('judges', inFile.students + Math.min(set++, inFile.judges));
       const found = accounts.find((a) => a.email === j.email);
       if (found?.role === 'admin') {
         problems.push(`${j.email} is a coordinator’s sign-in, so it was not made a judge.`);
@@ -202,7 +231,9 @@ export async function applyUpload(event: EventRow, accountId: string, fileName: 
     },
     logStatement(event.id, accountId, 'workbook.upload', { file: fileName, ...counts, problems: problems.length }),
   );
+  report('saving', inFile.students + inFile.judges);
   await transaction(statements);
+  report('done', inFile.students + inFile.judges);
 
   const done = [
     [counts.studentsNew, 'new student'],
@@ -222,4 +253,22 @@ export async function applyUpload(event: EventRow, accountId: string, fileName: 
     `Uploaded ${fileName}: ${done.length ? done.join(', ') : 'nothing needed changing'}.` +
     `${missing.length ? ` The file had ${missing.join(', and ')}.` : ''} No one was removed and no score changed.`;
   return { ok: true, message, problems, signIns };
+}
+
+/**
+ * The whole upload from the Data tab, for a coordinator already checked by the caller: the server action and the
+ * upload route (which reports progress as it goes) both run exactly this.
+ */
+export async function uploadWorkbookFile(eventId: string, accountId: string, file: FormDataEntryValue | null, onProgress?: (p: UploadProgress) => void): Promise<UploadResult> {
+  const event = await getEvent(eventId);
+  if (!event) return { ok: false, message: 'This event no longer exists.', problems: [], signIns: [] };
+  const locked = sentLock(event);
+  if (locked) return { ok: false, message: locked, problems: [], signIns: [] };
+  if (!(file instanceof File) || file.size === 0) return { ok: false, message: 'Choose an Excel file first.', problems: [], signIns: [] };
+  try {
+    return await applyUpload(event, accountId, file.name, await parseWorkbook(await file.arrayBuffer()), onProgress);
+  } catch (e) {
+    if (e instanceof ImportError) return { ok: false, message: e.message, problems: [], signIns: [] };
+    throw e;
+  }
 }

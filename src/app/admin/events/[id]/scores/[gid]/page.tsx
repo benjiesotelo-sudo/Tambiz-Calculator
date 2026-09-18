@@ -73,7 +73,7 @@ export default async function GroupScoresPage({
         <Notice ok={sp.ok} error={sp.error} />
         <p className="lead">
           {group.adviser_name ?? 'No adviser'} · {group.member_count} member{group.member_count === 1 ? '' : 's'}. Every judge’s scores for this group, one column per judge. To correct a score, type the reason first, then type the new score over the old one (empty it to remove
-          the score). The judge’s own score is kept, the cell turns yellow, and selecting it shows what the judge gave and why it changed. Only submitted sheets count.
+          the score). The judge’s own score is kept, the cell is shaded and underlined, and selecting it shows what the judge gave and why it changed. Only submitted sheets count.
         </p>
         {half === 'defense' ? (
           <p className="sub">

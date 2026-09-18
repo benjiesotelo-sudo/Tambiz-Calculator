@@ -5,10 +5,9 @@ import { redirect } from 'next/navigation';
 import { requireAdmin } from '@/lib/auth';
 import { logStatement } from '@/lib/change-log';
 import { newId, one, query, transaction } from '@/lib/db';
-import { applyUpload, type UploadResult } from '@/lib/data-upload';
-import { ImportError, parseWorkbook } from '@/lib/data-workbook';
+import { uploadWorkbookFile, type UploadResult } from '@/lib/data-upload';
 import { itemsNeedYou } from '@/lib/finalise';
-import { LOCKED_SENT, sentLock } from '@/lib/locks';
+import { LOCKED_SENT } from '@/lib/locks';
 import { eventFinaliseChecks, eventReport, getEvent, listEvents } from '@/lib/repo';
 import { HALVES, rubricForNewEvent, withCriterionWording } from '@/lib/rubric';
 import { isSeedEvent, replaceSampleEvent } from '@/lib/seed';
@@ -158,19 +157,8 @@ export async function saveCriteria(fd: FormData) {
 /** Reads an uploaded workbook and applies it. Returns what happened, and each judge's password to print, shown once. */
 export async function uploadWorkbook(eventId: string, _previous: UploadResult | null, fd: FormData): Promise<UploadResult> {
   const acc = await requireAdmin();
-  const event = await getEvent(eventId);
-  if (!event) return { ok: false, message: 'This event no longer exists.', problems: [], signIns: [] };
-  const locked = sentLock(event);
-  if (locked) return { ok: false, message: locked, problems: [], signIns: [] };
-  const file = fd.get('file');
-  if (!(file instanceof File) || file.size === 0) return { ok: false, message: 'Choose an Excel file first.', problems: [], signIns: [] };
-  try {
-    const result = await applyUpload(event, acc.id, file.name, await parseWorkbook(await file.arrayBuffer()));
-    // The Data table below the form shows the students as they are now.
-    if (result.ok) refresh();
-    return result;
-  } catch (e) {
-    if (e instanceof ImportError) return { ok: false, message: e.message, problems: [], signIns: [] };
-    throw e;
-  }
+  const result = await uploadWorkbookFile(eventId, acc.id, fd.get('file'));
+  // The Data table below the form shows the students as they are now.
+  if (result.ok) refresh();
+  return result;
 }
