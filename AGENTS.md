@@ -23,7 +23,8 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - Scores above a criterion's maximum are refused (client `checkScore`, server `refuseReason` in `src/lib/sheet.ts`), never clamped.
 - Real student data must never be committed; `.gitignore` blocks `.xlsx`, `.csv` and `data/` directories, so do not name source folders `data`.
 - Look and feel (captain's premium finish, 18 September 2026): the palette, spacing scale, radii and rules (gold at most once per screen, green only on what is pressed, the alert colour only for trouble, motion off under `prefers-reduced-motion`) are the tokens and header comment of `src/app/globals.css`; brand images live in `src/assets/brand/` (the orange IABF crest only on the white sign-in card). The Data tab uploads through `src/app/api/admin/events/[id]/upload/route.ts`, which runs the same `uploadWorkbookFile` as the `uploadWorkbook` action and streams real progress.
-- Coordinator how-to: `docs/how-to-run-an-event.md`. Deployment: `README.md`.
+- Coordinator guide: the illustrated manual in `docs/manual/` (HTML source, images, PDF; rebuild steps in its README); a change to a screen or rule means updating it too. `docs/how-to-run-an-event.md` only points there. Deployment: `README.md`. Its pictures use invented data only; the private copy with account details lives outside the repository.
+- MIT covers the code, not the marks: the FEU and IABF images in `src/assets/brand/` are FEU's (`NOTICE`).
 
 ## Maintaining this file
 
